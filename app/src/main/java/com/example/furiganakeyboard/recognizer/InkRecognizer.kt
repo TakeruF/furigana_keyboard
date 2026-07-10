@@ -1,5 +1,7 @@
 package com.example.furiganakeyboard.recognizer
 
+data class RecognitionCandidate(val text: String, val score: Float)
+
 /**
  * Abstraction over a handwriting recognition engine.
  *
@@ -13,10 +15,10 @@ interface InkRecognizer {
 
     /**
      * Recognize [ink] asynchronously. [callback] is always invoked on the main
-     * thread with an ordered list of candidate strings (best first), or an empty
-     * list on failure.
+     * thread with candidates and their native scores (best first), or an empty
+     * list on failure. Higher scores are better.
      */
-    fun recognize(ink: HandwritingInk, callback: (List<String>) -> Unit)
+    fun recognize(ink: HandwritingInk, callback: (List<RecognitionCandidate>) -> Unit)
 
     /** Release any native/model resources. Safe to call multiple times. */
     fun close() {}

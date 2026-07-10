@@ -3,8 +3,13 @@ package com.example.furiganakeyboard.reading
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.example.furiganakeyboard.data.AssetInstaller
+import java.io.File
 
 data class WordReadingCandidate(val surface: String, val readings: List<String>)
+data class KanjiUsagePriority(val grade: Int, val frequency: Int) {
+    val isJoyo: Boolean get() = grade in 1..6 || grade == 8
+    val isJinmeiyo: Boolean get() = grade == 9 || grade == 10
+}
 
 /** Read-only access to the bundled KANJIDIC2 and JMdict snapshot. */
 class ReadingRepository(context: Context) : AutoCloseable {
@@ -17,6 +22,7 @@ class ReadingRepository(context: Context) : AutoCloseable {
             DB_FILE,
             DB_SHA256
         )
+        LEGACY_DB_FILES.forEach { name -> File(context.noBackupFilesDir, name).delete() }
         database = SQLiteDatabase.openDatabase(
             dbFile.absolutePath,
             null,
@@ -65,6 +71,29 @@ class ReadingRepository(context: Context) : AutoCloseable {
         return surfaces.map { WordReadingCandidate(it, readingsFor(it)) }
     }
 
+    /** Batch-load KANJIDIC grade/frequency for recognition candidate re-ranking. */
+    fun kanjiPriorities(literals: List<String>): Map<String, KanjiUsagePriority> {
+        val unique = literals.asSequence()
+            .filter { it.codePointCount(0, it.length) == 1 }
+            .distinct()
+            .toList()
+        if (unique.isEmpty()) return emptyMap()
+        val placeholders = List(unique.size) { "?" }.joinToString(",")
+        return database.rawQuery(
+            "SELECT literal, grade, frequency FROM kanji_priority WHERE literal IN ($placeholders)",
+            unique.toTypedArray()
+        ).use { cursor ->
+            buildMap {
+                while (cursor.moveToNext()) {
+                    put(
+                        cursor.getString(0),
+                        KanjiUsagePriority(cursor.getInt(1), cursor.getInt(2))
+                    )
+                }
+            }
+        }
+    }
+
     fun metadata(key: String): String? = database.rawQuery(
         "SELECT value FROM metadata WHERE key=?", arrayOf(key)
     ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
@@ -73,8 +102,9 @@ class ReadingRepository(context: Context) : AutoCloseable {
 
     companion object {
         private const val DB_ASSET = "reading.db"
-        private const val DB_FILE = "reading-v1.db"
+        private const val DB_FILE = "reading-v2.db"
         private const val DB_SHA256 =
-            "b505bacfb48bff9f328123dc4239104a2405cace90abdd098b5566d28948134f"
+            "75e8a3d1be161d54a9206ab61476f9c2fbb9d6049ca492d377ed4f6fa0cb82b5"
+        private val LEGACY_DB_FILES = listOf("reading-v1.db", "reading-v1.db.sha256")
     }
 }

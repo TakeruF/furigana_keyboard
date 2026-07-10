@@ -12,6 +12,6 @@ internal object NativeZinnia {
         height: Int,
         strokes: Array<FloatArray>,
         limit: Int
-    ): Array<String>
+    ): Array<RecognitionCandidate>
     external fun nativeDestroy(handle: Long)
 }

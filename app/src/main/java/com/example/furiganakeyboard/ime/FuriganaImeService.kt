@@ -15,6 +15,7 @@ import android.widget.FrameLayout
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.recognizer.InkRecognizer
+import com.example.furiganakeyboard.recognizer.KanjiCandidateRanker
 import com.example.furiganakeyboard.recognizer.ZinniaInkRecognizer
 import com.example.furiganakeyboard.settings.KeyboardPrefs
 import com.example.furiganakeyboard.settings.AppLocale
@@ -177,11 +178,15 @@ class FuriganaImeService : InputMethodService() {
     private fun wireHandwriting() {
         handwritingView.onRecognize = { ink ->
             ensureRecognizer().recognize(ink) { values ->
-                val candidates = values.map { value ->
-                    val resolved = readings.readingsFor(value)
+                val rankedValues = KanjiCandidateRanker.rank(
+                    values,
+                    readings.kanjiPriorities(values.map { it.text })
+                )
+                val candidates = rankedValues.map { value ->
+                    val resolved = readings.readingsFor(value.text)
                     CandidateUiModel(
-                        text = value,
-                        readings = if (resolved.isEmpty() && isHan(value)) {
+                        text = value.text,
+                        readings = if (resolved.isEmpty() && isHan(value.text)) {
                             listOf(getString(R.string.reading_unavailable))
                         } else resolved,
                         kind = CandidateKind.CHARACTER

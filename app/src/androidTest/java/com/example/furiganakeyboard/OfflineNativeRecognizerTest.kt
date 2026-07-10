@@ -38,7 +38,13 @@ class OfflineNativeRecognizerTest {
                 floatArrayOf(213f, 886f, 726f, 926f)
             )
             val candidates = NativeZinnia.nativeRecognize(handle, 1000, 1000, strokes, 10)
-            assertTrue("日 should be in top 10: ${candidates.toList()}", "日" in candidates)
+            assertTrue(
+                "日 should be in top 10: ${candidates.toList()}",
+                candidates.any { it.text == "日" }
+            )
+            assertTrue("native scores should be descending", candidates.toList().zipWithNext().all {
+                it.first.score >= it.second.score
+            })
 
             val durationsMs = List(20) {
                 measureNanoTime {
@@ -70,8 +76,8 @@ class OfflineNativeRecognizerTest {
     @Test
     fun bundledDictionaryPreparesWithinBudget() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        File(context.noBackupFilesDir, "reading-v1.db").delete()
-        File(context.noBackupFilesDir, "reading-v1.db.sha256").delete()
+        File(context.noBackupFilesDir, "reading-v2.db").delete()
+        File(context.noBackupFilesDir, "reading-v2.db.sha256").delete()
         var date: String? = null
         lateinit var exactWord: String
         lateinit var exactReadings: List<String>
@@ -81,6 +87,9 @@ class OfflineNativeRecognizerTest {
                 val candidate = it.suggest("日本").first()
                 exactWord = candidate.surface
                 exactReadings = candidate.readings
+                val priorities = it.kanjiPriorities(listOf("日", "本", "龍"))
+                assertTrue(priorities.getValue("日").isJoyo)
+                assertEquals(1, priorities.getValue("日").frequency)
             }
         } / 1_000_000.0
         assertTrue("dictionary preparation took ${prepareMs}ms", prepareMs <= 5_000.0)

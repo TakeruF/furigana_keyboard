@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path
 
 
-SCHEMA_VERSION = "1"
+SCHEMA_VERSION = "2"
 
 # The Tegaki JIS X 0208 label set contains the ditto mark 仝, which is not a
 # standalone KANJIDIC2 entry. It is the old-form equivalent of 同.
@@ -78,6 +78,12 @@ def create_schema(db: sqlite3.Connection) -> None:
             PRIMARY KEY (literal, kind, position)
         ) WITHOUT ROWID;
 
+        CREATE TABLE kanji_priority (
+            literal TEXT PRIMARY KEY,
+            grade INTEGER NOT NULL,
+            frequency INTEGER NOT NULL
+        ) WITHOUT ROWID;
+
         CREATE TABLE word_reading (
             surface TEXT NOT NULL,
             reading TEXT NOT NULL,
@@ -91,11 +97,13 @@ def create_schema(db: sqlite3.Connection) -> None:
     )
 
 
-def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, str]:
+def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, int, str]:
     characters = 0
     readings = 0
+    prioritized = 0
     creation_date = "unknown"
     batch: list[tuple[str, str, int, int]] = []
+    priority_batch: list[tuple[str, int, int]] = []
     with gzip.open(source, "rb") as stream:
         for event, elem in ET.iterparse(stream, events=("end",)):
             if elem.tag == "date_of_creation" and elem.text:
@@ -103,6 +111,11 @@ def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, str
             elif elem.tag == "character":
                 literal = elem.findtext("literal")
                 if literal:
+                    grade = int(elem.findtext("./misc/grade") or 0)
+                    frequency = int(elem.findtext("./misc/freq") or 0)
+                    priority_batch.append((literal, grade, frequency))
+                    if grade or frequency:
+                        prioritized += 1
                     position = {0: 0, 1: 0, 2: 0}
                     for node in elem.findall("./reading_meaning/rmgroup/reading"):
                         reading_type = node.attrib.get("r_type")
@@ -130,8 +143,18 @@ def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, str
                     "INSERT OR IGNORE INTO kanji_reading VALUES (?, ?, ?, ?)", batch
                 )
                 batch.clear()
+            if len(priority_batch) >= 20_000:
+                db.executemany(
+                    "INSERT OR REPLACE INTO kanji_priority VALUES (?, ?, ?)",
+                    priority_batch,
+                )
+                priority_batch.clear()
     if batch:
         db.executemany("INSERT OR IGNORE INTO kanji_reading VALUES (?, ?, ?, ?)", batch)
+    if priority_batch:
+        db.executemany(
+            "INSERT OR REPLACE INTO kanji_priority VALUES (?, ?, ?)", priority_batch
+        )
     for literal, values in MODEL_READING_OVERRIDES.items():
         for pos, (reading, kind) in enumerate(values):
             db.execute(
@@ -139,7 +162,7 @@ def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, str
                 (literal, reading, kind, pos),
             )
             readings += 1
-    return characters, readings, creation_date
+    return characters, readings, prioritized, creation_date
 
 
 def import_jmdict(db: sqlite3.Connection, source: Path) -> tuple[int, int]:
@@ -226,7 +249,9 @@ def main() -> int:
     db = sqlite3.connect(args.output)
     try:
         create_schema(db)
-        chars, kanji_readings, kanjidic_date = import_kanjidic(db, args.kanjidic)
+        chars, kanji_readings, kanji_priorities, kanjidic_date = import_kanjidic(
+            db, args.kanjidic
+        )
         entries, word_pairs = import_jmdict(db, args.jmdict)
         labels = model_labels(args.model_archive)
         han_labels, missing = validate(db, labels)
@@ -238,6 +263,7 @@ def main() -> int:
             "model_archive_sha256": sha256(args.model_archive),
             "kanji_characters": str(chars),
             "kanji_readings": str(kanji_readings),
+            "kanji_priorities": str(kanji_priorities),
             "jmdict_entries": str(entries),
             "word_pairs": str(word_pairs),
             "model_labels": str(len(labels)),

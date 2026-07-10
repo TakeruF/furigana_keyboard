@@ -12,7 +12,9 @@ class ReadingDatabaseTest {
     @Test
     fun databaseMeetsCoverageContract() {
         connect().use { db ->
+            assertEquals("2", metadata(db, "schema_version"))
             assertEquals("13108", metadata(db, "kanji_characters"))
+            assertTrue(metadata(db, "kanji_priorities").toInt() >= 3_000)
             assertEquals("6356", metadata(db, "model_han_labels"))
             assertEquals("0", metadata(db, "model_missing_readings"))
             assertTrue(metadata(db, "word_pairs").toInt() >= 240_000)
@@ -26,6 +28,22 @@ class ReadingDatabaseTest {
             assertTrue(readings(db, "𠮟", "kanji_reading").isNotEmpty())
             assertEquals(listOf("ドウ", "おな.じ"), readings(db, "仝", "kanji_reading"))
             assertTrue(readings(db, "鬥", "kanji_reading").contains("とうがまえ"))
+        }
+    }
+
+    @Test
+    fun kanjidicIncludesJoyoAndFrequencyPriority() {
+        connect().use { db ->
+            db.prepareStatement(
+                "SELECT grade, frequency FROM kanji_priority WHERE literal=?"
+            ).use { statement ->
+                statement.setString(1, "日")
+                statement.executeQuery().use { result ->
+                    assertTrue(result.next())
+                    assertEquals(1, result.getInt(1))
+                    assertEquals(1, result.getInt(2))
+                }
+            }
         }
     }
 

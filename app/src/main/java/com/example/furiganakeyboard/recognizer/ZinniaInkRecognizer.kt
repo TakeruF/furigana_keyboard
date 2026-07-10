@@ -53,7 +53,7 @@ class ZinniaInkRecognizer(context: Context) : InkRecognizer {
         }
     }
 
-    override fun recognize(ink: HandwritingInk, callback: (List<String>) -> Unit) {
+    override fun recognize(ink: HandwritingInk, callback: (List<RecognitionCandidate>) -> Unit) {
         if (ink.isEmpty || closed) {
             callback(emptyList())
             return
@@ -74,7 +74,7 @@ class ZinniaInkRecognizer(context: Context) : InkRecognizer {
                         }
                     }.toTypedArray(),
                     RESULT_LIMIT
-                ).distinct()
+                ).distinctBy { it.text }
             } catch (error: Throwable) {
                 Log.e(TAG, "Offline recognition failed", error)
                 postState(InkRecognizer.State.ERROR)

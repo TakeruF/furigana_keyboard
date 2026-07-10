@@ -2,11 +2,11 @@ Reading data snapshot generated 2026-07-10
 
 KANJIDIC2
 URL: https://www.edrdg.org/kanjidic/kanjidic2.xml.gz
-SHA-256: f3886f34f006d4c27db0395c63542b4369b6137d8efe08ed49c64b83a64664a2
+SHA-256: 9786f2c2c7df568da5042e4c9bbb3f23667895ddb5c64d82d585d8a1616b85b0
 
 JMdict (English subset; Japanese surfaces/readings are complete)
 URL: https://www.edrdg.org/pub/Nihongo/JMdict_e.gz
-SHA-256: 8c7f399e5918bd511609b2b62052977153c22257f569624522aad546be8677dc
+SHA-256: 99ecf0435b523c99114dc9680bc940738eb8d131691b2f794e67b8a0d5ed32b3
 
 Tegaki Zinnia Japanese 0.3 model archive
 URL: https://cdn.netbsd.org/pub/pkgsrc/distfiles/tegaki-zinnia-japanese-0.3.zip

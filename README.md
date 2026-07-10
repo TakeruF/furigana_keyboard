@@ -12,7 +12,9 @@ downloads are unavailable.
   0208 kanji labels plus hiragana and katakana.
 - KANJIDIC2 snapshot with 13,108 characters and 40,510 Japanese on, kun,
   nanori, and radical-name readings.
-- JMdict snapshot with 217,810 entries and 247,627 surface/reading pairs.
+- JMdict snapshot with 217,819 entries and 247,673 surface/reading pairs.
+- KANJIDIC2 school/Jōyō grade and newspaper-frequency metadata gently
+  re-ranks visually close kanji candidates toward commonly used characters.
 - Unicode-code-point-safe composition, including supplementary-plane kanji.
 - Word completion from the current handwritten composition. Exact JMdict
   readings are shown instead of guessed per-character concatenations. After

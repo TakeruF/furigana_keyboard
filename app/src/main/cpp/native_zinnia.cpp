@@ -82,12 +82,20 @@ Java_com_example_furiganakeyboard_recognizer_NativeZinnia_nativeRecognize(
     return nullptr;
   }
 
-  jclass string_class = env->FindClass("java/lang/String");
+  jclass candidate_class = env->FindClass(
+      "com/example/furiganakeyboard/recognizer/RecognitionCandidate");
+  if (candidate_class == nullptr) return nullptr;
+  jmethodID constructor = env->GetMethodID(
+      candidate_class, "<init>", "(Ljava/lang/String;F)V");
+  if (constructor == nullptr) return nullptr;
   jobjectArray output = env->NewObjectArray(static_cast<jsize>(result->size()),
-                                             string_class, nullptr);
+                                             candidate_class, nullptr);
   for (size_t i = 0; i < result->size(); ++i) {
     jstring value = env->NewStringUTF(result->value(i));
-    env->SetObjectArrayElement(output, static_cast<jsize>(i), value);
+    jobject candidate = env->NewObject(
+        candidate_class, constructor, value, static_cast<jfloat>(result->score(i)));
+    env->SetObjectArrayElement(output, static_cast<jsize>(i), candidate);
+    env->DeleteLocalRef(candidate);
     env->DeleteLocalRef(value);
   }
   return output;
