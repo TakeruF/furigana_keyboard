@@ -12,7 +12,7 @@ class ReadingDatabaseTest {
     @Test
     fun databaseMeetsCoverageContract() {
         connect().use { db ->
-            assertEquals("2", metadata(db, "schema_version"))
+            assertEquals("3", metadata(db, "schema_version"))
             assertEquals("13108", metadata(db, "kanji_characters"))
             assertTrue(metadata(db, "kanji_priorities").toInt() >= 3_000)
             assertEquals("6356", metadata(db, "model_han_labels"))
@@ -54,6 +54,30 @@ class ReadingDatabaseTest {
             assertEquals("おとな", readings(db, "大人", "word_reading").first())
             val japan = readings(db, "日本", "word_reading").take(2).toSet()
             assertEquals(setOf("にっぽん", "にほん"), japan)
+        }
+    }
+
+    @Test
+    fun jmdictSupportsIndexedReadingPrefixConversion() {
+        connect().use { db ->
+            val indexes = db.metaData.getIndexInfo(null, null, "word_reading", false, false).use { result ->
+                buildSet { while (result.next()) result.getString("INDEX_NAME")?.let(::add) }
+            }
+            assertTrue(indexes.contains("word_reading_reading_rank"))
+            db.prepareStatement(
+                """SELECT surface FROM word_reading
+                   WHERE reading>=? AND reading<?
+                   ORDER BY CASE WHEN reading=? THEN 0 ELSE 1 END, priority, length(surface), surface
+                   LIMIT 20"""
+            ).use { statement ->
+                statement.setString(1, "にほん")
+                statement.setString(2, "にほん" + String(Character.toChars(Character.MAX_CODE_POINT)))
+                statement.setString(3, "にほん")
+                statement.executeQuery().use { result ->
+                    val surfaces = buildList { while (result.next()) add(result.getString(1)) }
+                    assertTrue(surfaces.contains("日本"))
+                }
+            }
         }
     }
 

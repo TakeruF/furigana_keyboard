@@ -71,6 +71,40 @@ class ReadingRepository(context: Context) : AutoCloseable {
         return surfaces.map { WordReadingCandidate(it, readingsFor(it)) }
     }
 
+    /** JMdict conversion candidates whose kana reading starts with [prefix]. */
+    fun suggestByReading(prefix: String, limit: Int = 8): List<WordReadingCandidate> {
+        if (prefix.isEmpty()) return emptyList()
+        val upperBound = prefix + String(Character.toChars(Character.MAX_CODE_POINT))
+        val surfaces = database.rawQuery(
+            """SELECT surface, min(priority) AS best_priority,
+                      min(CASE WHEN reading=? THEN 0 ELSE 1 END) AS exact_match
+               FROM word_reading
+               WHERE reading>=? AND reading<?
+               GROUP BY surface
+               ORDER BY exact_match, best_priority, length(surface), surface
+               LIMIT ?""",
+            arrayOf(prefix, prefix, upperBound, limit.toString())
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(cursor.getString(0))
+            }
+        }
+        return surfaces.map { surface ->
+            val matchingReadings = database.rawQuery(
+                """SELECT reading FROM word_reading
+                   WHERE surface=? AND reading>=? AND reading<?
+                   ORDER BY CASE WHEN reading=? THEN 0 ELSE 1 END, priority, reading
+                   LIMIT 3""",
+                arrayOf(surface, prefix, upperBound, prefix)
+            ).use { cursor ->
+                buildList {
+                    while (cursor.moveToNext()) add(cursor.getString(0))
+                }
+            }
+            WordReadingCandidate(surface, matchingReadings)
+        }
+    }
+
     /** Batch-load KANJIDIC grade/frequency for recognition candidate re-ranking. */
     fun kanjiPriorities(literals: List<String>): Map<String, KanjiUsagePriority> {
         val unique = literals.asSequence()
@@ -102,9 +136,12 @@ class ReadingRepository(context: Context) : AutoCloseable {
 
     companion object {
         private const val DB_ASSET = "reading.db"
-        private const val DB_FILE = "reading-v2.db"
+        private const val DB_FILE = "reading-v3.db"
         private const val DB_SHA256 =
-            "75e8a3d1be161d54a9206ab61476f9c2fbb9d6049ca492d377ed4f6fa0cb82b5"
-        private val LEGACY_DB_FILES = listOf("reading-v1.db", "reading-v1.db.sha256")
+            "2d32ffc75a600ca090724ceeece4c70c1630ecd1bf16eca4383a67b2ba27a3ae"
+        private val LEGACY_DB_FILES = listOf(
+            "reading-v1.db", "reading-v1.db.sha256",
+            "reading-v2.db", "reading-v2.db.sha256"
+        )
     }
 }

@@ -5,12 +5,11 @@
     <string name="settings_title">Furigana Keyboard</string>
 
     <string name="key_symbol">Symbols</string>
-    <string name="key_abc">ABC</string>
-    <string name="key_settings">Settings</string>
-    <string name="key_keyboard_switch">⌨</string>
     <string name="key_keyboard_switch_desc">Switch keyboard</string>
     <string name="key_numbers">123</string>
-    <string name="key_settings_short">⚙</string>
+    <string name="key_english" translatable="false">abc</string>
+    <string name="key_romaji_japanese" translatable="false">あ</string>
+    <string name="key_english_input_desc">English typing</string>
     <string name="key_romaji_input_desc">Romaji input</string>
     <string name="key_delete_desc">Delete</string>
     <string name="key_punctuation_comma" translatable="false">、</string>

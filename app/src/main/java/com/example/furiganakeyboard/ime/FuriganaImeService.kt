@@ -1,6 +1,5 @@
 package com.example.furiganakeyboard.ime
 
-import android.content.Intent
 import android.content.Context
 import android.inputmethodservice.InputMethodService
 import android.view.KeyEvent
@@ -21,7 +20,6 @@ import com.example.furiganakeyboard.recognizer.ZinniaInkRecognizer
 import com.example.furiganakeyboard.settings.KeyboardPrefs
 import com.example.furiganakeyboard.settings.AppLocale
 import com.example.furiganakeyboard.settings.ReadingMode
-import com.example.furiganakeyboard.settings.SettingsActivity
 import com.example.furiganakeyboard.view.CandidateBarView
 import com.example.furiganakeyboard.view.CandidateKind
 import com.example.furiganakeyboard.view.CandidateUiModel
@@ -33,7 +31,7 @@ import com.example.furiganakeyboard.view.SymbolPadView
 
 /** Japanese handwriting IME with fully bundled recognition and reading data. */
 class FuriganaImeService : InputMethodService() {
-    private enum class Panel { HANDWRITING, SYMBOLS, QWERTY }
+    private enum class Panel { HANDWRITING, SYMBOLS, ENGLISH, ROMAJI }
 
     private lateinit var prefs: KeyboardPrefs
     private lateinit var readings: ReadingRepository
@@ -41,7 +39,8 @@ class FuriganaImeService : InputMethodService() {
     private lateinit var handwritingView: HandwritingView
     private lateinit var handwritingPanel: View
     private lateinit var symbolPad: SymbolPadView
-    private lateinit var qwertyPad: QwertyPadView
+    private lateinit var englishPad: QwertyPadView
+    private lateinit var romajiPad: QwertyPadView
     private lateinit var enterKey: Button
 
     private val composition = CompositionBuffer()
@@ -51,6 +50,7 @@ class FuriganaImeService : InputMethodService() {
     private var latestCharacterAlternatives: List<String> = emptyList()
     private var wordRootBeforeLastCharacter = ""
     private var lastCharacterAlternatives: List<String> = emptyList()
+    private var romajiRaw = ""
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -86,6 +86,7 @@ class FuriganaImeService : InputMethodService() {
             setInputView(onCreateInputView())
         }
         composition.clear()
+        romajiRaw = ""
         clearAlternativeContext()
         Haptics.enabled = prefs.haptics
         applyReadingMode(prefs.readingMode)
@@ -141,8 +142,9 @@ class FuriganaImeService : InputMethodService() {
 
     private fun buildExtraPanels(container: FrameLayout) {
         symbolPad = SymbolPadView(this)
-        qwertyPad = QwertyPadView(this)
-        for (pad in listOf<View>(symbolPad, qwertyPad)) {
+        englishPad = QwertyPadView(this)
+        romajiPad = QwertyPadView(this)
+        for (pad in listOf<View>(symbolPad, englishPad, romajiPad)) {
             pad.visibility = View.GONE
             container.addView(
                 pad,
@@ -153,13 +155,17 @@ class FuriganaImeService : InputMethodService() {
             )
         }
         symbolPad.onText = { commitDirect(it) }
-        qwertyPad.onText = { commitDirect(it) }
+        englishPad.onText = { commitDirect(it) }
+        romajiPad.onText = { appendRomajiInput(it) }
         symbolPad.onDelete = { deleteBeforeCursor() }
-        qwertyPad.onDelete = { deleteBeforeCursor() }
+        englishPad.onDelete = { deleteBeforeCursor() }
+        romajiPad.onDelete = { deleteRomajiInput() }
         symbolPad.onEnter = { sendEnter() }
-        qwertyPad.onEnter = { sendEnter() }
+        englishPad.onEnter = { sendEnter() }
+        romajiPad.onEnter = { sendEnter() }
         symbolPad.onBack = { switchPanel(Panel.HANDWRITING) }
-        qwertyPad.onBack = { switchPanel(Panel.HANDWRITING) }
+        englishPad.onBack = { switchPanel(Panel.HANDWRITING) }
+        romajiPad.onBack = { switchPanel(Panel.HANDWRITING) }
     }
 
     private fun switchPanel(panel: Panel) {
@@ -171,7 +177,8 @@ class FuriganaImeService : InputMethodService() {
         currentPanel = panel
         handwritingPanel.visibility = if (panel == Panel.HANDWRITING) View.VISIBLE else View.GONE
         symbolPad.visibility = if (panel == Panel.SYMBOLS) View.VISIBLE else View.GONE
-        qwertyPad.visibility = if (panel == Panel.QWERTY) View.VISIBLE else View.GONE
+        englishPad.visibility = if (panel == Panel.ENGLISH) View.VISIBLE else View.GONE
+        romajiPad.visibility = if (panel == Panel.ROMAJI) View.VISIBLE else View.GONE
     }
 
     private fun wireHandwriting() {
@@ -322,14 +329,8 @@ class FuriganaImeService : InputMethodService() {
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }
         root.findViewById<Button>(R.id.keySymbol).onKey { switchPanel(Panel.SYMBOLS) }
-        root.findViewById<Button>(R.id.keyAbc).onKey { switchPanel(Panel.QWERTY) }
-        root.findViewById<Button>(R.id.keySettings).onKey {
-            finishComposition()
-            startActivity(
-                Intent(this, SettingsActivity::class.java)
-                    .addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-            )
-        }
+        root.findViewById<Button>(R.id.keyEnglish).onKey { switchPanel(Panel.ENGLISH) }
+        root.findViewById<Button>(R.id.keyRomaji).onKey { switchPanel(Panel.ROMAJI) }
         root.findViewById<Button>(R.id.keyRewrite).onKey {
             handwritingView.clear()
             showWordSuggestions()
@@ -356,7 +357,60 @@ class FuriganaImeService : InputMethodService() {
         }
         enterKey.text = label
         symbolPad.setEnterLabel(label)
-        qwertyPad.setEnterLabel(label)
+        englishPad.setEnterLabel(label)
+        romajiPad.setEnterLabel(label)
+    }
+
+    private fun appendRomajiInput(text: String) {
+        if (text.length == 1 && text[0].isLetter() && text[0].code < 128) {
+            romajiRaw += text.lowercase()
+            updateRomajiComposition()
+        } else {
+            commitDirect(text)
+        }
+    }
+
+    private fun updateRomajiComposition() {
+        val converted = RomajiKanaConverter.convert(romajiRaw)
+        val display = converted.displayText
+        composition.replace(display)
+        clearAlternativeContext()
+        currentInputConnection?.setComposingText(display, 1)
+
+        if (converted.pending.isNotEmpty() || converted.kana.isEmpty()) {
+            candidateBar.setCandidates(
+                listOf(CandidateUiModel(display, kind = CandidateKind.WORD))
+            )
+            return
+        }
+
+        val dictionaryCandidates = readings.suggestByReading(converted.kana).map {
+            CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
+        }
+        val kanaCandidate = CandidateUiModel(
+            converted.kana,
+            listOf(converted.kana),
+            CandidateKind.WORD
+        )
+        candidateBar.setCandidates(
+            (dictionaryCandidates + kanaCandidate).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
+        )
+    }
+
+    private fun deleteRomajiInput() {
+        if (romajiRaw.isEmpty()) {
+            deleteBeforeCursor()
+            return
+        }
+        romajiRaw = romajiRaw.dropLast(1)
+        if (romajiRaw.isEmpty()) {
+            composition.clear()
+            currentInputConnection?.setComposingText("", 1)
+            currentInputConnection?.finishComposingText()
+            candidateBar.clear()
+        } else {
+            updateRomajiComposition()
+        }
     }
 
     private fun commitDirect(text: String) {
@@ -367,6 +421,7 @@ class FuriganaImeService : InputMethodService() {
     private fun finishComposition(clearCandidates: Boolean = true) {
         if (!composition.isEmpty) currentInputConnection?.finishComposingText()
         composition.clear()
+        romajiRaw = ""
         clearAlternativeContext()
         if (clearCandidates && this::candidateBar.isInitialized) candidateBar.clear()
     }
@@ -376,7 +431,10 @@ class FuriganaImeService : InputMethodService() {
         if (!composition.isEmpty) {
             val remaining = composition.deleteLastCodePoint()
             clearAlternativeContext()
-            if (remaining.isEmpty()) connection.finishComposingText()
+            if (remaining.isEmpty()) {
+                connection.setComposingText("", 1)
+                connection.finishComposingText()
+            }
             else connection.setComposingText(remaining, 1)
             showWordSuggestions()
             return

@@ -140,8 +140,7 @@
                     android:layout_margin="3dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/key_keyboard_switch_desc"
-                    android:text="@string/key_keyboard_switch"
-                    android:textSize="20sp" />
+                    android:drawableTop="@drawable/ic_globe_keyboard" />
 
                 <Button
                     android:id="@+id/keySymbol"
@@ -155,15 +154,15 @@
                     android:textSize="16sp" />
 
                 <Button
-                    android:id="@+id/keySettings"
-                    style="@style/SideKey"
+                    android:id="@+id/keyEnglish"
+                    style="@style/SideKey.Plain"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_margin="3dp"
                     android:layout_weight="1"
-                    android:contentDescription="@string/key_settings"
-                    android:text="@string/key_settings_short"
-                    android:textSize="19sp" />
+                    android:contentDescription="@string/key_english_input_desc"
+                    android:text="@string/key_english"
+                    android:textSize="16sp" />
 
                 <Button
                     android:id="@+id/keySpace"
@@ -176,15 +175,15 @@
                     android:textSize="13sp" />
 
                 <Button
-                    android:id="@+id/keyAbc"
+                    android:id="@+id/keyRomaji"
                     style="@style/SideKey.Plain"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_margin="3dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/key_romaji_input_desc"
-                    android:text="@string/key_abc"
-                    android:textSize="17sp" />
+                    android:text="@string/key_romaji_japanese"
+                    android:textSize="18sp" />
 
                 <Button
                     android:id="@+id/keyEnter"

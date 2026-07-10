@@ -18,7 +18,7 @@ import zipfile
 from pathlib import Path
 
 
-SCHEMA_VERSION = "2"
+SCHEMA_VERSION = "3"
 
 # The Tegaki JIS X 0208 label set contains the ditto mark 仝, which is not a
 # standalone KANJIDIC2 entry. It is the old-form equivalent of 同.
@@ -93,6 +93,9 @@ def create_schema(db: sqlite3.Connection) -> None:
 
         CREATE INDEX word_reading_rank
             ON word_reading(surface, priority, reading);
+
+        CREATE INDEX word_reading_reading_rank
+            ON word_reading(reading, priority, surface);
         """
     )
 
