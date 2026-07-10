@@ -1,0 +1,29 @@
+Reading data snapshot generated 2026-07-10
+
+KANJIDIC2
+URL: https://www.edrdg.org/kanjidic/kanjidic2.xml.gz
+SHA-256: f3886f34f006d4c27db0395c63542b4369b6137d8efe08ed49c64b83a64664a2
+
+JMdict (English subset; Japanese surfaces/readings are complete)
+URL: https://www.edrdg.org/pub/Nihongo/JMdict_e.gz
+SHA-256: 8c7f399e5918bd511609b2b62052977153c22257f569624522aad546be8677dc
+
+Tegaki Zinnia Japanese 0.3 model archive
+URL: https://cdn.netbsd.org/pub/pkgsrc/distfiles/tegaki-zinnia-japanese-0.3.zip
+SHA-256: 07861bbb5440d74e705864721f12a5ce1c7f21a869f9c95ff21433d8994aafda
+Bundled handwriting-ja.model SHA-256: d58618576d12c1ea38992606f30d19158a0a3beda3ac23bacccf1e48e651f2b2
+
+Zinnia 0.07 runtime source
+URL: https://github.com/taku910/zinnia/commit/581faa8f6f15e4a7b21964be3a5ec36265c80e5b
+Archive SHA-256: 355c12ee6ba7f2b75bee72e47a2723a5bfd6c134060aa68a056c2253e1c90a5b
+
+Run:
+python3 tools/build_reading_db.py \
+  --kanjidic kanjidic2.xml.gz \
+  --jmdict JMdict_e.gz \
+  --model-archive tegaki-zinnia-japanese-0.3.zip \
+  --output app/src/main/assets/reading.db
+
+Coverage note: the model label 仝 is an old-form ditto mark absent as a
+standalone KANJIDIC2 entry. The generator supplies the equivalent 同 readings
+(ドウ／おなじ). Radical-only entries use KANJIDIC2 rad_name values.
