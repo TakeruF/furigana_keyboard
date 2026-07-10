@@ -1,0 +1,28 @@
+Furigana Keyboard Terms of Use
+Effective: July 10, 2026
+
+1. Scope
+These terms govern use of Furigana Keyboard, provided by the Furigana Keyboard Project. By using the app, you agree to these terms.
+
+2. Service
+The app provides Japanese handwriting recognition, reading display, dictionary candidates, and text entry as an Android input method. Recognition and dictionary lookup run on the device.
+
+3. User responsibility
+You must use the app in accordance with applicable law and the rights of others. You may not use it for unlawful activity, rights infringement, or to harm another person.
+
+4. Recognition and dictionary limitations
+Handwriting recognition, readings, and word candidates are not guaranteed to be accurate. Guaranteed handwriting scope is limited to 6,356 JIS X 0208 kanji labels plus kana. Out-of-dictionary words, names, arbitrary Unicode Han characters, and sentence analysis are outside the guaranteed scope. Review input before confirming it in important contexts.
+
+5. Warranty and liability
+The app is provided as is. To the extent permitted by applicable law, no express or implied warranty is made, including merchantability, fitness for a particular purpose, availability, or error-free operation. The provider is not liable for loss arising from use or inability to use the app except where liability cannot legally be excluded.
+
+6. Third-party rights and licenses
+Dictionaries, the recognition engine, model, and libraries included in the app are governed by their respective third-party licenses. Details are available under About & licenses. These terms do not restrict rights granted by those licenses.
+
+7. Changes and discontinuation
+The app or these terms may be changed for improvement, maintenance, or legal compliance. Provision may be suspended or ended when reasonably necessary.
+
+8. Contact
+https://github.com/TakeruF/furigana_keyboard/issues
+
+These terms do not limit consumer rights that cannot be waived under applicable law.

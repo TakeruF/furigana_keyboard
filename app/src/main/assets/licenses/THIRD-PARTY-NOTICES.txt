@@ -1,0 +1,23 @@
+Furigana Keyboard — third-party software notices
+
+This application includes the following software distributed under the
+Apache License 2.0. A copy of that license is included in APACHE-2.0.txt.
+
+AndroidX Core 1.13.1
+Copyright The Android Open Source Project
+https://developer.android.com/jetpack/androidx
+
+AndroidX AppCompat 1.7.0
+Copyright The Android Open Source Project
+https://developer.android.com/jetpack/androidx/releases/appcompat
+
+Material Components for Android 1.12.0
+Copyright The Android Open Source Project
+https://github.com/material-components/material-components-android
+
+Kotlin 1.9.24 runtime
+Copyright 2010-2024 JetBrains s.r.o. and Kotlin Programming Language contributors
+https://github.com/JetBrains/kotlin
+
+This notice supplements the separate notices for Zinnia, the Tegaki Japanese
+model, and EDRDG dictionary data available from the same settings screen.

@@ -1,0 +1,15 @@
+This application includes data derived from KANJIDIC2 and JMdict.
+
+Copyright: Electronic Dictionary Research and Development Group (EDRDG)
+License: Creative Commons Attribution-ShareAlike 4.0 International
+
+Project pages:
+https://www.edrdg.org/wiki/index.php/KANJIDIC_Project
+https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project
+
+License statement:
+https://www.edrdg.org/edrdg/licence.html
+
+The bundled generated database is distributed under the same CC BY-SA 4.0
+terms. The surrounding application software is not covered by this data
+license.
