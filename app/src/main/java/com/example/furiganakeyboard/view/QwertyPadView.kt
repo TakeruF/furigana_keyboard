@@ -2,17 +2,24 @@ package com.example.furiganakeyboard.view
 
 import android.content.Context
 import android.annotation.SuppressLint
+import android.view.Gravity
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
+import android.content.res.ColorStateList
 import com.example.furiganakeyboard.R
+import com.example.furiganakeyboard.settings.AccentColor
+import com.example.furiganakeyboard.settings.KeyboardPrefs
 import com.example.furiganakeyboard.view.KeyFactory.Kind
 
 /**
  * ABC input panel: a simple QWERTY keyboard (number row + three letter rows +
  * control row) with a one-shot shift, replacing the old placeholder toast.
  */
-class QwertyPadView(context: Context) : LinearLayout(context) {
+class QwertyPadView(
+    context: Context,
+    private val includeJapaneseLongVowelKey: Boolean = false
+) : LinearLayout(context) {
 
     /** Input callbacks wired by the IME service. */
     var onText: ((String) -> Unit)? = null
@@ -29,14 +36,31 @@ class QwertyPadView(context: Context) : LinearLayout(context) {
         orientation = VERTICAL
         addRow(buildCharRow("1234567890"))
         addRow(buildCharRow("qwertyuiop"))
-        addRow(buildCharRow("asdfghjkl", sidePad = 0.5f))
+        addRow(
+            if (includeJapaneseLongVowelKey) {
+                buildCharRow("asdfghjklー")
+            } else {
+                buildCharRow("asdfghjkl", sidePad = 0.5f)
+            }
+        )
         addRow(buildShiftRow("zxcvbnm"))
         addRow(buildBottomRow())
+        setAccentColor(KeyboardPrefs(context).accentColor)
     }
 
     /** Update the enter key label (改行 / 送信 / 検索). */
     fun setEnterLabel(label: String) {
         enterKey?.text = label
+    }
+
+    /** Refresh accent controls when settings changed while the IME was hidden. */
+    fun setAccentColor(color: AccentColor) {
+        enterKey?.let { AccentStyle.apply(it, color) }
+        val dark = AccentStyle.isDark(context)
+        shiftKey?.foregroundTintList = ColorStateList(
+            arrayOf(intArrayOf(android.R.attr.state_selected), intArrayOf()),
+            intArrayOf(color.accent(dark), ContextCompat.getColor(context, R.color.kbd_on_surface))
+        )
     }
 
     private fun addRow(row: LinearLayout) {
@@ -51,19 +75,26 @@ class QwertyPadView(context: Context) : LinearLayout(context) {
             val key = KeyFactory.key(context, c.toString(), Kind.PLAIN) {
                 commitLetter(c)
             }
-            if (c.isLetter()) letterKeys.add(key)
+            if (c.isLetter()) {
+                letterKeys.add(key)
+            }
             row.addView(key, KeyFactory.rowParams(context, 1f))
         }
         if (sidePad > 0) row.addView(Spacer(), KeyFactory.rowParams(context, sidePad))
         return row
     }
 
-    /** ⇧ + letters + ⌫ row. */
+    /** Compact shift icon + letters + ⌫ row. */
     @SuppressLint("ClickableViewAccessibility")
     private fun buildShiftRow(chars: String): LinearLayout {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
-        shiftKey = KeyFactory.key(context, "⇧", Kind.FUNCTION, 18f) { toggleShift() }
-        row.addView(shiftKey, KeyFactory.rowParams(context, 1.5f))
+        val shift = KeyFactory.key(context, "", Kind.FUNCTION) { toggleShift() }.apply {
+            contentDescription = context.getString(R.string.key_shift)
+            foreground = ContextCompat.getDrawable(context, R.drawable.ic_shift_state)
+            foregroundGravity = Gravity.CENTER
+        }
+        shiftKey = shift
+        row.addView(shift, KeyFactory.rowParams(context, 1.5f))
         for (c in chars) {
             val key = KeyFactory.key(context, c.toString(), Kind.PLAIN) {
                 commitLetter(c)
@@ -114,7 +145,7 @@ class QwertyPadView(context: Context) : LinearLayout(context) {
         if (shifted) toggleShift()
     }
 
-    /** Toggle shift: relabel letter keys and tint the shift key. */
+    /** Toggle shift: relabel letters and switch the arrow between outline/fill. */
     private fun toggleShift() {
         shifted = !shifted
         shiftKey?.isSelected = shifted
@@ -122,12 +153,6 @@ class QwertyPadView(context: Context) : LinearLayout(context) {
             val t = key.text.toString()
             key.text = if (shifted) t.uppercase() else t.lowercase()
         }
-        shiftKey?.setTextColor(
-            ContextCompat.getColor(
-                context,
-                if (shifted) R.color.kbd_accent else R.color.kbd_on_surface
-            )
-        )
     }
 
     /** Invisible flexible gap used to inset the middle letter row. */

@@ -18,10 +18,10 @@
         android:layout_width="match_parent"
         android:layout_height="60dp" />
 
-    <FrameLayout
+    <com.example.furiganakeyboard.view.KeyboardPanelContainer
         android:id="@+id/panelContainer"
         android:layout_width="match_parent"
-        android:layout_height="300dp">
+        android:layout_height="wrap_content">
 
         <LinearLayout
             android:id="@+id/handwritingPanel"
@@ -93,33 +93,34 @@
                         android:textSize="20sp" />
 
                     <Button
-                        android:id="@+id/keyLineBreak"
+                        android:id="@+id/keyQuestion"
                         style="@style/CanvasActionKey"
                         android:layout_width="match_parent"
                         android:layout_height="0dp"
                         android:layout_weight="1"
-                        android:text="@string/key_enter"
-                        android:textSize="12sp" />
+                        android:contentDescription="@string/key_question_desc"
+                        android:text="@string/key_punctuation_question"
+                        android:textSize="20sp" />
                 </LinearLayout>
             </FrameLayout>
 
             <!-- Requested positions: keyboard picker at far left, ABC at the
                  former language/read-mode position beside the action key. -->
             <LinearLayout
+                android:id="@+id/handwritingBottomRow"
                 android:layout_width="match_parent"
-                android:layout_height="58dp"
+                android:layout_height="48dp"
                 android:orientation="horizontal">
 
-                <Button
+                <ImageButton
                     android:id="@+id/keyKeyboardSwitch"
-                    style="@style/SideKey"
+                    style="@style/KeyboardIconKey"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_margin="1dp"
                     android:layout_weight="1"
                     android:contentDescription="@string/key_keyboard_switch_desc"
-                    android:drawableStart="@drawable/ic_globe_keyboard"
-                    android:gravity="center" />
+                    android:src="@drawable/ic_globe_keyboard" />
 
                 <Button
                     android:id="@+id/keySymbol"
@@ -145,7 +146,7 @@
 
                 <Button
                     android:id="@+id/keySpace"
-                    style="@style/SideKey.Plain"
+                    style="@style/SideKey"
                     android:layout_width="0dp"
                     android:layout_height="match_parent"
                     android:layout_margin="1dp"
@@ -175,5 +176,5 @@
                     android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
-    </FrameLayout>
+    </com.example.furiganakeyboard.view.KeyboardPanelContainer>
 </LinearLayout>

@@ -2,13 +2,16 @@ package com.example.furiganakeyboard.view
 
 import android.content.Context
 import android.util.TypedValue
+import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.appcompat.widget.AppCompatButton
 import androidx.core.content.ContextCompat
 import androidx.core.widget.TextViewCompat
 import com.example.furiganakeyboard.R
+import com.example.furiganakeyboard.settings.KeyboardPrefs
 
 /**
  * Helper for building WeChat-style flat key buttons in code (used by the
@@ -35,6 +38,9 @@ internal object KeyFactory {
         minimumWidth = 0
         minimumHeight = 0
         setPadding(0, 0, 0, 0)
+        gravity = Gravity.CENTER
+        textAlignment = View.TEXT_ALIGNMENT_CENTER
+        includeFontPadding = false
         stateListAnimator = null // kill Material elevation animation
         setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp)
         maxLines = 1
@@ -45,14 +51,11 @@ internal object KeyFactory {
             1,
             TypedValue.COMPLEX_UNIT_SP
         )
-        background = ContextCompat.getDrawable(
-            context,
-            when (kind) {
-                Kind.PLAIN -> R.drawable.key_background
-                Kind.FUNCTION -> R.drawable.key_function_background
-                Kind.ACCENT -> R.drawable.key_accent_background
-            }
-        )
+        background = when (kind) {
+            Kind.PLAIN -> ContextCompat.getDrawable(context, R.drawable.key_background)
+            Kind.FUNCTION -> ContextCompat.getDrawable(context, R.drawable.key_function_background)
+            Kind.ACCENT -> AccentStyle.background(context, KeyboardPrefs(context).accentColor)
+        }
         setTextColor(
             ContextCompat.getColor(
                 context,
