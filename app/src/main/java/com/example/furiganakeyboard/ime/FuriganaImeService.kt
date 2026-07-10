@@ -384,7 +384,10 @@ class FuriganaImeService : InputMethodService() {
             return
         }
 
-        val dictionaryCandidates = readings.suggestByReading(converted.kana).map {
+        val dictionaryCandidates = readings.suggestByReading(
+            converted.kana,
+            MAX_WORD_CANDIDATES - 1
+        ).map {
             CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
         }
         val kanaCandidate = CandidateUiModel(
