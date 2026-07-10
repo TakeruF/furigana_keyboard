@@ -26,8 +26,11 @@
     <color name="settings_icon">#FF4F5A58</color>
     <color name="settings_card_stroke">#143C514D</color>
     <color name="settings_divider">#1F61706D</color>
-    <color name="settings_accent">#FF167C69</color>
-    <color name="settings_accent_surface">#FFDDF2EC</color>
     <color name="settings_success">#FF16705F</color>
     <color name="settings_success_surface">#FFDDF3EB</color>
+    <color name="settings_toggle_on">#FF252B2A</color>
+    <color name="settings_toggle_off">#FFD1D9D7</color>
+    <color name="settings_toggle_thumb">#FFFFFFFF</color>
+    <color name="settings_pressed_overlay">#0F1D2524</color>
+    <color name="settings_focused_overlay">#141D2524</color>
 </resources>

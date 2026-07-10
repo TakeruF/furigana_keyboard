@@ -4,7 +4,9 @@ import android.content.Context
 import android.content.Intent
 import android.content.res.ColorStateList
 import android.content.res.Configuration
+import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
+import android.graphics.drawable.StateListDrawable
 import android.graphics.Typeface
 import android.os.Bundle
 import android.provider.Settings
@@ -16,20 +18,19 @@ import android.widget.GridLayout
 import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
-import android.widget.RadioButton
 import android.widget.ScrollView
 import android.widget.TextView
 import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
-import androidx.appcompat.content.res.AppCompatResources
 import androidx.core.content.ContextCompat
 import androidx.core.os.LocaleListCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.ReadingRepository
+import com.example.furiganakeyboard.view.HanluToggleView
+import com.example.furiganakeyboard.view.Haptics
 import com.google.android.material.card.MaterialCardView
-import com.google.android.material.switchmaterial.SwitchMaterial
 
 /** Card-based settings hub with focused preference, privacy, legal, and help pages. */
 class SettingsActivity : AppCompatActivity() {
@@ -53,6 +54,7 @@ class SettingsActivity : AppCompatActivity() {
             )
         }
         super.onCreate(savedInstanceState)
+        Haptics.enabled = prefs.haptics
         val darkMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
         WindowInsetsControllerCompat(window, window.decorView).apply {
@@ -76,23 +78,26 @@ class SettingsActivity : AppCompatActivity() {
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(14), dp(18), dp(14))
+            setPadding(dp(14), dp(10), dp(14), dp(10))
         }
         backButton = ImageButton(this).apply {
             setImageResource(R.drawable.ic_arrow_back)
             imageTintList = ColorStateList.valueOf(color(R.color.settings_text))
-            background = selectableBackground()
+            background = neutralFeedback()
             contentDescription = getString(R.string.settings_back)
-            setOnClickListener { showHub() }
+            setOnClickListener {
+                Haptics.click(it)
+                showHub()
+            }
         }
-        header.addView(backButton, LinearLayout.LayoutParams(dp(48), dp(48)))
+        header.addView(backButton, LinearLayout.LayoutParams(dp(44), dp(44)))
         headerIcon = ImageView(this).apply { setImageResource(R.drawable.ic_launcher) }
-        header.addView(headerIcon, LinearLayout.LayoutParams(dp(52), dp(52)).apply {
-            marginEnd = dp(16)
+        header.addView(headerIcon, LinearLayout.LayoutParams(dp(46), dp(46)).apply {
+            marginEnd = dp(13)
         })
         headerTitle = TextView(this).apply {
             setTextColor(color(R.color.settings_text))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 22f)
             setTypeface(typeface, Typeface.BOLD)
         }
         header.addView(headerTitle, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
@@ -104,7 +109,7 @@ class SettingsActivity : AppCompatActivity() {
         }
         contentHost = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setPadding(dp(18), dp(12), dp(18), dp(32))
+            setPadding(dp(14), dp(6), dp(14), dp(24))
         }
         scroll.addView(contentHost, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
         root.addView(scroll, LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 0, 1f))
@@ -142,7 +147,7 @@ class SettingsActivity : AppCompatActivity() {
         contentHost.addView(grid, LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT)
 
         contentHost.addView(sectionTitle(getString(R.string.settings_more)).apply {
-            setPadding(dp(8), dp(30), 0, dp(16))
+            setPadding(dp(6), dp(22), 0, dp(10))
         })
         val moreGrid = GridLayout(this).apply {
             columnCount = 2
@@ -189,44 +194,52 @@ class SettingsActivity : AppCompatActivity() {
         action: () -> Unit
     ) {
         val card = MaterialCardView(this).apply {
-            radius = dp(20).toFloat()
+            radius = dp(17).toFloat()
             cardElevation = 0f
             strokeWidth = 0
             setCardBackgroundColor(color(R.color.settings_card))
             isClickable = true
             isFocusable = true
-            foreground = selectableBackground()
-            setOnClickListener { action() }
+            foreground = neutralFeedback()
+            setOnClickListener {
+                Haptics.click(it)
+                action()
+            }
             contentDescription = getString(titleRes) + ". " + getString(descriptionRes)
         }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.START
-            setPadding(dp(20), dp(20), dp(18), dp(18))
+            setPadding(
+                dp(16),
+                dp(if (compact) 13 else 15),
+                dp(14),
+                dp(if (compact) 10 else 14)
+            )
         }
         body.addView(ImageView(this).apply { setImageResource(iconRes) }, LinearLayout.LayoutParams(
-            dp(if (compact) 31 else 36),
-            dp(if (compact) 31 else 36)
+            dp(if (compact) 26 else 30),
+            dp(if (compact) 26 else 30)
         ))
         body.addView(TextView(this).apply {
             setText(titleRes)
             setTextColor(color(R.color.settings_text))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, if (compact) 15.5f else 16.5f)
             setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
-        ).apply { topMargin = dp(if (compact) 22 else 18) })
+        ).apply { topMargin = dp(if (compact) 17 else 14) })
         if (!compact) {
             body.addView(TextView(this).apply {
                 setText(descriptionRes)
                 setTextColor(color(R.color.settings_secondary))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
                 maxLines = 3
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(8) })
+            ).apply { topMargin = dp(6) })
         }
         card.addView(body)
         grid.addView(card, GridLayout.LayoutParams(
@@ -234,8 +247,8 @@ class SettingsActivity : AppCompatActivity() {
             GridLayout.spec(GridLayout.UNDEFINED, 1f)
         ).apply {
             width = 0
-            height = dp(if (compact) 132 else 190)
-            val margin = dp(7)
+            height = dp(if (compact) 116 else 158)
+            val margin = dp(5)
             setMargins(margin, margin, margin, margin)
         })
     }
@@ -312,7 +325,10 @@ class SettingsActivity : AppCompatActivity() {
                 R.string.settings_haptics,
                 R.string.settings_haptics_desc,
                 prefs.haptics
-            ) { prefs.haptics = it }
+            ) {
+                prefs.haptics = it
+                Haptics.enabled = it
+            }
         )))
         showDetail(
             getString(R.string.card_effects_title),
@@ -571,11 +587,18 @@ class SettingsActivity : AppCompatActivity() {
                 setPadding(dp(20), dp(12), dp(20), dp(12))
             })
         }
-        AlertDialog.Builder(this)
+        val dialog = AlertDialog.Builder(this)
             .setTitle(titleRes)
             .setView(scroll)
             .setPositiveButton(R.string.license_close, null)
-            .show()
+            .create()
+        dialog.setOnShowListener {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { button ->
+                Haptics.click(button)
+                dialog.dismiss()
+            }
+        }
+        dialog.show()
     }
 
     private fun detailBody() = LinearLayout(this).apply {
@@ -586,59 +609,51 @@ class SettingsActivity : AppCompatActivity() {
     private fun sectionTitle(value: String) = TextView(this).apply {
         text = value
         setTextColor(color(R.color.settings_text))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 30f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 25f)
         setTypeface(typeface, Typeface.BOLD)
-        setPadding(dp(8), dp(6), 0, dp(16))
+        setPadding(dp(6), dp(4), 0, dp(10))
     }
 
     private fun detailText(value: String) = TextView(this).apply {
         text = value
         setTextColor(color(R.color.settings_secondary))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 14f)
         setLineSpacing(0f, 1.2f)
         setPadding(0, dp(8), 0, dp(8))
     }
 
     private data class Choice(val value: String, val titleRes: Int, val summaryRes: Int? = null)
 
-    private fun pageIntro(iconRes: Int, descriptionRes: Int): View {
-        val card = MaterialCardView(this).apply {
-            radius = dp(24).toFloat()
-            cardElevation = 0f
-            strokeWidth = 0
-            setCardBackgroundColor(color(R.color.settings_accent_surface))
-        }
-        val row = LinearLayout(this).apply {
+    private fun pageIntro(iconRes: Int, descriptionRes: Int): View =
+        LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            setPadding(dp(18), dp(18), dp(20), dp(18))
-        }
+            setPadding(dp(5), dp(2), dp(6), dp(5))
+        }.also { row ->
         row.addView(ImageView(this).apply {
             setImageResource(iconRes)
-            imageTintList = ColorStateList.valueOf(color(R.color.settings_accent))
-        }, LinearLayout.LayoutParams(dp(34), dp(34)).apply { marginEnd = dp(16) })
+            imageTintList = ColorStateList.valueOf(color(R.color.settings_icon))
+        }, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(10) })
         row.addView(TextView(this).apply {
             setText(descriptionRes)
-            setTextColor(color(R.color.settings_text))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
-            setLineSpacing(0f, 1.15f)
+            setTextColor(color(R.color.settings_secondary))
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+            setLineSpacing(0f, 1.08f)
         }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
-        card.addView(row)
-        return card
     }
 
     private fun sectionLabel(textRes: Int) = TextView(this).apply {
         setText(textRes)
         setTextColor(color(R.color.settings_secondary))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         setTypeface(typeface, Typeface.BOLD)
         letterSpacing = 0.04f
-        setPadding(dp(6), dp(24), dp(6), dp(9))
+        setPadding(dp(5), dp(17), dp(5), dp(7))
     }
 
     private fun groupCard(rows: List<View>): MaterialCardView {
         val card = MaterialCardView(this).apply {
-            radius = dp(20).toFloat()
+            radius = dp(16).toFloat()
             cardElevation = 0f
             strokeWidth = dp(1)
             strokeColor = color(R.color.settings_card_stroke)
@@ -658,35 +673,33 @@ class SettingsActivity : AppCompatActivity() {
         selected: String,
         onSelected: (String) -> Unit
     ): MaterialCardView {
-        val buttons = mutableListOf<Pair<String, RadioButton>>()
+        val marks = mutableListOf<Pair<String, TextView>>()
         val rows = options.map { option ->
             val optionSummary = option.summaryRes?.let(::getString)
-            val radio = RadioButton(this).apply {
-                id = View.generateViewId()
-                isChecked = option.value == selected
-                isClickable = false
-                isFocusable = false
-                buttonTintList = ColorStateList(
-                    arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                    intArrayOf(color(R.color.settings_accent), color(R.color.settings_secondary))
-                )
+            val mark = TextView(this).apply {
+                text = if (option.value == selected) "✓" else ""
+                setTextColor(color(R.color.settings_text))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
+                gravity = Gravity.CENTER
+                minimumWidth = dp(24)
             }
-            buttons += option.value to radio
+            marks += option.value to mark
             settingRow(
                 getString(option.titleRes),
                 optionSummary,
-                radio
+                mark
             ).apply {
                 contentDescription = listOfNotNull(getString(option.titleRes), optionSummary)
                     .joinToString(". ")
                 isSelected = option.value == selected
                 isClickable = true
                 isFocusable = true
-                foreground = selectableBackground()
+                foreground = neutralFeedback()
                 setOnClickListener {
-                    buttons.forEach { (value, button) ->
-                        button.isChecked = value == option.value
-                        (button.parent as? View)?.isSelected = value == option.value
+                    if (!isSelected) Haptics.selection(this)
+                    marks.forEach { (value, selectionMark) ->
+                        selectionMark.text = if (value == option.value) "✓" else ""
+                        (selectionMark.parent as? View)?.isSelected = value == option.value
                     }
                     onSelected(option.value)
                 }
@@ -701,26 +714,17 @@ class SettingsActivity : AppCompatActivity() {
         checked: Boolean,
         onChanged: (Boolean) -> Unit
     ): View {
-        val toggle = SwitchMaterial(this).apply {
-            isChecked = checked
-            showText = false
+        val toggle = HanluToggleView(this).apply {
+            setChecked(checked)
             contentDescription = getString(titleRes)
-            thumbTintList = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(color(R.color.settings_accent), color(R.color.settings_secondary))
-            )
-            trackTintList = ColorStateList(
-                arrayOf(intArrayOf(android.R.attr.state_checked), intArrayOf()),
-                intArrayOf(color(R.color.settings_accent_surface), color(R.color.settings_divider))
-            )
-            setOnCheckedChangeListener { _, value -> onChanged(value) }
+            setOnCheckedChangeListener(onChanged)
         }
         return settingRow(getString(titleRes), getString(summaryRes), toggle).apply {
             contentDescription = getString(titleRes) + ". " + getString(summaryRes)
             isClickable = true
             isFocusable = true
-            foreground = selectableBackground()
-            setOnClickListener { toggle.isChecked = !toggle.isChecked }
+            foreground = neutralFeedback()
+            setOnClickListener { toggle.performClick() }
         }
     }
 
@@ -740,15 +744,18 @@ class SettingsActivity : AppCompatActivity() {
         val chevron = TextView(this).apply {
             text = "›"
             setTextColor(color(R.color.settings_secondary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 28f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
             gravity = Gravity.CENTER
         }
         return settingRow(getString(titleRes), summary, chevron, iconRes).apply {
             contentDescription = getString(titleRes) + ". " + summary
             isClickable = true
             isFocusable = true
-            foreground = selectableBackground()
-            setOnClickListener { action() }
+            foreground = neutralFeedback()
+            setOnClickListener {
+                Haptics.click(it)
+                action()
+            }
         }
     }
 
@@ -757,11 +764,11 @@ class SettingsActivity : AppCompatActivity() {
             TextView(this).apply {
                 text = it
                 setTextColor(color(R.color.settings_success))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
                 setTypeface(typeface, Typeface.BOLD)
                 gravity = Gravity.CENTER
                 background = roundedBackground(R.color.settings_success_surface, 99)
-                setPadding(dp(10), dp(6), dp(10), dp(6))
+                setPadding(dp(8), dp(4), dp(8), dp(4))
             }
         }
         return settingRow(title, summary, badgeView)
@@ -776,39 +783,39 @@ class SettingsActivity : AppCompatActivity() {
         val row = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
-            minimumHeight = dp(72)
-            setPadding(dp(18), dp(13), dp(14), dp(13))
+            minimumHeight = dp(58)
+            setPadding(dp(14), dp(9), dp(12), dp(9))
         }
         if (iconRes != null) {
             row.addView(ImageView(this).apply {
                 setImageResource(iconRes)
                 imageTintList = ColorStateList.valueOf(color(R.color.settings_icon))
-            }, LinearLayout.LayoutParams(dp(25), dp(25)).apply { marginEnd = dp(14) })
+            }, LinearLayout.LayoutParams(dp(22), dp(22)).apply { marginEnd = dp(11) })
         }
         val labels = LinearLayout(this).apply { orientation = LinearLayout.VERTICAL }
         labels.addView(TextView(this).apply {
             text = title
             setTextColor(color(R.color.settings_text))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 15f)
             setTypeface(typeface, Typeface.BOLD)
         })
         if (!summary.isNullOrBlank()) {
             labels.addView(TextView(this).apply {
                 text = summary
                 setTextColor(color(R.color.settings_secondary))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 13.5f)
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, 12.5f)
                 setLineSpacing(0f, 1.12f)
             }, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.MATCH_PARENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { topMargin = dp(4) })
+            ).apply { topMargin = dp(2) })
         }
         row.addView(labels, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
         if (trailing != null) {
             row.addView(trailing, LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
                 LinearLayout.LayoutParams.WRAP_CONTENT
-            ).apply { marginStart = dp(12) })
+            ).apply { marginStart = dp(9) })
         }
         return row
     }
@@ -819,17 +826,17 @@ class SettingsActivity : AppCompatActivity() {
             LinearLayout.LayoutParams.MATCH_PARENT,
             dp(1)
         ).apply {
-            marginStart = dp(18)
-            marginEnd = dp(18)
+            marginStart = dp(14)
+            marginEnd = dp(14)
         }
     }
 
     private fun footerNote(value: String) = TextView(this).apply {
         text = value
         setTextColor(color(R.color.settings_secondary))
-        setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
+        setTextSize(TypedValue.COMPLEX_UNIT_SP, 12f)
         setLineSpacing(0f, 1.15f)
-        setPadding(dp(7), dp(12), dp(7), 0)
+        setPadding(dp(5), dp(9), dp(5), 0)
     }
 
     private fun roundedBackground(colorRes: Int, radiusDp: Int) = GradientDrawable().apply {
@@ -838,10 +845,17 @@ class SettingsActivity : AppCompatActivity() {
         cornerRadius = dp(radiusDp).toFloat()
     }
 
-    private fun selectableBackground() = AppCompatResources.getDrawable(
-        this,
-        android.R.drawable.list_selector_background
-    )
+    private fun neutralFeedback() = StateListDrawable().apply {
+        addState(
+            intArrayOf(android.R.attr.state_pressed),
+            ColorDrawable(color(R.color.settings_pressed_overlay))
+        )
+        addState(
+            intArrayOf(android.R.attr.state_focused),
+            ColorDrawable(color(R.color.settings_focused_overlay))
+        )
+        addState(intArrayOf(), ColorDrawable(android.graphics.Color.TRANSPARENT))
+    }
 
     private fun color(res: Int) = ContextCompat.getColor(this, res)
     private fun dp(value: Int) = TypedValue.applyDimension(

@@ -1,6 +1,11 @@
 <resources>
     <style name="Theme.FuriganaKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
-        <item name="colorPrimary">@color/kbd_accent</item>
+        <item name="colorPrimary">@color/settings_text</item>
+        <item name="colorSecondary">@color/settings_text</item>
+        <item name="colorTertiary">@color/settings_text</item>
+        <item name="colorControlActivated">@color/settings_text</item>
+        <item name="colorControlHighlight">@color/settings_pressed_overlay</item>
+        <item name="android:colorAccent">@color/settings_text</item>
         <item name="android:fontFamily">sans</item>
         <item name="android:navigationBarColor">@color/settings_background</item>
         <item name="android:statusBarColor">@color/settings_background</item>
