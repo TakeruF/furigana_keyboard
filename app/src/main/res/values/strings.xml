@@ -48,7 +48,7 @@
     <string name="settings_reading_mode">Furigana display</string>
     <string name="settings_behavior">Input behavior</string>
     <string name="settings_auto_commit">Continuous handwriting</string>
-    <string name="settings_auto_commit_desc">Accept the first candidate when you begin the next character</string>
+    <string name="settings_auto_commit_desc">Add recognized characters automatically and show word candidates after two characters</string>
     <string name="settings_haptics">Haptic feedback</string>
     <string name="settings_haptics_desc">Vibrate gently for key presses and pen-down</string>
     <string name="settings_enable_ime">Enable keyboard in system settings</string>

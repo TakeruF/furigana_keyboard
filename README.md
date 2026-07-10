@@ -15,7 +15,9 @@ downloads are unavailable.
 - JMdict snapshot with 217,810 entries and 247,627 surface/reading pairs.
 - Unicode-code-point-safe composition, including supplementary-plane kanji.
 - Word completion from the current handwritten composition. Exact JMdict
-  readings are shown instead of guessed per-character concatenations.
+  readings are shown instead of guessed per-character concatenations. After
+  two sequential characters, recognition alternatives are combined and
+  matched against JMdict automatically.
 - Kana, romaji, or hidden reading display.
 - Japanese, Simplified Chinese, Korean, and English UI.
 - Two-column card settings hub with focused pages for display, handwriting,
@@ -76,11 +78,11 @@ any Han label in the bundled recognition model lacks a Japanese reading.
 1. Launch Furigana Keyboard.
 2. Open **System keyboard** and enable the IME.
 3. Choose Furigana Keyboard as the active input method.
-4. Write one character at a time. Tap a character candidate or begin the next
-   character with continuous writing enabled.
-5. The accepted characters remain as composing text. Tap a JMdict word
-   candidate to complete and commit it, or press space/enter to finish the
-   current composition.
+4. Write one character at a time. With continuous writing enabled, start the
+   second character after the first character candidates appear.
+5. The two characters are added as composing text and their recognition
+   alternatives are matched against JMdict. Tap a word candidate to replace
+   and commit it, or press space/enter to finish the current composition.
 
 ## Coverage boundary
 

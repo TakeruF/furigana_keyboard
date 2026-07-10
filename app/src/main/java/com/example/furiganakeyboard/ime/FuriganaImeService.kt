@@ -47,6 +47,9 @@ class FuriganaImeService : InputMethodService() {
     private var recognizer: InkRecognizer? = null
     private var currentPanel = Panel.HANDWRITING
     private var appliedLocaleTag = ""
+    private var latestCharacterAlternatives: List<String> = emptyList()
+    private var wordRootBeforeLastCharacter = ""
+    private var lastCharacterAlternatives: List<String> = emptyList()
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -83,6 +86,7 @@ class FuriganaImeService : InputMethodService() {
             setInputView(onCreateInputView())
         }
         composition.clear()
+        clearAlternativeContext()
         Haptics.enabled = prefs.haptics
         applyReadingMode(prefs.readingMode)
         updateEnterLabel(info)
@@ -183,8 +187,14 @@ class FuriganaImeService : InputMethodService() {
                         kind = CandidateKind.CHARACTER
                     )
                 }
-                candidateBar.setCandidates(candidates)
-                if (candidates.isNotEmpty()) handwritingView.markResultsDelivered()
+                if (candidates.isEmpty()) return@recognize
+                if (prefs.autoCommit && !composition.isEmpty) {
+                    stageRecognizedCharacter(candidates)
+                } else {
+                    latestCharacterAlternatives = candidates.map { it.text }
+                    candidateBar.setCandidates(candidates)
+                    handwritingView.markResultsDelivered()
+                }
             }
         }
 
@@ -192,14 +202,17 @@ class FuriganaImeService : InputMethodService() {
             if (!prefs.autoCommit) return@gate false
             val first = candidateBar.firstCandidate ?: return@gate false
             if (first.kind != CandidateKind.CHARACTER) return@gate false
-            appendToComposition(first.text)
+            appendToComposition(
+                first.text,
+                latestCharacterAlternatives.ifEmpty { listOf(first.text) }
+            )
             true
         }
 
         candidateBar.onCandidateSelected = { candidate ->
             when (candidate.kind) {
                 CandidateKind.CHARACTER -> {
-                    appendToComposition(candidate.text)
+                    appendToComposition(candidate.text, listOf(candidate.text))
                     handwritingView.clear()
                 }
                 CandidateKind.WORD -> commitWordCandidate(candidate.text)
@@ -208,11 +221,55 @@ class FuriganaImeService : InputMethodService() {
         }
     }
 
-    private fun appendToComposition(text: String) {
+    private fun appendToComposition(text: String, alternatives: List<String> = listOf(text)) {
+        wordRootBeforeLastCharacter = composition.text
+        lastCharacterAlternatives = alternatives.distinct()
         val value = composition.append(text)
         currentInputConnection?.setComposingText(value, 1)
+        latestCharacterAlternatives = emptyList()
         candidateBar.clear()
         showWordSuggestions()
+    }
+
+    /**
+     * Once at least one character is composing, the next recognized character
+     * is staged automatically and the alternative cross-product is resolved
+     * against JMdict. This makes two sequential handwritten characters behave
+     * as a word without requiring a tap on the second character.
+     */
+    private fun stageRecognizedCharacter(characters: List<CandidateUiModel>) {
+        val baseBeforeCurrent = composition.text
+        val currentAlternatives = characters.map { it.text }.distinct()
+        val possibleSurfaces = WordCandidateResolver.combine(
+            root = if (lastCharacterAlternatives.isEmpty()) baseBeforeCurrent else wordRootBeforeLastCharacter,
+            previousCharacters = lastCharacterAlternatives,
+            currentCharacters = currentAlternatives
+        )
+
+        val topSurface = composition.append(currentAlternatives.first())
+        currentInputConnection?.setComposingText(topSurface, 1)
+        val resolved = WordCandidateResolver.resolve(
+            surfaces = possibleSurfaces,
+            exactReadings = readings::readingsFor,
+            suggestions = readings::suggest
+        ).map { CandidateUiModel(it.surface, it.readings, CandidateKind.WORD) }
+
+        val fallback = CandidateUiModel(
+            text = topSurface,
+            readings = readings.readingsFor(topSurface).ifEmpty {
+                listOf(getString(R.string.reading_not_in_dictionary))
+            },
+            kind = CandidateKind.WORD
+        )
+        candidateBar.setCandidates(
+            (resolved + fallback).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
+        )
+
+        wordRootBeforeLastCharacter = baseBeforeCurrent
+        lastCharacterAlternatives = currentAlternatives
+        latestCharacterAlternatives = emptyList()
+        handwritingView.clear()
+        Haptics.selection(handwritingView)
     }
 
     private fun showWordSuggestions() {
@@ -310,6 +367,7 @@ class FuriganaImeService : InputMethodService() {
     private fun finishComposition(clearCandidates: Boolean = true) {
         if (!composition.isEmpty) currentInputConnection?.finishComposingText()
         composition.clear()
+        clearAlternativeContext()
         if (clearCandidates && this::candidateBar.isInitialized) candidateBar.clear()
     }
 
@@ -317,6 +375,7 @@ class FuriganaImeService : InputMethodService() {
         val connection = currentInputConnection ?: return
         if (!composition.isEmpty) {
             val remaining = composition.deleteLastCodePoint()
+            clearAlternativeContext()
             if (remaining.isEmpty()) connection.finishComposingText()
             else connection.setComposingText(remaining, 1)
             showWordSuggestions()
@@ -350,10 +409,20 @@ class FuriganaImeService : InputMethodService() {
     private fun isHan(text: String): Boolean = text.isNotEmpty() &&
         Character.UnicodeScript.of(text.codePointAt(0)) == Character.UnicodeScript.HAN
 
+    private fun clearAlternativeContext() {
+        latestCharacterAlternatives = emptyList()
+        wordRootBeforeLastCharacter = ""
+        lastCharacterAlternatives = emptyList()
+    }
+
     override fun onDestroy() {
         recognizer?.close()
         recognizer = null
         readings.close()
         super.onDestroy()
+    }
+
+    companion object {
+        private const val MAX_WORD_CANDIDATES = 8
     }
 }
