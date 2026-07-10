@@ -14,13 +14,8 @@
     <string name="key_delete_desc">Delete</string>
     <string name="key_punctuation_comma" translatable="false">、</string>
     <string name="key_punctuation_period" translatable="false">。</string>
-    <string name="key_punctuation_question" translatable="false">？</string>
-    <string name="key_punctuation_exclamation" translatable="false">！</string>
     <string name="key_comma_desc">Japanese comma</string>
     <string name="key_period_desc">Japanese period</string>
-    <string name="key_question_desc">Question mark</string>
-    <string name="key_exclamation_desc">Exclamation mark</string>
-    <string name="key_rewrite">Clear</string>
     <string name="key_delete">⌫</string>
     <string name="key_space">Space</string>
     <string name="key_enter">Enter</string>

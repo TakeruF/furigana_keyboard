@@ -331,17 +331,12 @@ class FuriganaImeService : InputMethodService() {
         root.findViewById<Button>(R.id.keySymbol).onKey { switchPanel(Panel.SYMBOLS) }
         root.findViewById<Button>(R.id.keyEnglish).onKey { switchPanel(Panel.ENGLISH) }
         root.findViewById<Button>(R.id.keyRomaji).onKey { switchPanel(Panel.ROMAJI) }
-        root.findViewById<Button>(R.id.keyRewrite).onKey {
-            handwritingView.clear()
-            showWordSuggestions()
-        }
         root.findViewById<Button>(R.id.keyDelete)
             .setOnTouchListener(RepeatOnTouchListener { deleteBeforeCursor() })
         root.findViewById<Button>(R.id.keySpace).onKey { commitDirect(" ") }
         root.findViewById<Button>(R.id.keyComma).onKey { commitDirect("、") }
         root.findViewById<Button>(R.id.keyPeriod).onKey { commitDirect("。") }
-        root.findViewById<Button>(R.id.keyQuestion).onKey { commitDirect("？") }
-        root.findViewById<Button>(R.id.keyExclamation).onKey { commitDirect("！") }
+        root.findViewById<Button>(R.id.keyLineBreak).onKey { commitDirect("\n") }
         enterKey.onKey { sendEnter() }
     }
 
