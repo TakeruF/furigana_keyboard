@@ -1,0 +1,100 @@
+name: FuriganaKeyboard
+
+options:
+  bundleIdPrefix: com.example.furiganakeyboard
+  deploymentTarget:
+    iOS: "16.0"
+  createIntermediateGroups: true
+
+settings:
+  base:
+    CURRENT_PROJECT_VERSION: 1
+    MARKETING_VERSION: 1.0.0
+    SWIFT_VERSION: 5.0
+    CODE_SIGN_STYLE: Automatic
+    DEVELOPMENT_TEAM: ""
+
+targets:
+  FuriganaKeyboard:
+    type: application
+    platform: iOS
+    sources:
+      - Sources/App
+      - Sources/Shared
+    info:
+      path: Sources/App/Info.plist
+      properties:
+        CFBundleDisplayName: Furigana Keyboard
+        UILaunchScreen: {}
+        UIApplicationSceneManifest:
+          UIApplicationSupportsMultipleScenes: false
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.furiganakeyboard.ios
+        PRODUCT_NAME: Furigana Keyboard
+        PRODUCT_MODULE_NAME: FuriganaKeyboard
+        TARGETED_DEVICE_FAMILY: "1,2"
+    dependencies:
+      - target: FuriganaKeyboardExtension
+        embed: true
+
+  FuriganaKeyboardExtension:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Sources/KeyboardExtension
+      - path: Sources/Shared
+      - path: Sources/Recognition
+      - path: ../app/src/main/cpp/zinnia
+        excludes:
+          - "*.h"
+      - path: ../app/src/main/assets/handwriting-ja.model
+        buildPhase: resources
+      - path: ../app/src/main/assets/reading.db
+        buildPhase: resources
+    info:
+      path: Sources/KeyboardExtension/Info.plist
+      properties:
+        CFBundleDisplayName: Furigana Keyboard
+        NSExtension:
+          NSExtensionAttributes:
+            IsASCIICapable: false
+            PrefersRightToLeft: false
+            PrimaryLanguage: ja-JP
+            RequestsOpenAccess: false
+          NSExtensionPointIdentifier: com.apple.keyboard-service
+          NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).KeyboardViewController"
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.furiganakeyboard.ios.keyboard
+        PRODUCT_NAME: FuriganaKeyboardExtension
+        PRODUCT_MODULE_NAME: FuriganaKeyboardExtension
+        SKIP_INSTALL: true
+        APPLICATION_EXTENSION_API_ONLY: true
+        SWIFT_OBJC_BRIDGING_HEADER: Sources/KeyboardExtension/KeyboardExtension-Bridging-Header.h
+        HEADER_SEARCH_PATHS: "$(SRCROOT)/../app/src/main/cpp/zinnia"
+        GCC_PREPROCESSOR_DEFINITIONS:
+          - "$(inherited)"
+          - HAVE_SYS_TYPES_H=1
+          - HAVE_SYS_STAT_H=1
+          - HAVE_FCNTL_H=1
+          - HAVE_STRING_H=1
+          - HAVE_SYS_MMAN_H=1
+          - HAVE_UNISTD_H=1
+          - HAVE_MMAP=1
+          - WORDS_LITENDIAN=1
+        CLANG_CXX_LANGUAGE_STANDARD: c++17
+        OTHER_CPLUSPLUSFLAGS: "$(inherited) -Wall -Wextra -Wno-unused-parameter"
+    dependencies:
+      - sdk: libsqlite3.tbd
+
+  FuriganaKeyboardTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - Tests
+    dependencies:
+      - target: FuriganaKeyboard
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: com.example.furiganakeyboard.ios.tests
