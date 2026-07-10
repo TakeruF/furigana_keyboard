@@ -16,6 +16,10 @@ npm run dev
 npm run build
 ```
 
+The default scripts use standard Next.js and produce `.next/` for EdgeOne
+Makers. The former Sites/Vinext build remains available as `npm run build:sites`
+during the hosting transition.
+
 ## Release links
 
 Set these environment variables in the hosting environment, then rebuild:
@@ -26,5 +30,6 @@ No source edit is required when the release URLs become available.
 
 ## Publishing
 
-See [`PUBLISHING.md`](./PUBLISHING.md) for the complete OpenAI Sites deployment,
-public-access, and `keyboard.hanlu.app` custom-domain setup guide.
+See [`PUBLISHING.md`](./PUBLISHING.md) for the EdgeOne Makers deployment guide,
+including coexistence with the existing `hanlu.app` project and the
+`keyboard.hanlu.app` custom-domain setup.

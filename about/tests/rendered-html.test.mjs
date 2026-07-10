@@ -1,22 +1,55 @@
 import assert from "node:assert/strict";
 import { access, readFile } from "node:fs/promises";
-import test from "node:test";
+import { after, before, test } from "node:test";
+import { spawn } from "node:child_process";
+import net from "node:net";
 
-async function render(path = "/ja") {
-  const workerUrl = new URL("../dist/server/index.js", import.meta.url);
-  workerUrl.searchParams.set("test", `${process.pid}-${Date.now()}-${path}`);
-  const { default: worker } = await import(workerUrl.href);
-  return worker.fetch(
-    new Request(`http://localhost${path}`, { headers: { accept: "text/html" } }),
-    { ASSETS: { fetch: async () => new Response("Not found", { status: 404 }) } },
-    { waitUntil() {}, passThroughOnException() {} },
-  );
+let server;
+let baseUrl;
+
+async function availablePort() {
+  return new Promise((resolve, reject) => {
+    const listener = net.createServer();
+    listener.once("error", reject);
+    listener.listen(0, "127.0.0.1", () => {
+      const address = listener.address();
+      listener.close(() => resolve(address.port));
+    });
+  });
 }
 
+async function waitForServer(url) {
+  const deadline = Date.now() + 30_000;
+  while (Date.now() < deadline) {
+    try {
+      await fetch(url, { redirect: "manual" });
+      return;
+    } catch {
+      await new Promise((resolve) => setTimeout(resolve, 150));
+    }
+  }
+  throw new Error(`Next.js test server did not start at ${url}`);
+}
+
+before(async () => {
+  const port = await availablePort();
+  baseUrl = `http://127.0.0.1:${port}`;
+  server = spawn(
+    process.execPath,
+    ["node_modules/next/dist/bin/next", "start", "-H", "127.0.0.1", "-p", String(port)],
+    { cwd: new URL("..", import.meta.url), stdio: "ignore" },
+  );
+  await waitForServer(baseUrl);
+});
+
+after(() => {
+  server?.kill("SIGTERM");
+});
+
 test("redirects the root page to Japanese", async () => {
-  const response = await render("/");
+  const response = await fetch(baseUrl, { redirect: "manual" });
   assert.equal(response.status, 307);
-  assert.equal(response.headers.get("location"), "http://localhost/ja");
+  assert.equal(response.headers.get("location"), "/ja");
 });
 
 for (const expectation of [
@@ -26,7 +59,7 @@ for (const expectation of [
   { path: "/ko", lang: "ko", title: "쓰고. 읽고.", pending: "준비 중" },
 ]) {
   test(`server-renders localized content for ${expectation.path}`, async () => {
-    const response = await render(expectation.path);
+    const response = await fetch(`${baseUrl}${expectation.path}`);
     assert.equal(response.status, 200);
     assert.match(response.headers.get("content-type") ?? "", /^text\/html\b/i);
     const html = await response.text();
