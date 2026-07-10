@@ -12,13 +12,17 @@
     <string name="key_english_input_desc">English typing</string>
     <string name="key_romaji_input_desc">Romaji input</string>
     <string name="key_delete_desc">Delete</string>
+    <string name="key_shift" translatable="false">Shift</string>
     <string name="key_punctuation_comma" translatable="false">、</string>
     <string name="key_punctuation_period" translatable="false">。</string>
+    <string name="key_punctuation_question" translatable="false">？</string>
     <string name="key_comma_desc">Japanese comma</string>
     <string name="key_period_desc">Japanese period</string>
+    <string name="key_question_desc">Japanese question mark</string>
     <string name="key_delete">⌫</string>
     <string name="key_space">Space</string>
     <string name="key_enter">Enter</string>
+    <string name="key_convert">Convert</string>
     <string name="key_send">Send</string>
     <string name="key_search">Search</string>
     <string name="key_back_hw">Write</string>
@@ -38,10 +42,12 @@
     <string name="settings_back">Back</string>
     <string name="card_reading_title">Reading &amp; display ›</string>
     <string name="card_reading_desc">Furigana style and visibility</string>
+    <string name="card_layout_title">Layout &amp; display ›</string>
+    <string name="card_layout_desc">Keyboard height, candidates and accent color</string>
     <string name="card_handwriting_title">Handwriting ›</string>
     <string name="card_handwriting_desc">Continuous writing and offline data</string>
     <string name="card_effects_title">Key effects ›</string>
-    <string name="card_effects_desc">Haptic feedback</string>
+    <string name="card_effects_desc">Key sound and haptic strength</string>
     <string name="card_language_title">Language ›</string>
     <string name="card_language_desc">English, 日本語, 中文, 한국어</string>
     <string name="card_system_title">System keyboard ›</string>
@@ -65,6 +71,42 @@
     <string name="settings_plus_note">On by default for everyone. The first use downloads about 20 MB; turn this off if the download or recognition does not work reliably in your region.</string>
     <string name="settings_haptics">Haptic feedback</string>
     <string name="settings_haptics_desc">Vibrate gently for key presses and pen-down</string>
+    <string name="settings_key_sound">Key sound</string>
+    <string name="settings_key_sound_silent_note">Key sounds are muted while the system is in silent or vibrate mode.</string>
+    <string name="sound_quiet">Quiet</string>
+    <string name="sound_loud">Loud</string>
+    <string name="settings_haptic_strength">Haptic strength</string>
+    <string name="haptic_none">None</string>
+    <string name="haptic_system">System</string>
+    <string name="haptic_weak">Weak</string>
+    <string name="haptic_medium_weak">Soft</string>
+    <string name="haptic_medium">Medium</string>
+    <string name="haptic_medium_strong">Firm</string>
+    <string name="haptic_strong">Strong</string>
+    <string name="settings_section_accent_color">Accent color</string>
+    <string name="settings_accent_note">The settings background uses a subtle tint of the selected keyboard color.</string>
+    <string name="settings_section_keyboard_height">Keyboard height</string>
+    <string name="keyboard_height_compact">Compact</string>
+    <string name="keyboard_height_standard">Standard</string>
+    <string name="keyboard_height_tall">Tall</string>
+    <string name="settings_section_candidate_size">Candidate text size</string>
+    <!-- Retained only as resource fallbacks for older installed translations; no UI uses these. -->
+    <string name="settings_section_keys">Keyboard keys</string>
+    <string name="settings_show_emoji_key">Show emoji key</string>
+    <string name="settings_show_emoji_key_desc">Add a key that opens the emoji panel</string>
+    <string name="settings_swipe_input">Swipe up for numbers and symbols</string>
+    <string name="settings_swipe_input_desc">Swipe upward on letter keys to enter their secondary character</string>
+    <string name="swipe_numbers_symbols">Numbers and symbols</string>
+    <string name="swipe_numbers_only">Numbers only</string>
+    <string name="candidate_size_small">Small</string>
+    <string name="candidate_size_standard">Standard</string>
+    <string name="candidate_size_large">Large</string>
+    <string name="settings_layout_note">Layout changes are applied the next time the keyboard is shown. The selected color also tints the settings background.</string>
+    <string name="accent_blue">Blue</string>
+    <string name="accent_purple">Purple</string>
+    <string name="accent_green">Green</string>
+    <string name="accent_orange">Orange</string>
+    <string name="accent_pink">Pink</string>
     <string name="settings_enable_ime">Enable keyboard in system settings</string>
     <string name="settings_choose_ime">Choose keyboard</string>
     <string name="settings_note">Changes are applied the next time the keyboard is shown.</string>
@@ -82,7 +124,7 @@
     <string name="about_edrdg">Dictionary data: KANJIDIC2 and JMdict by EDRDG, CC BY-SA 4.0.</string>
     <string name="about_zinnia">Recognition engine: Zinnia 0.07, New BSD License.</string>
     <string name="about_tegaki">Japanese handwriting model: Tegaki 0.3, LGPL 2.1.</string>
-    <string name="about_app_libraries">AndroidX, Material Components and Kotlin, Apache 2.0.</string>
+    <string name="about_app_libraries">AndroidX, Material Components, Material Symbols and Kotlin, Apache 2.0.</string>
     <string name="about_plus_title" translatable="false">Furigana Plus</string>
     <string name="about_plus_desc">Optional Google ML Kit on-device recognition; subject to Google’s ML Kit terms.</string>
     <string name="license_edrdg">EDRDG source and license</string>
@@ -143,5 +185,6 @@
     <string name="help_coverage_title">Recognition coverage</string>
     <string name="help_coverage_desc">Handwriting covers 6,356 JIS X 0208 kanji labels plus kana; arbitrary Unicode Han characters are outside the guaranteed range</string>
     <string name="help_support_title">Support and inquiries</string>
-    <string name="help_support_desc">Use the project issue tracker shown in the privacy policy when reporting a problem</string>
+    <string name="help_support_desc">Email support@hanlu.app for help or to report a problem</string>
+    <string name="support_email" translatable="false">support@hanlu.app</string>
 </resources>

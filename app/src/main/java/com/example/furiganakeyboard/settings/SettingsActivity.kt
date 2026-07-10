@@ -8,6 +8,7 @@ import android.graphics.drawable.ColorDrawable
 import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.graphics.Typeface
+import android.net.Uri
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
@@ -19,6 +20,7 @@ import android.widget.ImageButton
 import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
+import android.widget.SeekBar
 import android.widget.TextView
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
@@ -29,6 +31,7 @@ import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.view.HanluToggleView
 import com.example.furiganakeyboard.view.Haptics
+import com.example.furiganakeyboard.view.KeySounds
 import com.google.android.material.card.MaterialCardView
 
 /** Card-based settings hub with focused preference, privacy, legal, and help pages. */
@@ -38,6 +41,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var headerIcon: ImageView
     private lateinit var headerTitle: TextView
     private lateinit var contentHost: LinearLayout
+    private lateinit var screenRoot: LinearLayout
     private var backAction: (() -> Unit)? = null
 
     override fun attachBaseContext(newBase: Context) {
@@ -54,8 +58,14 @@ class SettingsActivity : AppCompatActivity() {
         }
         super.onCreate(savedInstanceState)
         Haptics.enabled = prefs.haptics
+        Haptics.strength = prefs.hapticStrength
+        KeySounds.enabled = prefs.keySound
+        KeySounds.volumeStep = prefs.keySoundVolume
         val darkMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
+        val settingsBackground = prefs.accentColor.settingsBackground(darkMode)
+        window.statusBarColor = settingsBackground
+        window.navigationBarColor = settingsBackground
         WindowInsetsControllerCompat(window, window.decorView).apply {
             isAppearanceLightStatusBars = !darkMode
             isAppearanceLightNavigationBars = !darkMode
@@ -72,8 +82,9 @@ class SettingsActivity : AppCompatActivity() {
     private fun buildScreen(): View {
         val root = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
-            setBackgroundColor(color(R.color.settings_background))
+            setBackgroundColor(prefs.accentColor.settingsBackground(isDarkMode()))
         }
+        screenRoot = root
         val header = LinearLayout(this).apply {
             orientation = LinearLayout.HORIZONTAL
             gravity = Gravity.CENTER_VERTICAL
@@ -130,6 +141,9 @@ class SettingsActivity : AppCompatActivity() {
         }
         addCard(grid, R.drawable.ic_settings_reading, R.string.card_reading_title, R.string.card_reading_desc) {
             showReadingDetails()
+        }
+        addCard(grid, R.drawable.ic_settings_layout, R.string.card_layout_title, R.string.card_layout_desc) {
+            showLayoutDetails()
         }
         addCard(grid, R.drawable.ic_settings_handwriting, R.string.card_handwriting_title, R.string.card_handwriting_desc) {
             showHandwritingDetails()
@@ -204,7 +218,7 @@ class SettingsActivity : AppCompatActivity() {
                 Haptics.click(it)
                 action()
             }
-            contentDescription = getString(titleRes) + ". " + getString(descriptionRes)
+            contentDescription = getString(titleRes).removeSuffix(" ›") + ". " + getString(descriptionRes)
         }
         val body = LinearLayout(this).apply {
             orientation = LinearLayout.VERTICAL
@@ -220,12 +234,22 @@ class SettingsActivity : AppCompatActivity() {
             dp(if (compact) 26 else 30),
             dp(if (compact) 26 else 30)
         ))
-        body.addView(TextView(this).apply {
-            setText(titleRes)
+        val titleRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        titleRow.addView(TextView(this).apply {
+            text = getString(titleRes).removeSuffix(" ›")
             setTextColor(color(R.color.settings_text))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, if (compact) 15.5f else 16.5f)
             setTypeface(typeface, Typeface.BOLD)
-        }, LinearLayout.LayoutParams(
+            maxLines = 2
+        }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        titleRow.addView(ImageView(this).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            imageTintList = ColorStateList.valueOf(color(R.color.settings_secondary))
+        }, LinearLayout.LayoutParams(dp(19), dp(19)).apply { marginStart = dp(4) })
+        body.addView(titleRow, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(if (compact) 17 else 14) })
@@ -333,23 +357,213 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun showEffectsDetails() {
         val body = detailBody()
-        body.addView(sectionLabel(R.string.settings_section_feedback))
-        body.addView(groupCard(listOf(
-            toggleRow(
-                R.string.settings_haptics,
-                R.string.settings_haptics_desc,
-                prefs.haptics
-            ) {
+        body.addView(sectionLabel(R.string.settings_key_sound))
+        body.addView(effectControlCard(
+            titleRes = R.string.settings_key_sound,
+            checked = prefs.keySound,
+            progress = prefs.keySoundVolume,
+            max = 4,
+            labels = listOf(R.string.sound_quiet, R.string.sound_loud),
+            onToggle = {
+                prefs.keySound = it
+                KeySounds.enabled = it
+            },
+            onProgress = {
+                prefs.keySoundVolume = it
+                KeySounds.volumeStep = it
+            },
+            preview = { view -> KeySounds.key(view) }
+        ))
+        body.addView(footerNote(getString(R.string.settings_key_sound_silent_note)))
+        body.addView(sectionLabel(R.string.settings_haptic_strength))
+        body.addView(effectControlCard(
+            titleRes = R.string.settings_haptic_strength,
+            checked = prefs.haptics,
+            progress = prefs.hapticStrength.ordinal,
+            max = HapticStrength.entries.lastIndex,
+            labels = listOf(
+                R.string.haptic_none,
+                R.string.haptic_system,
+                R.string.haptic_weak,
+                R.string.haptic_medium_weak,
+                R.string.haptic_medium,
+                R.string.haptic_medium_strong,
+                R.string.haptic_strong
+            ),
+            onToggle = {
                 prefs.haptics = it
                 Haptics.enabled = it
-            }
-        )))
+            },
+            onProgress = {
+                val strength = HapticStrength.entries[it]
+                prefs.hapticStrength = strength
+                Haptics.strength = strength
+            },
+            preview = { view -> Haptics.selection(view) }
+        ))
         showDetail(
             getString(R.string.card_effects_title),
             R.string.card_effects_desc,
             R.drawable.ic_settings_effects,
             body
         )
+    }
+
+    private fun effectControlCard(
+        titleRes: Int,
+        checked: Boolean,
+        progress: Int,
+        max: Int,
+        labels: List<Int>,
+        onToggle: (Boolean) -> Unit,
+        onProgress: (Int) -> Unit,
+        preview: (View) -> Unit
+    ): MaterialCardView {
+        val card = MaterialCardView(this).apply {
+            radius = dp(16).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = color(R.color.settings_card_stroke)
+            setCardBackgroundColor(color(R.color.settings_card))
+        }
+        val content = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(2), dp(4), dp(2), dp(12))
+        }
+        val seek = SeekBar(this).apply {
+            this.max = max
+            this.progress = progress.coerceIn(0, max)
+            progressTintList = ColorStateList.valueOf(
+                prefs.accentColor.accent(isDarkMode())
+            )
+            thumbTintList = progressTintList
+        }
+        val toggle = HanluToggleView(this).apply {
+            setChecked(checked)
+            setOnCheckedChangeListener {
+                seek.isEnabled = it
+                seek.alpha = if (it) 1f else 0.45f
+                onToggle(it)
+            }
+        }
+        seek.isEnabled = checked
+        seek.alpha = if (checked) 1f else 0.45f
+        content.addView(settingRow(getString(titleRes), trailing = toggle))
+        content.addView(seek, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            dp(42)
+        ).apply {
+            marginStart = dp(12)
+            marginEnd = dp(12)
+        })
+        val labelRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = Gravity.CENTER_VERTICAL
+        }
+        labels.forEach { labelRes ->
+            labelRow.addView(TextView(this).apply {
+                setText(labelRes)
+                setTextColor(color(R.color.settings_secondary))
+                setTextSize(TypedValue.COMPLEX_UNIT_SP, if (labels.size > 2) 10.5f else 13f)
+                gravity = Gravity.CENTER
+                maxLines = 1
+            }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
+        }
+        content.addView(labelRow, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply {
+            marginStart = dp(12)
+            marginEnd = dp(12)
+        })
+        seek.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
+            override fun onProgressChanged(seekBar: SeekBar, value: Int, fromUser: Boolean) {
+                if (!fromUser) return
+                onProgress(value)
+                preview(seekBar)
+            }
+            override fun onStartTrackingTouch(seekBar: SeekBar) = Unit
+            override fun onStopTrackingTouch(seekBar: SeekBar) = Unit
+        })
+        card.addView(content)
+        return card
+    }
+
+    private fun showLayoutDetails() {
+        val body = detailBody()
+        body.addView(sectionLabel(R.string.settings_section_keyboard_height))
+        body.addView(choiceCard(
+            options = listOf(
+                Choice(KeyboardHeight.COMPACT.name, R.string.keyboard_height_compact),
+                Choice(KeyboardHeight.STANDARD.name, R.string.keyboard_height_standard),
+                Choice(KeyboardHeight.TALL.name, R.string.keyboard_height_tall)
+            ),
+            selected = prefs.keyboardHeight.name
+        ) { prefs.keyboardHeight = KeyboardHeight.fromStored(it) })
+
+        body.addView(sectionLabel(R.string.settings_section_candidate_size))
+        body.addView(choiceCard(
+            options = listOf(
+                Choice(CandidateTextSize.SMALL.name, R.string.candidate_size_small),
+                Choice(CandidateTextSize.STANDARD.name, R.string.candidate_size_standard),
+                Choice(CandidateTextSize.LARGE.name, R.string.candidate_size_large)
+            ),
+            selected = prefs.candidateTextSize.name
+        ) { prefs.candidateTextSize = CandidateTextSize.fromStored(it) })
+
+        body.addView(sectionLabel(R.string.settings_section_accent_color))
+        body.addView(accentChoiceCard())
+        body.addView(footerNote(getString(R.string.settings_layout_note)))
+        showDetail(
+            getString(R.string.card_layout_title),
+            R.string.card_layout_desc,
+            R.drawable.ic_settings_layout,
+            body
+        )
+    }
+
+    private fun accentChoiceCard(): MaterialCardView {
+        val options = listOf(
+            AccentColor.BLUE to R.string.accent_blue,
+            AccentColor.PURPLE to R.string.accent_purple,
+            AccentColor.GREEN to R.string.accent_green,
+            AccentColor.ORANGE to R.string.accent_orange,
+            AccentColor.PINK to R.string.accent_pink
+        )
+        val rows = options.map { (accent, titleRes) ->
+            val selected = accent == prefs.accentColor
+            val swatch = View(this).apply {
+                background = GradientDrawable().apply {
+                    shape = GradientDrawable.OVAL
+                    setColor(accent.accent(isDarkMode()))
+                }
+            }
+            val mark = ImageView(this).apply {
+                setImageResource(R.drawable.ic_check)
+                imageTintList = ColorStateList.valueOf(color(R.color.settings_text))
+                visibility = if (selected) View.VISIBLE else View.INVISIBLE
+            }
+            settingRow(getString(titleRes), trailing = mark).apply {
+                addView(swatch, 0, LinearLayout.LayoutParams(dp(26), dp(26)).apply {
+                    marginStart = dp(2)
+                    marginEnd = dp(12)
+                })
+                contentDescription = getString(titleRes)
+                isSelected = selected
+                isClickable = true
+                isFocusable = true
+                foreground = neutralFeedback()
+                setOnClickListener {
+                    if (!selected) {
+                        Haptics.selection(it)
+                        prefs.accentColor = accent
+                        applyAccentSurface()
+                        showLayoutDetails()
+                    }
+                }
+            }
+        }
+        return groupCard(rows)
     }
 
     private fun showLanguageDetails() {
@@ -602,10 +816,17 @@ class SettingsActivity : AppCompatActivity() {
                 getString(R.string.help_coverage_title),
                 getString(R.string.help_coverage_desc)
             ),
-            infoRow(
-                getString(R.string.help_support_title),
-                getString(R.string.help_support_desc)
-            )
+            actionRow(
+                R.string.help_support_title,
+                getString(R.string.help_support_desc),
+                R.drawable.ic_settings_help
+            ) {
+                val email = getString(R.string.support_email)
+                val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")).apply {
+                    putExtra(Intent.EXTRA_SUBJECT, getString(R.string.app_name))
+                }
+                if (intent.resolveActivity(packageManager) != null) startActivity(intent)
+            }
         )))
         showDetail(
             getString(R.string.card_help_title),
@@ -737,15 +958,15 @@ class SettingsActivity : AppCompatActivity() {
         selected: String,
         onSelected: (String) -> Unit
     ): MaterialCardView {
-        val marks = mutableListOf<Pair<String, TextView>>()
+        val marks = mutableListOf<Pair<String, ImageView>>()
         val rows = options.map { option ->
             val optionSummary = option.summaryRes?.let(::getString)
-            val mark = TextView(this).apply {
-                text = if (option.value == selected) "✓" else ""
-                setTextColor(color(R.color.settings_text))
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 18f)
-                gravity = Gravity.CENTER
+            val mark = ImageView(this).apply {
+                setImageResource(R.drawable.ic_check)
+                imageTintList = ColorStateList.valueOf(color(R.color.settings_text))
+                visibility = if (option.value == selected) View.VISIBLE else View.INVISIBLE
                 minimumWidth = dp(24)
+                minimumHeight = dp(24)
             }
             marks += option.value to mark
             settingRow(
@@ -762,7 +983,7 @@ class SettingsActivity : AppCompatActivity() {
                 setOnClickListener {
                     if (!isSelected) Haptics.selection(this)
                     marks.forEach { (value, selectionMark) ->
-                        selectionMark.text = if (value == option.value) "✓" else ""
+                        selectionMark.visibility = if (value == option.value) View.VISIBLE else View.INVISIBLE
                         (selectionMark.parent as? View)?.isSelected = value == option.value
                     }
                     onSelected(option.value)
@@ -805,11 +1026,11 @@ class SettingsActivity : AppCompatActivity() {
         iconRes: Int? = null,
         action: () -> Unit
     ): View {
-        val chevron = TextView(this).apply {
-            text = "›"
-            setTextColor(color(R.color.settings_secondary))
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
-            gravity = Gravity.CENTER
+        val chevron = ImageView(this).apply {
+            setImageResource(R.drawable.ic_chevron_right)
+            imageTintList = ColorStateList.valueOf(color(R.color.settings_secondary))
+            minimumWidth = dp(24)
+            minimumHeight = dp(24)
         }
         return settingRow(getString(titleRes), summary, chevron, iconRes).apply {
             contentDescription = getString(titleRes) + ". " + summary
@@ -922,6 +1143,17 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun color(res: Int) = ContextCompat.getColor(this, res)
+    private fun isDarkMode(): Boolean =
+        resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
+
+    private fun applyAccentSurface() {
+        val background = prefs.accentColor.settingsBackground(isDarkMode())
+        screenRoot.setBackgroundColor(background)
+        window.statusBarColor = background
+        window.navigationBarColor = background
+    }
+
     private fun dp(value: Int) = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP,
         value.toFloat(),

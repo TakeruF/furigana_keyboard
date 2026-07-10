@@ -23,6 +23,6 @@ Dictionaries, the recognition engine, model, and libraries included in the app a
 The app or these terms may be changed for improvement, maintenance, or legal compliance. Provision may be suspended or ended when reasonably necessary.
 
 8. Contact
-https://github.com/TakeruF/furigana_keyboard/issues
+support@hanlu.app
 
 These terms do not limit consumer rights that cannot be waived under applicable law.

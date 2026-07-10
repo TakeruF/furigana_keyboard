@@ -2,8 +2,8 @@ Furigana Keyboard Privacy Policy
 Effective: July 10, 2026
 
 1. Provider and contact
-Furigana Keyboard is provided by the Furigana Keyboard Project. Privacy inquiries may be submitted through:
-https://github.com/TakeruF/furigana_keyboard/issues
+Furigana Keyboard is provided by the Furigana Keyboard Project. Privacy inquiries may be submitted to:
+support@hanlu.app
 
 2. Information collected
 The app developer does not access, collect, or transmit typed text, handwriting strokes, personal information, device identifiers, or location. The app has no account, advertising, or developer-operated analytics features. When Furigana Plus is enabled, Google ML Kit may process service-performance and utilization metrics as described in Google's ML Kit privacy documentation. Handwriting strokes, typed text, and recognition results are not sent to Google.

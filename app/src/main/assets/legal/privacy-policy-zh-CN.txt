@@ -2,8 +2,8 @@
 生效日期：2026年7月10日
 
 1. 提供方和联系方式
-“振假名键盘”（以下简称“本应用”）由 Furigana Keyboard Project 提供。隐私相关咨询可通过以下项目窗口提交：
-https://github.com/TakeruF/furigana_keyboard/issues
+“振假名键盘”（以下简称“本应用”）由 Furigana Keyboard Project 提供。隐私相关咨询可发送至以下电子邮箱：
+support@hanlu.app
 
 2. 收集的信息
 本应用开发者不会访问、收集或传输输入文字、手写笔画、个人信息、设备标识符或位置信息。本应用不提供账号、广告或由开发者运营的分析功能。启用Furigana Plus后，Google ML Kit可能会按照其隐私说明处理服务性能和使用情况指标。手写笔画、输入文字和识别结果不会发送给Google。

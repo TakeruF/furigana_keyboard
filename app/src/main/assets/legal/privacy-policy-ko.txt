@@ -2,8 +2,8 @@
 시행일: 2026년 7월 10일
 
 1. 제공자 및 문의
-후리가나 키보드(이하 “본 앱”)는 Furigana Keyboard Project에서 제공합니다. 개인정보 관련 문의는 다음 프로젝트 창구로 접수할 수 있습니다.
-https://github.com/TakeruF/furigana_keyboard/issues
+후리가나 키보드(이하 “본 앱”)는 Furigana Keyboard Project에서 제공합니다. 개인정보 관련 문의는 다음 이메일 주소로 접수할 수 있습니다.
+support@hanlu.app
 
 2. 수집하는 정보
 본 앱 개발자는 입력 문자, 필기 스트로크, 개인정보, 기기 식별자 또는 위치를 접근, 수집 또는 전송하지 않습니다. 계정, 광고 및 개발자가 운영하는 분석 기능도 없습니다. Furigana Plus를 사용하면 Google ML Kit가 자체 개인정보 안내에 따라 서비스 성능 및 이용 지표를 처리할 수 있습니다. 필기 스트로크, 입력 문자 및 인식 결과는 Google로 전송되지 않습니다.

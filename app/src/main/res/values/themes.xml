@@ -22,6 +22,9 @@
         <item name="android:minWidth">0dp</item>
         <item name="android:minHeight">0dp</item>
         <item name="android:padding">0dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAlignment">center</item>
+        <item name="android:includeFontPadding">false</item>
         <item name="android:maxLines">1</item>
         <item name="android:singleLine">true</item>
         <item name="android:stateListAnimator">@null</item>
@@ -37,6 +40,16 @@
         <item name="android:textColor">@color/kbd_on_accent</item>
     </style>
 
+    <!-- Icon-only keyboard control; src is rendered independently of text metrics. -->
+    <style name="KeyboardIconKey" parent="android:Widget.ImageButton">
+        <item name="android:background">@drawable/key_function_background</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:scaleType">center</item>
+        <item name="android:stateListAnimator">@null</item>
+    </style>
+
     <!-- Borderless actions shown around the handwriting canvas. -->
     <style name="CanvasActionKey" parent="android:Widget.Button">
         <item name="android:background">@drawable/candidate_background</item>
@@ -46,6 +59,9 @@
         <item name="android:minWidth">0dp</item>
         <item name="android:minHeight">0dp</item>
         <item name="android:padding">0dp</item>
+        <item name="android:gravity">center</item>
+        <item name="android:textAlignment">center</item>
+        <item name="android:includeFontPadding">false</item>
         <item name="android:maxLines">1</item>
         <item name="android:singleLine">true</item>
         <item name="android:stateListAnimator">@null</item>
