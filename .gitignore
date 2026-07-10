@@ -9,3 +9,15 @@
 .externalNativeBuild
 .cxx/
 *.apk
+
+# Generated iOS project and local Xcode state (regenerate with XcodeGen).
+/ios/FuriganaKeyboard.xcodeproj/
+/ios/DerivedData/
+*.xcuserstate
+
+# About-site build and local tooling output.
+/about/node_modules/
+/about/.next/
+/about/.vinext/
+/about/.wrangler/
+/about/dist/
