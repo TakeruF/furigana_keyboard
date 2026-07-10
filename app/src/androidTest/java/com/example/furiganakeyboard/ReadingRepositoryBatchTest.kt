@@ -34,4 +34,14 @@ class ReadingRepositoryBatchTest {
             assertTrue(repository.suggestByReading("にほん", 8).any { it.surface == "日本" })
         }
     }
+
+    @Test
+    fun readingConversionPromotesWordPlusParticleComposition() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val candidates = repository.suggestByReading("きょうは", 8)
+
+            assertEquals("今日は", candidates.first().surface)
+            assertEquals(listOf("きょうは"), candidates.first().readings)
+        }
+    }
 }

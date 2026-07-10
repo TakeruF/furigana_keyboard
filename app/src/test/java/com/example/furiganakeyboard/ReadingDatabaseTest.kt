@@ -81,6 +81,28 @@ class ReadingDatabaseTest {
         }
     }
 
+    @Test
+    fun todayIsThePreferredExactWordForKyouPhraseComposition() {
+        connect().use { db ->
+            db.prepareStatement(
+                """SELECT surface, min(priority) AS best_priority
+                   FROM word_reading
+                   WHERE reading=?
+                   GROUP BY surface
+                   ORDER BY CASE WHEN surface=? THEN 1 ELSE 0 END,
+                            best_priority, length(surface) DESC, surface
+                   LIMIT 1"""
+            ).use { statement ->
+                statement.setString(1, "きょう")
+                statement.setString(2, "きょう")
+                statement.executeQuery().use { result ->
+                    assertTrue(result.next())
+                    assertEquals("今日", result.getString(1))
+                }
+            }
+        }
+    }
+
     private fun connect(): Connection = DriverManager.getConnection("jdbc:sqlite:${database.absolutePath}")
 
     private fun metadata(db: Connection, key: String): String = db.prepareStatement(

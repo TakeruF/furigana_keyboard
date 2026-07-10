@@ -14,6 +14,8 @@ import androidx.core.content.ContextCompat
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.RomajiConverter
 import com.example.furiganakeyboard.settings.ReadingMode
+import com.example.furiganakeyboard.settings.AccentColor
+import com.example.furiganakeyboard.settings.CandidateTextSize
 
 /**
  * Horizontal, scrollable candidate bar. The first (best) candidate is shown in
@@ -43,6 +45,8 @@ class CandidateBarView @JvmOverloads constructor(
 
     private var candidates: List<CandidateUiModel> = emptyList()
     private var readingMode: ReadingMode = ReadingMode.KANA
+    private var accentColor: Int = color(R.color.kbd_accent)
+    private var candidateTextSize: CandidateTextSize = CandidateTextSize.STANDARD
 
     init {
         isFillViewport = true
@@ -65,6 +69,20 @@ class CandidateBarView @JvmOverloads constructor(
     fun setReadingMode(mode: ReadingMode) {
         if (readingMode == mode) return
         readingMode = mode
+        bindCandidates(resetScroll = false)
+    }
+
+    /** Apply the user-selected accent to the leading candidate. */
+    fun setAccentColor(value: AccentColor) {
+        val resolved = value.accent(AccentStyle.isDark(context))
+        if (accentColor == resolved) return
+        accentColor = resolved
+        bindCandidates(resetScroll = false)
+    }
+
+    fun setCandidateTextSize(value: CandidateTextSize) {
+        if (candidateTextSize == value) return
+        candidateTextSize = value
         bindCandidates(resetScroll = false)
     }
 
@@ -136,8 +154,10 @@ class CandidateBarView @JvmOverloads constructor(
                 else R.drawable.candidate_background
             )
             primary.text = value.text
+            primary.setTextSize(TypedValue.COMPLEX_UNIT_SP, candidateTextSize.primarySp)
+            reading.setTextSize(TypedValue.COMPLEX_UNIT_SP, candidateTextSize.readingSp)
             primary.setTextColor(
-                color(if (highlight) R.color.kbd_accent else R.color.kbd_on_surface)
+                if (highlight) accentColor else color(R.color.kbd_on_surface)
             )
             val readingText = readingText(value)
             reading.text = readingText

@@ -29,6 +29,9 @@ import com.example.furiganakeyboard.view.Haptics
 import com.example.furiganakeyboard.view.QwertyPadView
 import com.example.furiganakeyboard.view.RepeatOnTouchListener
 import com.example.furiganakeyboard.view.SymbolPadView
+import com.example.furiganakeyboard.view.AccentStyle
+import com.example.furiganakeyboard.view.KeyboardPanelContainer
+import com.example.furiganakeyboard.view.KeySounds
 
 /** Japanese handwriting IME with optional Plus recognition and bundled fallback. */
 class FuriganaImeService : InputMethodService() {
@@ -39,11 +42,12 @@ class FuriganaImeService : InputMethodService() {
     private lateinit var candidateBar: CandidateBarView
     private lateinit var handwritingView: HandwritingView
     private lateinit var handwritingPanel: View
-    private lateinit var panelContainer: FrameLayout
+    private lateinit var panelContainer: KeyboardPanelContainer
     private var symbolPad: SymbolPadView? = null
     private var englishPad: QwertyPadView? = null
     private var romajiPad: QwertyPadView? = null
     private lateinit var enterKey: Button
+    private lateinit var questionKey: Button
     private lateinit var symbolModeKey: Button
     private lateinit var englishModeKey: Button
     private lateinit var romajiModeKey: Button
@@ -70,6 +74,9 @@ class FuriganaImeService : InputMethodService() {
         candidatePipeline = CandidatePipeline({ ReadingRepository(this) })
         candidatePipeline.prewarm()
         Haptics.enabled = prefs.haptics
+        Haptics.strength = prefs.hapticStrength
+        KeySounds.enabled = prefs.keySound
+        KeySounds.volumeStep = prefs.keySoundVolume
     }
 
     @SuppressLint("InflateParams")
@@ -84,9 +91,12 @@ class FuriganaImeService : InputMethodService() {
         handwritingPanel = root.findViewById(R.id.handwritingPanel)
         panelContainer = root.findViewById(R.id.panelContainer)
         enterKey = root.findViewById(R.id.keyEnter)
+        questionKey = root.findViewById(R.id.keyQuestion)
         symbolModeKey = root.findViewById(R.id.keySymbol)
         englishModeKey = root.findViewById(R.id.keyEnglish)
         romajiModeKey = root.findViewById(R.id.keyRomaji)
+        applyAccentColor()
+        applyLayoutPreferences()
 
         wireHandwriting()
         wireControlKeys(root)
@@ -106,6 +116,11 @@ class FuriganaImeService : InputMethodService() {
         candidatePipeline.invalidate()
         recognizer?.cancelPending()
         Haptics.enabled = prefs.haptics
+        Haptics.strength = prefs.hapticStrength
+        KeySounds.enabled = prefs.keySound
+        KeySounds.volumeStep = prefs.keySoundVolume
+        applyAccentColor()
+        applyLayoutPreferences()
         applyReadingMode(prefs.readingMode)
         updateEnterLabel(info)
         showPanel(Panel.HANDWRITING)
@@ -209,7 +224,7 @@ class FuriganaImeService : InputMethodService() {
                 }
             }
             Panel.ROMAJI -> if (romajiPad == null) {
-                romajiPad = QwertyPadView(this).also { pad ->
+                romajiPad = QwertyPadView(this, includeJapaneseLongVowelKey = true).also { pad ->
                     addPanel(pad)
                     pad.onText = { appendRomajiInput(it) }
                     pad.onDelete = { deleteRomajiInput() }
@@ -270,10 +285,7 @@ class FuriganaImeService : InputMethodService() {
 
         candidateBar.onCandidateSelected = { candidate ->
             when (candidate.kind) {
-                CandidateKind.CHARACTER -> {
-                    appendToComposition(candidate.text, listOf(candidate.text))
-                    handwritingView.clear()
-                }
+                CandidateKind.CHARACTER -> commitCharacterCandidate(candidate.text)
                 CandidateKind.WORD -> commitWordCandidate(candidate.text)
                 CandidateKind.STATUS -> Unit
             }
@@ -285,6 +297,7 @@ class FuriganaImeService : InputMethodService() {
         lastCharacterAlternatives = alternatives.distinct()
         val value = composition.append(text)
         currentInputConnection?.setComposingText(value, 1)
+        updateEnterLabel(currentInputEditorInfo)
         latestCharacterAlternatives = emptyList()
         showWordSuggestions()
     }
@@ -309,6 +322,7 @@ class FuriganaImeService : InputMethodService() {
                 val baseBeforeCurrent = composition.text
                 composition.replace(result.topSurface)
                 currentInputConnection?.setComposingText(result.topSurface, 1)
+                updateEnterLabel(currentInputEditorInfo)
                 val resolved = result.candidates.map {
                     CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
                 }
@@ -357,18 +371,26 @@ class FuriganaImeService : InputMethodService() {
         handwritingView.clear()
     }
 
+    /** A deliberate candidate tap selects and confirms the character immediately. */
+    private fun commitCharacterCandidate(text: String) {
+        val surface = composition.append(text)
+        currentInputConnection?.setComposingText(surface, 1)
+        finishComposition()
+        handwritingView.clear()
+    }
+
     private fun showStatus(message: String) {
         candidateBar.setCandidates(listOf(CandidateUiModel(message, kind = CandidateKind.STATUS)))
     }
 
-    private fun Button.onKey(action: () -> Unit) = setOnClickListener {
+    private fun View.onKey(action: () -> Unit) = setOnClickListener {
         Haptics.key(it)
         action()
     }
 
     @SuppressLint("ClickableViewAccessibility")
     private fun wireControlKeys(root: View) {
-        root.findViewById<Button>(R.id.keyKeyboardSwitch).onKey {
+        root.findViewById<View>(R.id.keyKeyboardSwitch).onKey {
             finishComposition()
             getSystemService(InputMethodManager::class.java).showInputMethodPicker()
         }
@@ -381,7 +403,7 @@ class FuriganaImeService : InputMethodService() {
         root.findViewById<Button>(R.id.keySpace).onKey { commitDirect(" ") }
         root.findViewById<Button>(R.id.keyComma).onKey { commitDirect("、") }
         root.findViewById<Button>(R.id.keyPeriod).onKey { commitDirect("。") }
-        root.findViewById<Button>(R.id.keyLineBreak).onKey { commitDirect("\n") }
+        questionKey.onKey { commitDirect("？") }
         enterKey.onKey { sendEnter() }
     }
 
@@ -397,11 +419,31 @@ class FuriganaImeService : InputMethodService() {
         candidateBar.setReadingMode(mode)
     }
 
+    private fun applyAccentColor() {
+        if (!this::enterKey.isInitialized || !this::candidateBar.isInitialized) return
+        val accent = prefs.accentColor
+        AccentStyle.apply(enterKey, accent)
+        candidateBar.setAccentColor(accent)
+        symbolPad?.setAccentColor(accent)
+        englishPad?.setAccentColor(accent)
+        romajiPad?.setAccentColor(accent)
+    }
+
+    private fun applyLayoutPreferences() {
+        if (!this::panelContainer.isInitialized || !this::candidateBar.isInitialized) return
+        panelContainer.canvasScale = prefs.keyboardHeight.canvasScale
+        candidateBar.setCandidateTextSize(prefs.candidateTextSize)
+    }
+
     private fun updateEnterLabel(info: EditorInfo?) {
-        val label = when (editorAction(info)) {
-            EditorInfo.IME_ACTION_SEND -> getString(R.string.key_send)
-            EditorInfo.IME_ACTION_SEARCH -> getString(R.string.key_search)
-            else -> getString(R.string.key_enter)
+        val label = if (!composition.isEmpty) {
+            getString(R.string.key_convert)
+        } else {
+            when (editorAction(info)) {
+                EditorInfo.IME_ACTION_SEND -> getString(R.string.key_send)
+                EditorInfo.IME_ACTION_SEARCH -> getString(R.string.key_search)
+                else -> getString(R.string.key_enter)
+            }
         }
         currentEnterLabel = label
         enterKey.text = label
@@ -413,6 +455,9 @@ class FuriganaImeService : InputMethodService() {
     private fun appendRomajiInput(text: String) {
         if (text.length == 1 && text[0].isLetter() && text[0].code < 128) {
             romajiRaw.append(text.lowercase())
+            updateRomajiComposition()
+        } else if (text == JAPANESE_LONG_VOWEL_MARK) {
+            romajiRaw.append(text)
             updateRomajiComposition()
         } else {
             commitDirect(text)
@@ -426,6 +471,7 @@ class FuriganaImeService : InputMethodService() {
         composition.replace(display)
         clearAlternativeContext()
         currentInputConnection?.setComposingText(display, 1)
+        updateEnterLabel(currentInputEditorInfo)
 
         if (converted.pending.isNotEmpty() || converted.kana.isEmpty()) {
             candidateBar.setCandidates(
@@ -455,13 +501,16 @@ class FuriganaImeService : InputMethodService() {
             deleteBeforeCursor()
             return
         }
-        romajiRaw.setLength(romajiRaw.length - 1)
+        val remainingRaw = RomajiKanaConverter.deleteLastUnit(romajiRaw.toString())
+        romajiRaw.setLength(0)
+        romajiRaw.append(remainingRaw)
         if (romajiRaw.isEmpty()) {
             candidatePipeline.invalidate()
             composition.clear()
             currentInputConnection?.setComposingText("", 1)
             currentInputConnection?.finishComposingText()
             candidateBar.clear()
+            updateEnterLabel(currentInputEditorInfo)
         } else {
             updateRomajiComposition()
         }
@@ -480,6 +529,7 @@ class FuriganaImeService : InputMethodService() {
         candidatePipeline.invalidate()
         recognizer?.cancelPending()
         if (clearCandidates && this::candidateBar.isInitialized) candidateBar.clear()
+        if (this::enterKey.isInitialized) updateEnterLabel(currentInputEditorInfo)
     }
 
     private fun deleteBeforeCursor() {
@@ -492,6 +542,7 @@ class FuriganaImeService : InputMethodService() {
                 connection.finishComposingText()
             }
             else connection.setComposingText(remaining, 1)
+            updateEnterLabel(currentInputEditorInfo)
             showWordSuggestions()
             return
         }
@@ -509,6 +560,10 @@ class FuriganaImeService : InputMethodService() {
     }
 
     private fun sendEnter() {
+        if (!composition.isEmpty) {
+            finishComposition()
+            return
+        }
         finishComposition()
         val connection = currentInputConnection ?: return
         val action = editorAction(currentInputEditorInfo)
@@ -539,5 +594,6 @@ class FuriganaImeService : InputMethodService() {
     companion object {
         private const val MAX_WORD_CANDIDATES = 8
         private const val MAX_RECOGNITION_CONTEXT = 20
+        private const val JAPANESE_LONG_VOWEL_MARK = "ー"
     }
 }

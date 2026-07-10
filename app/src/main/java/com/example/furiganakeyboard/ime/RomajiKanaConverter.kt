@@ -64,12 +64,28 @@ object RomajiKanaConverter {
         }
     }
 
+    /** Short canonical spelling for rebuilding a visible kana prefix on delete. */
+    private val canonicalRomajiByKana: Map<String, String> = buildMap {
+        syllables.forEach { (romaji, kana) ->
+            val current = get(kana)
+            if (current == null || romaji.length < current.length) put(kana, romaji)
+        }
+        put("ん", "nn")
+        put(JAPANESE_LONG_VOWEL_MARK.toString(), JAPANESE_LONG_VOWEL_MARK.toString())
+    }
+
     fun convert(rawInput: String): Result {
         val input = rawInput.lowercase()
         val kana = StringBuilder()
         var index = 0
         while (index < input.length) {
             val current = input[index]
+
+            if (current == JAPANESE_LONG_VOWEL_MARK) {
+                kana.append(current)
+                index++
+                continue
+            }
 
             if (index + 1 < input.length &&
                 current == input[index + 1] &&
@@ -117,6 +133,53 @@ object RomajiKanaConverter {
         return Result(kana.toString(), "")
     }
 
+    /**
+     * Removes one visible input unit. Completed kana are removed as a whole
+     * syllable ("sa" -> ""), while an incomplete romaji suffix still steps
+     * back one key at a time ("sh" -> "s").
+     */
+    fun deleteLastUnit(rawInput: String): String {
+        if (rawInput.isEmpty()) return rawInput
+        val converted = convert(rawInput)
+        if (converted.pending.isNotEmpty() || converted.kana.isEmpty()) {
+            return rawInput.dropLast(1)
+        }
+
+        val targetKana = converted.kana.dropLastCodePoint()
+        for (prefixLength in rawInput.lastIndex downTo 0) {
+            val prefix = rawInput.substring(0, prefixLength)
+            if (convert(prefix).displayText == targetKana) return prefix
+        }
+
+        // A multi-kana syllable can have no raw prefix for its visible base:
+        // "kyu" -> "きゅ", but "ky" is not "き". Rebuild the remaining
+        // visible kana with canonical spellings ("き" -> "ki"). This also
+        // covers the internal small-tsu case ("tta" -> "っ").
+        canonicalRawForKana(targetKana)?.let { return it }
+        return rawInput.dropLast(1)
+    }
+
+    private fun canonicalRawForKana(kana: String): String? {
+        if (kana.isEmpty()) return ""
+        val memo = HashMap<Int, String?>()
+
+        fun buildFrom(index: Int): String? {
+            if (index == kana.length) return ""
+            if (memo.containsKey(index)) return memo[index]
+            val best = canonicalRomajiByKana.entries
+                .asSequence()
+                .filter { (visible, _) -> kana.startsWith(visible, index) }
+                .mapNotNull { (visible, romaji) ->
+                    buildFrom(index + visible.length)?.let { suffix -> romaji + suffix }
+                }
+                .minWithOrNull(compareBy<String> { it.length }.thenBy { it })
+            memo[index] = best
+            return best
+        }
+
+        return buildFrom(0)?.takeIf { convert(it).displayText == kana }
+    }
+
     /** Longest-prefix lookup is bounded by the longest supported syllable. */
     private fun longestMatch(input: String, start: Int): Pair<String, Int>? {
         var node = syllableTrie
@@ -135,4 +198,11 @@ object RomajiKanaConverter {
     }
 
     private fun Char.isConsonant(): Boolean = this in 'a'..'z' && this !in "aiueo"
+
+    private fun String.dropLastCodePoint(): String {
+        if (isEmpty()) return this
+        return substring(0, offsetByCodePoints(length, -1))
+    }
+
+    private const val JAPANESE_LONG_VOWEL_MARK = 'ー'
 }

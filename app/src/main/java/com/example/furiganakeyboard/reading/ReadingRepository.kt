@@ -105,9 +105,13 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         return surfaces.map { WordReadingCandidate(it, readings[it].orEmpty()) }
     }
 
-    /** JMdict conversion candidates whose kana reading starts with [prefix]. */
+    /**
+     * JMdict conversion candidates whose kana reading starts with [prefix].
+     * Natural word + particle compositions (きょう + は -> 今日は) are
+     * promoted ahead of unrelated whole-word homophones such as 教派.
+     */
     override fun suggestByReading(prefix: String, limit: Int): List<WordReadingCandidate> {
-        if (prefix.isEmpty()) return emptyList()
+        if (prefix.isEmpty() || limit <= 0) return emptyList()
         val upperBound = prefix + String(Character.toChars(Character.MAX_CODE_POINT))
         val surfaces = database.rawQuery(
             """SELECT surface, min(priority) AS best_priority,
@@ -124,8 +128,47 @@ class ReadingRepository(context: Context) : ReadingDataSource {
             }
         }
         val matchingReadings = matchingWordReadings(surfaces, prefix, upperBound)
-        return surfaces.map { WordReadingCandidate(it, matchingReadings[it].orEmpty()) }
+        val wholeWordCandidates = surfaces.map {
+            WordReadingCandidate(it, matchingReadings[it].orEmpty())
+        }
+        return (composedReadingCandidates(prefix, limit) + wholeWordCandidates)
+            .distinctBy { it.surface }
+            .take(limit)
     }
+
+    private fun composedReadingCandidates(
+        reading: String,
+        limit: Int
+    ): List<WordReadingCandidate> = buildList {
+        for (split in reading.lastIndex downTo 1) {
+            val suffix = reading.substring(split)
+            if (suffix !in COMPOSABLE_KANA_SUFFIXES) continue
+            val wordReading = reading.substring(0, split)
+            exactSurfacesByReading(wordReading, COMPOSED_PER_SPLIT_LIMIT)
+                .asSequence()
+                .filter { it != wordReading }
+                .forEach { surface ->
+                    add(WordReadingCandidate(surface + suffix, listOf(reading)))
+                }
+            if (size >= limit) break
+        }
+    }.distinctBy { it.surface }.take(limit)
+
+    private fun exactSurfacesByReading(reading: String, limit: Int): List<String> =
+        database.rawQuery(
+            """SELECT surface, min(priority) AS best_priority
+               FROM word_reading
+               WHERE reading=?
+               GROUP BY surface
+               ORDER BY CASE WHEN surface=? THEN 1 ELSE 0 END,
+                        best_priority, length(surface) DESC, surface
+               LIMIT ?""",
+            arrayOf(reading, reading, limit.toString())
+        ).use { cursor ->
+            buildList {
+                while (cursor.moveToNext()) add(cursor.getString(0))
+            }
+        }
 
     /** Resolve completion candidates for several recognition alternatives in two queries. */
     override fun suggestForPrefixes(
@@ -233,6 +276,12 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         private val LEGACY_DB_FILES = listOf(
             "reading-v1.db", "reading-v1.db.sha256",
             "reading-v2.db", "reading-v2.db.sha256"
+        )
+        private const val COMPOSED_PER_SPLIT_LIMIT = 4
+        private val COMPOSABLE_KANA_SUFFIXES = setOf(
+            "は", "が", "を", "に", "で", "と", "も", "の", "へ", "や", "か", "ね", "よ",
+            "から", "まで", "より", "ので", "のに", "には", "では", "とは", "へは", "にも",
+            "でも", "とも", "しか", "だけ"
         )
     }
 }
