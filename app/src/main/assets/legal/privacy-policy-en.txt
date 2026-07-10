@@ -6,16 +6,16 @@ Furigana Keyboard is provided by the Furigana Keyboard Project. Privacy inquirie
 https://github.com/TakeruF/furigana_keyboard/issues
 
 2. Information collected
-The app developer does not access, collect, or transmit typed text, handwriting strokes, personal information, device identifiers, usage data, or location. The app has no account, advertising, or analytics features.
+The app developer does not access, collect, or transmit typed text, handwriting strokes, personal information, device identifiers, or location. The app has no account, advertising, or developer-operated analytics features. When Furigana Plus is enabled, Google ML Kit may process service-performance and utilization metrics as described in Google's ML Kit privacy documentation. Handwriting strokes, typed text, and recognition results are not sent to Google.
 
 3. Input processing
 Handwriting strokes and composing text are processed temporarily on the device to recognize characters and show candidates. The app does not retain input history. Text that you confirm is delivered through Android's input connection to the app currently receiving keyboard input. That receiving app's privacy policy governs its subsequent handling of the text.
 
 4. Network communication
-The app does not request Android's INTERNET permission and does not contact an external server for recognition, dictionary lookup, or settings.
+The app requests Android's INTERNET permission for the optional Furigana Plus feature. ML Kit uses it to download and update the Japanese recognition model and may contact Google for bug fixes, hardware-compatibility information, and service metrics. Recognition and dictionary lookup run on the device. When Plus is disabled, the bundled Zinnia model remains available without a network connection.
 
 5. On-device storage
-The app stores preferences such as display language, reading style, continuous handwriting, and haptic feedback on the device. The recognition model and dictionaries are also stored locally. Input content and handwriting history are not stored. App backup is disabled.
+The app stores preferences such as display language, reading style, continuous handwriting, haptic feedback, and the Furigana Plus switch on the device. The bundled recognition model, dictionaries, and an approximately 20 MB Plus model after download are stored locally. Input content and handwriting history are not stored. App backup is disabled.
 
 6. Permissions and access
 Android grants the app access to the input field in its role as an input method. The app does not request sensitive runtime permissions for the camera, microphone, location, contacts, photos, files, or advertising identifiers.
@@ -24,9 +24,9 @@ Android grants the app access to the input field in its role as an input method.
 Preferences remain until you change them, clear app data in Android settings, or uninstall the app. Because typed text and handwriting strokes are not retained by the app, there is no server-held input data to request for deletion.
 
 8. Third-party materials
-The app uses Zinnia, the Tegaki Japanese model, KANJIDIC2, JMdict, AndroidX, Material Components, and Kotlin. They operate locally in this app and do not transmit user data from it. Sources and licenses are available under Settings > More > About & licenses.
+The app uses Google ML Kit for optional on-device digital-ink recognition. ML Kit's terms and privacy information are available at https://developers.google.com/ml-kit/terms. The bundled fallback uses Zinnia and the Tegaki Japanese model; reading data uses KANJIDIC2 and JMdict. Sources and open-source licenses are available under Settings > More > About & licenses.
 
 9. Changes
 If app functionality or data handling changes, this policy and the in-app disclosures will be updated. Material changes will be communicated by an appropriate method.
 
-This policy describes the current fully offline version of the app.
+The core keyboard remains usable offline. Furigana Plus is optional and can be turned off under Settings > Handwriting.

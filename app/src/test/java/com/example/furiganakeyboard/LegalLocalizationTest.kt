@@ -38,6 +38,20 @@ class LegalLocalizationTest {
         }
     }
 
+    @Test
+    fun plusNetworkDisclosureIsPresentInEveryPrivacyPolicy() {
+        supportedLocales.forEach { locale ->
+            val text = projectFile("src/main/assets/legal/privacy-policy-$locale.txt").readText()
+            assertTrue("privacy-policy-$locale does not disclose ML Kit", text.contains("ML Kit"))
+            assertTrue("privacy-policy-$locale does not disclose Plus", text.contains("Plus"))
+        }
+        assertTrue(
+            "Manifest is missing Plus model delivery permission",
+            projectFile("src/main/AndroidManifest.xml").readText()
+                .contains("android.permission.INTERNET")
+        )
+    }
+
     private fun projectFile(relativeToApp: String): File = sequenceOf(
         File(relativeToApp),
         File("app/$relativeToApp")
@@ -64,7 +78,12 @@ class LegalLocalizationTest {
             "third_party_notices_desc",
             "legal_effective_date",
             "license_app_libraries",
-            "about_app_libraries"
+            "about_app_libraries",
+            "settings_plus_recognition",
+            "settings_plus_recognition_desc",
+            "settings_plus_note",
+            "privacy_model_only",
+            "about_plus_desc"
         )
         private val requiredLicenseFiles = listOf(
             "EDRDG-CC-BY-SA-4.0.txt",

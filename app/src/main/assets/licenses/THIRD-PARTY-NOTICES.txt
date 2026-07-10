@@ -21,3 +21,11 @@ https://github.com/JetBrains/kotlin
 
 This notice supplements the separate notices for Zinnia, the Tegaki Japanese
 model, and EDRDG dictionary data available from the same settings screen.
+
+Furigana Plus optionally uses Google ML Kit Digital Ink Recognition. ML Kit is
+provided under the Google APIs Terms of Service and the additional ML Kit terms:
+https://developers.google.com/ml-kit/terms
+
+ML Kit recognition runs on device after its Japanese model is downloaded. Its
+model delivery and service-data behavior are described in the localized privacy
+policy bundled with this application.
