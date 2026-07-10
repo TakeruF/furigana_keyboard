@@ -24,7 +24,15 @@ target_compile_definitions(
     HAVE_MMAP
     WORDS_LITENDIAN
 )
-target_compile_options(furigana_zinnia PRIVATE -Wall -Wextra -Wno-unused-parameter)
+target_compile_options(
+    furigana_zinnia
+    PRIVATE
+    -Wall
+    -Wextra
+    -Wno-unused-parameter
+    "-ffile-prefix-map=${CMAKE_SOURCE_DIR}=."
+    "-fdebug-prefix-map=${CMAKE_SOURCE_DIR}=."
+)
 target_link_options(
     furigana_zinnia
     PRIVATE

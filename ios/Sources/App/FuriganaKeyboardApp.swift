@@ -31,6 +31,9 @@ private struct SetupView: View {
                         .font(.footnote)
                         .foregroundStyle(.secondary)
                         .padding(.horizontal, 4)
+                    Link("サポート：support@hanlu.app", destination: URL(string: "mailto:support@hanlu.app")!)
+                        .font(.footnote.weight(.semibold))
+                        .padding(.horizontal, 4)
                 }
                 .padding(20)
             }
@@ -94,4 +97,3 @@ private struct SetupView: View {
         .background(Color.green.opacity(0.09), in: RoundedRectangle(cornerRadius: 18))
     }
 }
-

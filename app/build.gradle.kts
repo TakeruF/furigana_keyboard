@@ -1,6 +1,15 @@
+import java.util.Properties
+
 plugins {
     id("com.android.application")
     id("org.jetbrains.kotlin.android")
+}
+
+val keystorePropertiesFile = rootProject.file("key.properties")
+val keystoreProperties = Properties().apply {
+    if (keystorePropertiesFile.isFile) {
+        keystorePropertiesFile.inputStream().use(::load)
+    }
 }
 
 android {
@@ -8,7 +17,7 @@ android {
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.example.furiganakeyboard"
+        applicationId = "app.hanlu.furiganakeyboard"
         minSdk = 24
         targetSdk = 34
         versionCode = 1
@@ -26,9 +35,31 @@ android {
         }
     }
 
+    signingConfigs {
+        if (keystorePropertiesFile.isFile) {
+            create("release") {
+                fun requiredProperty(name: String): String =
+                    requireNotNull(keystoreProperties.getProperty(name)) {
+                        "Missing $name in ${keystorePropertiesFile.path}"
+                    }
+
+                // Resolve storeFile relative to the real properties file. This also
+                // supports a local key.properties symlink to another project.
+                val propertiesDirectory = keystorePropertiesFile.canonicalFile.parentFile
+                storeFile = propertiesDirectory.resolve(requiredProperty("storeFile")).canonicalFile
+                storePassword = requiredProperty("storePassword")
+                keyAlias = requiredProperty("keyAlias")
+                keyPassword = requiredProperty("keyPassword")
+            }
+        }
+    }
+
     buildTypes {
         release {
             isMinifyEnabled = false
+            if (keystorePropertiesFile.isFile) {
+                signingConfig = signingConfigs.getByName("release")
+            }
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro"

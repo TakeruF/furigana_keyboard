@@ -1,7 +1,7 @@
 name: FuriganaKeyboard
 
 options:
-  bundleIdPrefix: com.example.furiganakeyboard
+  bundleIdPrefix: app.hanlu.furiganakeyboard
   deploymentTarget:
     iOS: "16.0"
   createIntermediateGroups: true
@@ -11,8 +11,15 @@ settings:
     CURRENT_PROJECT_VERSION: 1
     MARKETING_VERSION: 1.0.0
     SWIFT_VERSION: 5.0
+    OTHER_SWIFT_FLAGS: "$(inherited) -debug-prefix-map $(SRCROOT)=."
     CODE_SIGN_STYLE: Automatic
     DEVELOPMENT_TEAM: ""
+  configs:
+    Release:
+      COPY_PHASE_STRIP: true
+      DEPLOYMENT_POSTPROCESSING: true
+      STRIP_INSTALLED_PRODUCT: true
+      STRIP_STYLE: all
 
 targets:
   FuriganaKeyboard:
@@ -30,7 +37,8 @@ targets:
           UIApplicationSupportsMultipleScenes: false
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.furiganakeyboard.ios
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard
         PRODUCT_NAME: Furigana Keyboard
         PRODUCT_MODULE_NAME: FuriganaKeyboard
         TARGETED_DEVICE_FAMILY: "1,2"
@@ -66,7 +74,7 @@ targets:
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).KeyboardViewController"
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.furiganakeyboard.ios.keyboard
+        PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard.keyboard
         PRODUCT_NAME: FuriganaKeyboardExtension
         PRODUCT_MODULE_NAME: FuriganaKeyboardExtension
         SKIP_INSTALL: true
@@ -84,7 +92,13 @@ targets:
           - HAVE_MMAP=1
           - WORDS_LITENDIAN=1
         CLANG_CXX_LANGUAGE_STANDARD: c++17
-        OTHER_CPLUSPLUSFLAGS: "$(inherited) -Wall -Wextra -Wno-unused-parameter"
+        OTHER_CFLAGS: "$(inherited) -ffile-prefix-map=$(SRCROOT)=. -fdebug-prefix-map=$(SRCROOT)=. -ffile-prefix-map=$(HOME)/GitHub/furigana_keyboard=/src -fdebug-prefix-map=$(HOME)/GitHub/furigana_keyboard=/src"
+        OTHER_CPLUSPLUSFLAGS: "$(inherited) -Wall -Wextra -Wno-unused-parameter -ffile-prefix-map=$(SRCROOT)=. -fdebug-prefix-map=$(SRCROOT)=. -ffile-prefix-map=$(HOME)/GitHub/furigana_keyboard=/src -fdebug-prefix-map=$(HOME)/GitHub/furigana_keyboard=/src"
+      configs:
+        Release:
+          DEPLOYMENT_POSTPROCESSING: true
+          STRIP_INSTALLED_PRODUCT: true
+          STRIP_STYLE: all
     dependencies:
       - sdk: libsqlite3.tbd
 
@@ -97,4 +111,4 @@ targets:
       - target: FuriganaKeyboard
     settings:
       base:
-        PRODUCT_BUNDLE_IDENTIFIER: com.example.furiganakeyboard.ios.tests
+        PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard.tests
