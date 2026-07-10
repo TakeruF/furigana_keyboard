@@ -1,7 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Root view of the IME, laid out after WeChat IME's handwriting mode:
-       top    : candidate bar (first candidate highlighted in green)
-       middle : [left function column] [big handwriting canvas] [right column]
+<!-- Handwriting-first IME layout:
+     top    : horizontally scrolling candidates
+     middle : wide writing surface with editing and punctuation shortcuts
+     bottom : input-mode and system controls
      The symbol / ABC panels are added to panelContainer at runtime. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
@@ -12,120 +13,188 @@
     android:paddingRight="4dp"
     android:paddingBottom="6dp">
 
-    <!-- Candidate bar -->
     <com.example.furiganakeyboard.view.CandidateBarView
         android:id="@+id/candidateBar"
         android:layout_width="match_parent"
-        android:layout_height="62dp" />
+        android:layout_height="60dp" />
 
-    <!-- Panels (handwriting / symbols / qwerty) -->
     <FrameLayout
         android:id="@+id/panelContainer"
         android:layout_width="match_parent"
-        android:layout_height="252dp">
+        android:layout_height="300dp">
 
-        <!-- Handwriting panel -->
         <LinearLayout
             android:id="@+id/handwritingPanel"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:orientation="horizontal">
+            android:orientation="vertical">
 
-            <!-- Left function column: switchers -->
+            <!-- Small actions stay out of the writing surface. -->
             <LinearLayout
-                android:layout_width="62dp"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
+                android:layout_width="match_parent"
+                android:layout_height="48dp"
+                android:gravity="center_vertical"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/keyRewrite"
+                    style="@style/CanvasActionKey"
+                    android:layout_width="wrap_content"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:minWidth="72dp"
+                    android:text="@string/key_rewrite" />
+
+                <Space
+                    android:layout_width="0dp"
+                    android:layout_height="1dp"
+                    android:layout_weight="1" />
+
+                <Button
+                    android:id="@+id/keyDelete"
+                    style="@style/CanvasActionKey"
+                    android:layout_width="54dp"
+                    android:layout_height="match_parent"
+                    android:layout_marginStart="2dp"
+                    android:layout_marginEnd="2dp"
+                    android:contentDescription="@string/key_delete_desc"
+                    android:text="@string/key_delete"
+                    android:textSize="22sp" />
+            </LinearLayout>
+
+            <FrameLayout
+                android:layout_width="match_parent"
+                android:layout_height="0dp"
+                android:layout_weight="1">
+
+                <com.example.furiganakeyboard.view.HandwritingView
+                    android:id="@+id/handwritingView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:layout_margin="2dp"
+                    android:layout_marginEnd="48dp"
+                    android:background="@drawable/canvas_background" />
+
+                <!-- Frequently used Japanese punctuation, like the reference UI. -->
+                <LinearLayout
+                    android:layout_width="46dp"
+                    android:layout_height="match_parent"
+                    android:layout_gravity="end"
+                    android:orientation="vertical">
+
+                    <Button
+                        android:id="@+id/keyComma"
+                        style="@style/CanvasActionKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/key_comma_desc"
+                        android:text="@string/key_punctuation_comma"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/keyPeriod"
+                        style="@style/CanvasActionKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/key_period_desc"
+                        android:text="@string/key_punctuation_period"
+                        android:textSize="20sp" />
+
+                    <Button
+                        android:id="@+id/keyQuestion"
+                        style="@style/CanvasActionKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/key_question_desc"
+                        android:text="@string/key_punctuation_question"
+                        android:textSize="19sp" />
+
+                    <Button
+                        android:id="@+id/keyExclamation"
+                        style="@style/CanvasActionKey"
+                        android:layout_width="match_parent"
+                        android:layout_height="0dp"
+                        android:layout_weight="1"
+                        android:contentDescription="@string/key_exclamation_desc"
+                        android:text="@string/key_punctuation_exclamation"
+                        android:textSize="19sp" />
+                </LinearLayout>
+            </FrameLayout>
+
+            <!-- Requested positions: keyboard picker at far left, ABC at the
+                 former language/read-mode position beside the action key. -->
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="58dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/keyKeyboardSwitch"
+                    style="@style/SideKey"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_margin="3dp"
+                    android:layout_weight="1"
+                    android:contentDescription="@string/key_keyboard_switch_desc"
+                    android:text="@string/key_keyboard_switch"
+                    android:textSize="20sp" />
 
                 <Button
                     android:id="@+id/keySymbol"
                     style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_margin="3dp"
                     android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:text="@string/key_symbol" />
-
-                <Button
-                    android:id="@+id/keyAbc"
-                    style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:text="@string/key_abc" />
-
-                <Button
-                    android:id="@+id/keyMode"
-                    style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:text="@string/mode_kana" />
+                    android:contentDescription="@string/key_symbol"
+                    android:text="@string/key_numbers"
+                    android:textSize="16sp" />
 
                 <Button
                     android:id="@+id/keySettings"
                     style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_margin="3dp"
                     android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:text="@string/key_settings" />
-            </LinearLayout>
-
-            <!-- Big handwriting canvas -->
-            <com.example.furiganakeyboard.view.HandwritingView
-                android:id="@+id/handwritingView"
-                android:layout_width="0dp"
-                android:layout_height="match_parent"
-                android:layout_weight="1"
-                android:layout_margin="2dp"
-                android:background="@drawable/canvas_background" />
-
-            <!-- Right function column: editing keys (WeChat order) -->
-            <LinearLayout
-                android:layout_width="62dp"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
-
-                <Button
-                    android:id="@+id/keyDelete"
-                    style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:textSize="18sp"
-                    android:text="@string/key_delete" />
-
-                <Button
-                    android:id="@+id/keyRewrite"
-                    style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:textSize="12sp"
-                    android:text="@string/key_rewrite" />
+                    android:contentDescription="@string/key_settings"
+                    android:text="@string/key_settings_short"
+                    android:textSize="19sp" />
 
                 <Button
                     android:id="@+id/keySpace"
-                    style="@style/SideKey"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
+                    style="@style/SideKey.Plain"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_margin="3dp"
+                    android:layout_weight="2"
+                    android:text="@string/key_space"
+                    android:textSize="13sp" />
+
+                <Button
+                    android:id="@+id/keyAbc"
+                    style="@style/SideKey.Plain"
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_margin="3dp"
                     android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:text="@string/key_space" />
+                    android:contentDescription="@string/key_romaji_input_desc"
+                    android:text="@string/key_abc"
+                    android:textSize="17sp" />
 
                 <Button
                     android:id="@+id/keyEnter"
                     style="@style/SideKey.Accent"
-                    android:layout_width="match_parent"
-                    android:layout_height="0dp"
-                    android:layout_weight="1"
-                    android:layout_margin="2dp"
-                    android:text="@string/key_enter" />
+                    android:layout_width="0dp"
+                    android:layout_height="match_parent"
+                    android:layout_margin="3dp"
+                    android:layout_weight="1.45"
+                    android:text="@string/key_enter"
+                    android:textSize="14sp" />
             </LinearLayout>
         </LinearLayout>
     </FrameLayout>

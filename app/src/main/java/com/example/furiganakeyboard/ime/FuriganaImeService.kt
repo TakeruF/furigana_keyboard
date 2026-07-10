@@ -7,6 +7,7 @@ import android.view.KeyEvent
 import android.view.View
 import android.view.ViewGroup
 import android.view.inputmethod.EditorInfo
+import android.view.inputmethod.InputMethodManager
 import android.content.res.Configuration
 import android.annotation.SuppressLint
 import java.util.Locale
@@ -41,7 +42,6 @@ class FuriganaImeService : InputMethodService() {
     private lateinit var handwritingPanel: View
     private lateinit var symbolPad: SymbolPadView
     private lateinit var qwertyPad: QwertyPadView
-    private lateinit var modeKey: Button
     private lateinit var enterKey: Button
 
     private val composition = CompositionBuffer()
@@ -70,7 +70,6 @@ class FuriganaImeService : InputMethodService() {
         candidateBar = root.findViewById(R.id.candidateBar)
         handwritingView = root.findViewById(R.id.handwritingView)
         handwritingPanel = root.findViewById(R.id.handwritingPanel)
-        modeKey = root.findViewById(R.id.keyMode)
         enterKey = root.findViewById(R.id.keyEnter)
 
         wireHandwriting()
@@ -318,13 +317,12 @@ class FuriganaImeService : InputMethodService() {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun wireControlKeys(root: View) {
+        root.findViewById<Button>(R.id.keyKeyboardSwitch).onKey {
+            finishComposition()
+            getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+        }
         root.findViewById<Button>(R.id.keySymbol).onKey { switchPanel(Panel.SYMBOLS) }
         root.findViewById<Button>(R.id.keyAbc).onKey { switchPanel(Panel.QWERTY) }
-        modeKey.onKey {
-            val next = prefs.readingMode.next()
-            prefs.readingMode = next
-            applyReadingMode(next)
-        }
         root.findViewById<Button>(R.id.keySettings).onKey {
             finishComposition()
             startActivity(
@@ -339,18 +337,15 @@ class FuriganaImeService : InputMethodService() {
         root.findViewById<Button>(R.id.keyDelete)
             .setOnTouchListener(RepeatOnTouchListener { deleteBeforeCursor() })
         root.findViewById<Button>(R.id.keySpace).onKey { commitDirect(" ") }
+        root.findViewById<Button>(R.id.keyComma).onKey { commitDirect("、") }
+        root.findViewById<Button>(R.id.keyPeriod).onKey { commitDirect("。") }
+        root.findViewById<Button>(R.id.keyQuestion).onKey { commitDirect("？") }
+        root.findViewById<Button>(R.id.keyExclamation).onKey { commitDirect("！") }
         enterKey.onKey { sendEnter() }
     }
 
     private fun applyReadingMode(mode: ReadingMode) {
         candidateBar.setReadingMode(mode)
-        modeKey.setText(
-            when (mode) {
-                ReadingMode.KANA -> R.string.mode_kana
-                ReadingMode.ROMAJI -> R.string.mode_romaji
-                ReadingMode.OFF -> R.string.mode_off
-            }
-        )
     }
 
     private fun updateEnterLabel(info: EditorInfo?) {

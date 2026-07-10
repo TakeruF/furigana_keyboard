@@ -15,9 +15,9 @@ import com.example.furiganakeyboard.reading.RomajiConverter
 import com.example.furiganakeyboard.settings.ReadingMode
 
 /**
- * Horizontal, scrollable candidate bar, styled after WeChat IME: flat text
- * candidates with no borders, the first (best) candidate highlighted in the
- * accent green. Each chip shows the character large with its readings
+ * Horizontal, scrollable candidate bar. The first (best) candidate is shown in
+ * a compact white pill with blue text, while later candidates remain flat.
+ * Each chip shows the character large with its readings
  * underneath (kana / romaji / hidden). Tapping a chip fires [onCandidateSelected].
  */
 class CandidateBarView @JvmOverloads constructor(
@@ -79,9 +79,13 @@ class CandidateBarView @JvmOverloads constructor(
         val chip = LinearLayout(context).apply {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            background = ContextCompat.getDrawable(context, R.drawable.candidate_background)
-            val padH = dp(14)
-            setPadding(padH, dp(4), padH, dp(4))
+            background = ContextCompat.getDrawable(
+                context,
+                if (highlight) R.drawable.candidate_selected_background
+                else R.drawable.candidate_background
+            )
+            val padH = dp(16)
+            setPadding(padH, dp(3), padH, dp(3))
             isClickable = true
             isFocusable = true
             setOnClickListener {
@@ -94,7 +98,7 @@ class CandidateBarView @JvmOverloads constructor(
             LinearLayout.LayoutParams.MATCH_PARENT
         )
 
-        // Character (large). First candidate gets the WeChat-green accent.
+        // The first candidate is the only blue element in this row.
         chip.addView(TextView(context).apply {
             text = candidate.text
             textLocale = java.util.Locale.JAPAN // force Japanese glyph variants

@@ -1,7 +1,7 @@
 <resources>
-    <!-- Light palette, modeled on WeChat IME (微信输入法) handwriting mode. -->
-    <color name="kbd_background">#FFF2F2F2</color>
-    <color name="kbd_canvas">#FFFFFFFF</color>
+    <!-- Soft neutral palette for the handwriting-first keyboard. -->
+    <color name="kbd_background">#FFF0F2F5</color>
+    <color name="kbd_canvas">#FFF5F6F8</color>
     <color name="kbd_stroke">#FF1F1F1F</color>
     <color name="kbd_on_surface">#FF191919</color>
     <color name="kbd_on_surface_secondary">#FF9A9A9A</color>
@@ -10,9 +10,9 @@
     <color name="kbd_key_pressed">#FFD8D8D8</color>
     <color name="kbd_key_function">#FFE4E5E7</color>
     <color name="kbd_key_function_pressed">#FFCDCED0</color>
-    <!-- WeChat signature green. -->
-    <color name="kbd_accent">#FF07C160</color>
-    <color name="kbd_accent_pressed">#FF06AD56</color>
+    <!-- Blue is reserved for the selected candidate and editor action. -->
+    <color name="kbd_accent">#FF4E8FE8</color>
+    <color name="kbd_accent_pressed">#FF3E7FD5</color>
     <color name="kbd_on_accent">#FFFFFFFF</color>
     <color name="kbd_hint">#FFC4C4C4</color>
 

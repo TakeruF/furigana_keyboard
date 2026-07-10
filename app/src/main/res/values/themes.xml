@@ -13,7 +13,7 @@
         <item name="android:windowLightStatusBar">true</item>
     </style>
 
-    <!-- Visual style for the side function keys (layout params set inline). -->
+    <!-- Compact handwriting keyboard keys (layout params set inline). -->
     <style name="SideKey" parent="android:Widget.Button">
         <item name="android:background">@drawable/key_function_background</item>
         <item name="android:textColor">@color/kbd_on_surface</item>
@@ -25,9 +25,25 @@
         <item name="android:stateListAnimator">@null</item>
     </style>
 
-    <!-- Green accent key (改行/送信), WeChat style. -->
+    <style name="SideKey.Plain">
+        <item name="android:background">@drawable/key_background</item>
+    </style>
+
+    <!-- Primary editor action key. -->
     <style name="SideKey.Accent">
         <item name="android:background">@drawable/key_accent_background</item>
         <item name="android:textColor">@color/kbd_on_accent</item>
+    </style>
+
+    <!-- Borderless actions shown around the handwriting canvas. -->
+    <style name="CanvasActionKey" parent="android:Widget.Button">
+        <item name="android:background">@drawable/candidate_background</item>
+        <item name="android:textColor">@color/kbd_on_surface_secondary</item>
+        <item name="android:textSize">13sp</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="android:minWidth">0dp</item>
+        <item name="android:minHeight">0dp</item>
+        <item name="android:padding">0dp</item>
+        <item name="android:stateListAnimator">@null</item>
     </style>
 </resources>

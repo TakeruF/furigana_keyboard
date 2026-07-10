@@ -92,9 +92,10 @@ class SymbolPadView(context: Context) : LinearLayout(context) {
     companion object {
         private const val COLUMNS = 6
 
-        // Japanese symbols first, then ASCII. One key per character.
+        // Numbers, Japanese symbols, then ASCII. One key per character.
         private val SYMBOLS: List<Char> = (
-            "、。，．・：；？！〜ー…「」『』（）〔〕［］｛｝〈〉《》【】" +
+            "1234567890" +
+                "、。，．・：；？！〜ー…「」『』（）〔〕［］｛｝〈〉《》【】" +
                 "＋－±×÷＝≠＜＞％＃＆＊＠☆★○●◎◇◆□■△▲▽▼※→←↑↓♪￥" +
                 "!?@#$%&*()-_=+/\\:;\"',.<>[]{}|^~`"
             ).toList()
