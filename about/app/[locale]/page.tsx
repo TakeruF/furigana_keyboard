@@ -4,7 +4,6 @@ import { copy, isLocale, localeLabels, locales } from "../i18n";
 const releaseLinks = {
   androidApk: process.env.NEXT_PUBLIC_ANDROID_APK_URL ?? "",
   appStore: process.env.NEXT_PUBLIC_APP_STORE_URL ?? "",
-  source: process.env.NEXT_PUBLIC_SOURCE_URL ?? "",
 };
 
 type PageProps = { params: Promise<{ locale: string }> };
@@ -111,16 +110,16 @@ export default async function LocalePage({ params }: PageProps) {
               <div><strong>13,108</strong><span>{content.about.facts[1]}</span></div>
               <div><strong>0</strong><span>{content.about.facts[2]}</span></div>
             </div>
-            {releaseLinks.source ? <a className="text-link dark" href={releaseLinks.source} rel="noreferrer">{content.about.source} <span aria-hidden="true">↗</span></a> : null}
           </div>
         </div>
       </section>
 
       <footer className="shell">
         <div className="brand footer-brand"><span className="brand-mark" aria-hidden="true">振</span><span>Furigana Keyboard</span></div>
-        <p>{content.footer}</p><p>© 2026 Furigana Keyboard</p>
+        <p>{content.footer}</p>
+        <a className="support-link" href="mailto:support@hanlu.app">{content.support}: support@hanlu.app</a>
+        <p>© 2026 Furigana Keyboard</p>
       </footer>
     </main>
   );
 }
-

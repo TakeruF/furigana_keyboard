@@ -197,9 +197,11 @@ h1 em { color: var(--green); font-style: normal; }
 .facts span { color: #5f716a; font-size: 10px; }
 .text-link.dark { color: var(--ink); border-color: rgba(19,37,31,.35); }
 
-footer { min-height: 160px; display: grid; grid-template-columns: 1fr auto auto; align-items: center; gap: 34px; color: var(--muted); font-size: 11px; }
+footer { min-height: 160px; display: grid; grid-template-columns: 1fr auto auto auto; align-items: center; gap: 34px; color: var(--muted); font-size: 11px; }
 .footer-brand { color: var(--ink); font-size: 14px; }
 .footer-brand .brand-mark { width: 32px; height: 32px; border-radius: 9px; font-size: 17px; }
+.support-link { font-weight: 700; transition: color .2s ease; }
+.support-link:hover { color: var(--green); }
 
 @media (max-width: 820px) {
   .shell { width: min(100% - 32px, 620px); }

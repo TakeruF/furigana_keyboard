@@ -22,6 +22,9 @@ Set these environment variables in the hosting environment, then rebuild:
 
 - `NEXT_PUBLIC_ANDROID_APK_URL`: direct APK or release-page URL
 - `NEXT_PUBLIC_APP_STORE_URL`: Apple App Store product URL
-- `NEXT_PUBLIC_SOURCE_URL`: optional public source repository URL
-
 No source edit is required when the release URLs become available.
+
+## Publishing
+
+See [`PUBLISHING.md`](./PUBLISHING.md) for the complete OpenAI Sites deployment,
+public-access, and `keyboard.hanlu.app` custom-domain setup guide.

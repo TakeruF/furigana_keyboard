@@ -28,7 +28,8 @@ export const copy = {
       { title: "端末の中だけ", body: "認識モデルと辞書をアプリに同梱。書いた内容をサーバーへ送らず、オフラインで動作します。" },
     ] },
     download: { heading: "あなたの端末へ。", intro: "各ストアでの公開後、このページから直接アクセスできます。", androidTitle: "Android版", androidBody: "オフライン手書き認識、ふりがな表示、連続入力に対応。", apk: "APKをダウンロード", iosTitle: "iOS版", iosBody: "現在プレビュー開発中。端末内の単文字認識と読み表示から対応。", appStore: "App Storeで見る", pending: "準備中", pendingLabel: "現在準備中です", note: "リンクを設定すると「準備中」表示が自動でダウンロードボタンへ切り替わります。" },
-    about: { heading: ["文字の形と、", "読みのあいだを結ぶ。"], lead: "Furigana Keyboardは、「書けるけれど読めない」「読みは分かるけれど変換しづらい」という小さな壁をなくすための、日本語手書きキーボードです。", body: "ZinniaとTegakiの手書きモデル、KANJIDIC2・JMdictの辞書データを利用し、認識から読み検索までをオフラインで処理します。Google Playサービスやモデルの追加ダウンロードは必要ありません。", facts: ["JIS X 0208 漢字ラベル", "読みを収録した文字", "入力データの外部送信"], source: "ソースコードを見る" },
+    about: { heading: ["文字の形と、", "読みのあいだを結ぶ。"], lead: "Furigana Keyboardは、「書けるけれど読めない」「読みは分かるけれど変換しづらい」という小さな壁をなくすための、日本語手書きキーボードです。", body: "ZinniaとTegakiの手書きモデル、KANJIDIC2・JMdictの辞書データを利用し、認識から読み検索までをオフラインで処理します。Google Playサービスやモデルの追加ダウンロードは必要ありません。", facts: ["JIS X 0208 漢字ラベル", "読みを収録した文字", "入力データの外部送信"] },
+    support: "サポート",
     footer: "オフライン手書きで、読みやすい日本語を。",
   },
   zh: {
@@ -46,7 +47,8 @@ export const copy = {
       { title: "只在设备内", body: "识别模型和词典均内置于应用，不会把手写内容发送到服务器，可完全离线运行。" },
     ] },
     download: { heading: "安装到你的设备。", intro: "应用正式发布后，可从本页面直接前往下载。", androidTitle: "Android 版", androidBody: "支持离线手写识别、注音显示和连续输入。", apk: "下载 APK", iosTitle: "iOS 版", iosBody: "目前处于预览开发阶段，MVP 支持设备端单字识别和读音显示。", appStore: "前往 App Store", pending: "准备中", pendingLabel: "目前正在准备中", note: "配置发布链接后，“准备中”会自动变为下载按钮。" },
-    about: { heading: ["连接字形与", "读音之间。"], lead: "Furigana Keyboard 是一款日语手写键盘，旨在消除“会写却不会读”或“知道读音却难以转换”的小障碍。", body: "应用使用 Zinnia 与 Tegaki 手写模型，以及 KANJIDIC2、JMdict 词典数据，从识别到读音查询均离线处理，无需 Google Play 服务或额外下载模型。", facts: ["JIS X 0208 汉字标签", "收录读音的字符", "输入数据外传"], source: "查看源代码" },
+    about: { heading: ["连接字形与", "读音之间。"], lead: "Furigana Keyboard 是一款日语手写键盘，旨在消除“会写却不会读”或“知道读音却难以转换”的小障碍。", body: "应用使用 Zinnia 与 Tegaki 手写模型，以及 KANJIDIC2、JMdict 词典数据，从识别到读音查询均离线处理，无需 Google Play 服务或额外下载模型。", facts: ["JIS X 0208 汉字标签", "收录读音的字符", "输入数据外传"] },
+    support: "支持",
     footer: "离线手写，让日语更易读。",
   },
   en: {
@@ -64,7 +66,8 @@ export const copy = {
       { title: "Stays on device", body: "The recognition model and dictionaries are bundled with the app. Your handwriting is never sent to a server." },
     ] },
     download: { heading: "Bring it to your device.", intro: "Once each release is available, this page will link directly to it.", androidTitle: "Android", androidBody: "Offline handwriting recognition, furigana display, and continuous input.", apk: "Download APK", iosTitle: "iPhone & iPad", iosBody: "Now in preview development. The MVP supports on-device single-character recognition and readings.", appStore: "View on the App Store", pending: "Coming soon", pendingLabel: "This release is coming soon", note: "Adding a release URL automatically turns each coming-soon state into a download button." },
-    about: { heading: ["Connecting the shape", "of a character to its sound."], lead: "Furigana Keyboard is a Japanese handwriting keyboard designed to remove the small barriers between knowing how a character looks, knowing how it sounds, and getting it into a text field.", body: "It uses the Zinnia and Tegaki handwriting models with KANJIDIC2 and JMdict data. Recognition and reading lookup run offline, with no Google Play services or additional model download required.", facts: ["JIS X 0208 kanji labels", "characters with readings", "input data sent externally"], source: "View source code" },
+    about: { heading: ["Connecting the shape", "of a character to its sound."], lead: "Furigana Keyboard is a Japanese handwriting keyboard designed to remove the small barriers between knowing how a character looks, knowing how it sounds, and getting it into a text field.", body: "It uses the Zinnia and Tegaki handwriting models with KANJIDIC2 and JMdict data. Recognition and reading lookup run offline, with no Google Play services or additional model download required.", facts: ["JIS X 0208 kanji labels", "characters with readings", "input data sent externally"] },
+    support: "Support",
     footer: "Offline handwriting, readable Japanese.",
   },
   ko: {
@@ -82,8 +85,8 @@ export const copy = {
       { title: "기기 안에서만", body: "인식 모델과 사전이 앱에 포함되어 있습니다. 필기 내용은 서버로 전송되지 않으며 오프라인으로 작동합니다." },
     ] },
     download: { heading: "내 기기에서 시작하세요.", intro: "각 스토어에 공개되면 이 페이지에서 바로 이동할 수 있습니다.", androidTitle: "Android 버전", androidBody: "오프라인 필기 인식, 후리가나 표시, 연속 입력을 지원합니다.", apk: "APK 다운로드", iosTitle: "iOS 버전", iosBody: "현재 프리뷰 개발 중이며 MVP는 기기 내 한 글자 인식과 읽기 표시를 지원합니다.", appStore: "App Store에서 보기", pending: "준비 중", pendingLabel: "현재 준비 중입니다", note: "출시 링크를 설정하면 ‘준비 중’ 표시가 자동으로 다운로드 버튼으로 바뀝니다." },
-    about: { heading: ["글자의 모양과", "읽는 법을 잇다."], lead: "Furigana Keyboard는 ‘쓸 수 있지만 읽기 어렵다’거나 ‘읽는 법은 알지만 변환하기 어렵다’는 작은 장벽을 없애기 위한 일본어 필기 키보드입니다.", body: "Zinnia와 Tegaki 필기 모델, KANJIDIC2 및 JMdict 사전 데이터를 사용하며 인식부터 읽기 검색까지 오프라인으로 처리합니다. Google Play 서비스나 추가 모델 다운로드가 필요하지 않습니다.", facts: ["JIS X 0208 한자 라벨", "읽기가 수록된 문자", "외부로 전송되는 입력 데이터"], source: "소스 코드 보기" },
+    about: { heading: ["글자의 모양과", "읽는 법을 잇다."], lead: "Furigana Keyboard는 ‘쓸 수 있지만 읽기 어렵다’거나 ‘읽는 법은 알지만 변환하기 어렵다’는 작은 장벽을 없애기 위한 일본어 필기 키보드입니다.", body: "Zinnia와 Tegaki 필기 모델, KANJIDIC2 및 JMdict 사전 데이터를 사용하며 인식부터 읽기 검색까지 오프라인으로 처리합니다. Google Play 서비스나 추가 모델 다운로드가 필요하지 않습니다.", facts: ["JIS X 0208 한자 라벨", "읽기가 수록된 문자", "외부로 전송되는 입력 데이터"] },
+    support: "지원",
     footer: "오프라인 필기로, 더 읽기 쉬운 일본어를.",
   },
 } as const;
-

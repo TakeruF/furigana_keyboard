@@ -37,6 +37,8 @@ for (const expectation of [
     assert.match(html, /href="\/zh"/);
     assert.match(html, /href="\/en"/);
     assert.match(html, /href="\/ko"/);
+    assert.match(html, /mailto:support@hanlu\.app/);
+    assert.doesNotMatch(html, /github\.com\/TakeruF|furigana_keyboard/);
     assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
   });
 }
@@ -45,7 +47,7 @@ test("keeps future release URLs configurable without source rewrites", async () 
   const page = await readFile(new URL("../app/[locale]/page.tsx", import.meta.url), "utf8");
   assert.match(page, /NEXT_PUBLIC_ANDROID_APK_URL/);
   assert.match(page, /NEXT_PUBLIC_APP_STORE_URL/);
-  assert.match(page, /NEXT_PUBLIC_SOURCE_URL/);
+  assert.doesNotMatch(page, /NEXT_PUBLIC_SOURCE_URL|github\.com\/TakeruF/);
   await access(new URL("../public/og.png", import.meta.url));
 });
 
