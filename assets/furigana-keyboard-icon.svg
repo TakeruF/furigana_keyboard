@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-labelledby="title desc">
+  <title id="title">Furigana Keyboard icon</title>
+  <desc id="desc">A rounded purple app icon showing furigana above a kanji character and a compact keyboard.</desc>
+
+  <defs>
+    <linearGradient id="bg" x1="128" y1="96" x2="896" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#8B5CF6"/>
+      <stop offset="1" stop-color="#5B21B6"/>
+    </linearGradient>
+    <linearGradient id="key" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#F3EEFF"/>
+    </linearGradient>
+    <filter id="shadow" x="-20%" y="-20%" width="140%" height="150%">
+      <feDropShadow dx="0" dy="24" stdDeviation="28" flood-color="#2E1065" flood-opacity=".28"/>
+    </filter>
+  </defs>
+
+  <rect width="1024" height="1024" rx="232" fill="url(#bg)"/>
+
+  <!-- subtle handwriting stroke -->
+  <path d="M150 253C242 187 358 164 458 184C535 200 581 238 555 280C525 327 408 328 345 366"
+        fill="none" stroke="#C4B5FD" stroke-width="28" stroke-linecap="round" opacity=".45"/>
+
+  <!-- main writing card -->
+  <rect x="176" y="138" width="672" height="504" rx="112" fill="#FFFFFF" filter="url(#shadow)"/>
+
+  <!-- furigana -->
+  <text x="512" y="275"
+        text-anchor="middle"
+        font-family="-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif"
+        font-size="96"
+        font-weight="700"
+        letter-spacing="16"
+        fill="#6D28D9">かん</text>
+
+  <!-- divider emphasizing reading relationship -->
+  <rect x="354" y="314" width="316" height="14" rx="7" fill="#DDD6FE"/>
+
+  <!-- kanji -->
+  <text x="512" y="568"
+        text-anchor="middle"
+        font-family="'Hiragino Mincho ProN', 'Yu Mincho', serif"
+        font-size="292"
+        font-weight="700"
+        fill="#24143F">漢</text>
+
+  <!-- keyboard body -->
+  <rect x="118" y="674" width="788" height="220" rx="70" fill="#2E1065" opacity=".95"/>
+
+  <!-- keyboard keys -->
+  <g fill="url(#key)">
+    <rect x="170" y="724" width="112" height="68" rx="22"/>
+    <rect x="302" y="724" width="112" height="68" rx="22"/>
+    <rect x="434" y="724" width="112" height="68" rx="22"/>
+    <rect x="566" y="724" width="112" height="68" rx="22"/>
+    <rect x="698" y="724" width="112" height="68" rx="22"/>
+
+    <rect x="214" y="812" width="112" height="36" rx="18"/>
+    <rect x="346" y="812" width="332" height="36" rx="18"/>
+    <rect x="698" y="812" width="112" height="36" rx="18"/>
+  </g>
+
+  <!-- kana marks on keys -->
+  <g fill="#6D28D9"
+     font-family="-apple-system, BlinkMacSystemFont, 'Hiragino Sans', 'Yu Gothic', sans-serif"
+     font-size="38"
+     font-weight="700"
+     text-anchor="middle">
+    <text x="226" y="772">あ</text>
+    <text x="358" y="772">か</text>
+    <text x="490" y="772">さ</text>
+    <text x="622" y="772">た</text>
+    <text x="754" y="772">な</text>
+  </g>
+
+  <!-- small pen nib accent -->
+  <g transform="translate(760 554) rotate(-18)">
+    <path d="M0 0L78 12L56 74L18 44Z" fill="#FBBF24"/>
+    <path d="M18 44L56 74L27 92Z" fill="#FFFFFF"/>
+    <circle cx="36" cy="48" r="8" fill="#5B21B6"/>
+  </g>
+</svg>
