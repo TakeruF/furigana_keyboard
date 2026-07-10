@@ -2,8 +2,12 @@ package com.example.furiganakeyboard.view
 
 import android.annotation.SuppressLint
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.Canvas
+import android.graphics.Color
+import android.graphics.DashPathEffect
 import android.graphics.Paint
+import android.graphics.PorterDuff
 import android.os.Handler
 import android.os.Looper
 import android.util.AttributeSet
@@ -13,8 +17,12 @@ import android.view.View
 import androidx.core.content.ContextCompat
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.recognizer.HandwritingInk
+import com.example.furiganakeyboard.recognizer.SideBySideInkSegmenter
+import kotlin.math.ceil
+import kotlin.math.floor
 import kotlin.math.hypot
 import kotlin.math.max
+import kotlin.math.min
 
 /**
  * Finger-drawing surface, visually modeled on WeChat IME's handwriting pad.
@@ -37,6 +45,9 @@ class HandwritingView @JvmOverloads constructor(
     /** Called (debounced) after the user finishes a stroke. */
     var onRecognize: ((HandwritingInk) -> Unit)? = null
 
+    /** Called as soon as new ink makes an in-flight recognition result stale. */
+    var onInkChanged: (() -> Unit)? = null
+
     /**
      * Called on pen-down when results for the current ink were already shown.
      * Return true to treat the new stroke as a NEW character: the host commits
@@ -48,12 +59,10 @@ class HandwritingView @JvmOverloads constructor(
     private val ink = HandwritingInk()
     private var activeStroke: HandwritingInk.Stroke? = null
 
-    // ---- rendered ink (points + per-point width) ----
-    private class RenderPoint(val x: Float, val y: Float, val w: Float)
-    private class RenderStroke { val pts = mutableListOf<RenderPoint>() }
-
-    private val renderStrokes = mutableListOf<RenderStroke>()
-    private var activeRender: RenderStroke? = null
+    // Completed and active segments are drawn once into this retained buffer.
+    private var renderBitmap: Bitmap? = null
+    private var renderCanvas: Canvas? = null
+    private var hasRenderPoint = false
 
     // Velocity → width state for the stroke in progress.
     private var lastX = 0f
@@ -80,11 +89,20 @@ class HandwritingView @JvmOverloads constructor(
         color = ContextCompat.getColor(context, R.color.kbd_hint)
         textLocale = java.util.Locale.JAPAN // Japanese glyph variants
     }
+    private val characterGuidePaint = Paint(Paint.ANTI_ALIAS_FLAG).apply {
+        style = Paint.Style.STROKE
+        strokeWidth = dp(1f)
+        color = ContextCompat.getColor(context, R.color.kbd_hint)
+        alpha = 90
+        pathEffect = DashPathEffect(floatArrayOf(dp(4f), dp(6f)), 0f)
+    }
     private val hintText = context.getString(R.string.hint_write)
 
     private val handler = Handler(Looper.getMainLooper())
     private val recognizeRunnable = Runnable {
-        if (!ink.isEmpty) onRecognize?.invoke(ink.snapshot(width, height))
+        if (!ink.isEmpty) {
+            onRecognize?.invoke(ink.snapshot(width, height, MAX_POINTS_PER_STROKE))
+        }
     }
 
     // True once the host displayed candidates for the current ink.
@@ -99,13 +117,27 @@ class HandwritingView @JvmOverloads constructor(
     fun setStrokeColor(color: Int) {
         strokePaint.color = color
         dotPaint.color = color
+        redrawInk()
         invalidate()
+    }
+
+    override fun onSizeChanged(w: Int, h: Int, oldw: Int, oldh: Int) {
+        super.onSizeChanged(w, h, oldw, oldh)
+        renderBitmap?.recycle()
+        renderBitmap = if (w > 0 && h > 0) Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888) else null
+        renderCanvas = renderBitmap?.let(::Canvas)
+        ink.width = w.coerceAtLeast(1)
+        ink.height = h.coerceAtLeast(1)
+        redrawInk()
     }
 
     override fun onDraw(canvas: Canvas) {
         super.onDraw(canvas)
+        val centerX = width / 2f
+        val verticalPadding = dp(12f)
+        canvas.drawLine(centerX, verticalPadding, centerX, height - verticalPadding, characterGuidePaint)
         // Faint hint while the pad is empty (like WeChat's 手写区域 hint).
-        if (ink.isEmpty && activeRender == null) {
+        if (ink.isEmpty && activeStroke == null) {
             canvas.drawText(
                 hintText,
                 width / 2f,
@@ -114,25 +146,7 @@ class HandwritingView @JvmOverloads constructor(
             )
             return
         }
-        for (stroke in renderStrokes) drawStroke(canvas, stroke)
-        activeRender?.let { drawStroke(canvas, it) }
-    }
-
-    /** Draw one stroke as width-interpolated round-cap segments. */
-    private fun drawStroke(canvas: Canvas, stroke: RenderStroke) {
-        val pts = stroke.pts
-        if (pts.isEmpty()) return
-        if (pts.size == 1) {
-            // A tap: draw a dot.
-            canvas.drawCircle(pts[0].x, pts[0].y, pts[0].w / 2f, dotPaint)
-            return
-        }
-        for (i in 1 until pts.size) {
-            val a = pts[i - 1]
-            val b = pts[i]
-            strokePaint.strokeWidth = (a.w + b.w) / 2f
-            canvas.drawLine(a.x, a.y, b.x, b.y, strokePaint)
-        }
+        renderBitmap?.let { canvas.drawBitmap(it, 0f, 0f, null) }
     }
 
     @SuppressLint("ClickableViewAccessibility")
@@ -140,17 +154,24 @@ class HandwritingView @JvmOverloads constructor(
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 handler.removeCallbacks(recognizeRunnable)
+                onInkChanged?.invoke()
                 // Continuous handwriting: results already shown → maybe commit
-                // the previous character and start a fresh one.
+                // the previous input and start fresh. Ink beginning clearly in
+                // the right-hand slot instead extends the current input to two
+                // side-by-side characters.
                 if (resultsDelivered && !ink.isEmpty) {
-                    if (onNewCharacterGate?.invoke() == true) clearInkOnly()
+                    val beginsSecondCharacter =
+                        SideBySideInkSegmenter.isSecondCharacterStart(ink, event.x)
+                    if (!beginsSecondCharacter && onNewCharacterGate?.invoke() == true) {
+                        clearInkOnly()
+                    }
                 }
                 resultsDelivered = false
 
                 Haptics.tick(this) // subtle pen-down feedback
 
                 activeStroke = HandwritingInk.Stroke()
-                activeRender = RenderStroke()
+                hasRenderPoint = false
                 lastX = event.x
                 lastY = event.y
                 lastT = event.eventTime
@@ -175,29 +196,38 @@ class HandwritingView @JvmOverloads constructor(
             MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
                 addPoint(event.x, event.y, event.eventTime)
                 activeStroke?.let { ink.strokes.add(it) }
-                activeRender?.let { renderStrokes.add(it) }
                 activeStroke = null
-                activeRender = null
+                hasRenderPoint = false
                 // Debounce so multi-stroke characters are recognized as a whole.
                 handler.removeCallbacks(recognizeRunnable)
                 handler.postDelayed(recognizeRunnable, RECOGNIZE_DELAY_MS)
             }
         }
-        invalidate()
         return true
     }
 
     /** Append a point to both the recognition ink and the rendered stroke. */
     private fun addPoint(x: Float, y: Float, t: Long) {
         activeStroke?.points?.add(HandwritingInk.Point(x, y, t))
-        val render = activeRender ?: return
+        val canvas = renderCanvas ?: return
+        if (!hasRenderPoint) {
+            canvas.drawCircle(x, y, lastW / 2f, dotPaint)
+            hasRenderPoint = true
+            invalidateSegment(x, y, x, y, lastW)
+            lastX = x
+            lastY = y
+            lastT = t
+            return
+        }
         val dist = hypot((x - lastX).toDouble(), (y - lastY).toDouble()).toFloat()
         val dt = max(1L, t - lastT)
         // Speed (px/ms) → width: slower strokes are thicker, like a brush.
         val norm = (dist / dt / SPEED_FOR_MIN_WIDTH).coerceIn(0f, 1f)
         val target = maxWidth - (maxWidth - minWidth) * norm
         lastW += (target - lastW) * WIDTH_SMOOTHING
-        render.pts.add(RenderPoint(x, y, lastW))
+        strokePaint.strokeWidth = lastW
+        canvas.drawLine(lastX, lastY, x, y, strokePaint)
+        invalidateSegment(lastX, lastY, x, y, lastW)
         lastX = x
         lastY = y
         lastT = t
@@ -213,10 +243,42 @@ class HandwritingView @JvmOverloads constructor(
     /** Reset ink/rendering without touching timers or flags. */
     private fun clearInkOnly() {
         ink.strokes.clear()
-        renderStrokes.clear()
         activeStroke = null
-        activeRender = null
+        hasRenderPoint = false
+        renderCanvas?.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
         invalidate()
+    }
+
+    private fun invalidateSegment(x1: Float, y1: Float, x2: Float, y2: Float, width: Float) {
+        val pad = width + dp(2f)
+        postInvalidateOnAnimation(
+            floor(min(x1, x2) - pad).toInt(),
+            floor(min(y1, y2) - pad).toInt(),
+            ceil(max(x1, x2) + pad).toInt(),
+            ceil(max(y1, y2) + pad).toInt()
+        )
+    }
+
+    private fun redrawInk() {
+        val canvas = renderCanvas ?: return
+        canvas.drawColor(Color.TRANSPARENT, PorterDuff.Mode.CLEAR)
+        strokePaint.strokeWidth = maxWidth * 0.75f
+        ink.strokes.forEach { stroke ->
+            val points = stroke.points
+            if (points.size == 1) {
+                canvas.drawCircle(points[0].x, points[0].y, strokePaint.strokeWidth / 2f, dotPaint)
+            } else {
+                for (index in 1 until points.size) {
+                    canvas.drawLine(
+                        points[index - 1].x,
+                        points[index - 1].y,
+                        points[index].x,
+                        points[index].y,
+                        strokePaint
+                    )
+                }
+            }
+        }
     }
 
     private fun dp(v: Float) = TypedValue.applyDimension(
@@ -229,7 +291,8 @@ class HandwritingView @JvmOverloads constructor(
 
     companion object {
         // Delay after finger-up before recognizing, to allow the next stroke.
-        private const val RECOGNIZE_DELAY_MS = 650L
+        private const val RECOGNIZE_DELAY_MS = 450L
+        private const val MAX_POINTS_PER_STROKE = 256
         // Speed (px/ms) at which the stroke reaches its minimum width.
         private const val SPEED_FOR_MIN_WIDTH = 1.5f
         // Low-pass factor for width changes (avoids jitter).

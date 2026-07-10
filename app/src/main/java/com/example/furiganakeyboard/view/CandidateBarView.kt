@@ -2,6 +2,7 @@ package com.example.furiganakeyboard.view
 
 import android.content.Context
 import android.graphics.Typeface
+import android.text.TextUtils
 import android.util.AttributeSet
 import android.util.TypedValue
 import android.view.Gravity
@@ -52,77 +53,113 @@ class CandidateBarView @JvmOverloads constructor(
         )
     }
 
-    /** Replace the displayed candidates and rebuild the chips. */
+    /** Replace the displayed candidates, reusing the existing chip views. */
     fun setCandidates(items: List<CandidateUiModel>) {
-        candidates = items
-        rebuild()
+        val bounded = items.take(MAX_CANDIDATES)
+        if (bounded == candidates) return
+        candidates = bounded
+        bindCandidates(resetScroll = true)
     }
 
     /** Change how readings are rendered; refreshes existing chips. */
     fun setReadingMode(mode: ReadingMode) {
+        if (readingMode == mode) return
         readingMode = mode
-        rebuild()
+        bindCandidates(resetScroll = false)
     }
 
     fun clear() = setCandidates(emptyList())
 
-    private fun rebuild() {
-        row.removeAllViews()
-        scrollX = 0
-        candidates.forEachIndexed { index, candidate ->
-            row.addView(makeChip(candidate, highlight = index == 0))
+    private fun bindCandidates(resetScroll: Boolean) {
+        while (row.childCount < candidates.size) {
+            row.addView(CandidateChipView(context))
         }
+        for (index in 0 until row.childCount) {
+            val chip = row.getChildAt(index) as CandidateChipView
+            if (index < candidates.size) {
+                chip.visibility = View.VISIBLE
+                chip.bind(candidates[index], highlight = index == 0)
+            } else {
+                chip.visibility = View.GONE
+                chip.unbind()
+            }
+        }
+        if (resetScroll) scrollTo(0, 0)
     }
 
-    /** Build a single tappable chip (character + reading). */
-    private fun makeChip(candidate: CandidateUiModel, highlight: Boolean): View {
-        val chip = LinearLayout(context).apply {
+    /** Rebindable candidate chip; at most [MAX_CANDIDATES] instances are allocated. */
+    private inner class CandidateChipView(context: Context) : LinearLayout(context) {
+        private var candidate: CandidateUiModel? = null
+        private val primary = TextView(context).apply {
+            textLocale = java.util.Locale.JAPAN
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
+            setTypeface(typeface, Typeface.BOLD)
+            gravity = Gravity.CENTER
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+        }
+        private val reading = TextView(context).apply {
+            textLocale = java.util.Locale.JAPAN
+            setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
+            gravity = Gravity.CENTER
+            maxLines = 1
+            ellipsize = TextUtils.TruncateAt.END
+            setTextColor(color(R.color.kbd_on_surface_secondary))
+        }
+
+        init {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
+            val padH = dp(16)
+            setPadding(padH, dp(3), padH, dp(3))
+            minimumWidth = dp(48)
+            minimumHeight = dp(48)
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.WRAP_CONTENT,
+                LinearLayout.LayoutParams.MATCH_PARENT
+            )
+            addView(primary)
+            addView(reading)
+            setOnClickListener {
+                candidate?.takeIf { it.kind != CandidateKind.STATUS }?.let { selected ->
+                    Haptics.key(it)
+                    onCandidateSelected?.invoke(selected)
+                }
+            }
+        }
+
+        fun bind(value: CandidateUiModel, highlight: Boolean) {
+            candidate = value
             background = ContextCompat.getDrawable(
                 context,
                 if (highlight) R.drawable.candidate_selected_background
                 else R.drawable.candidate_background
             )
-            val padH = dp(16)
-            setPadding(padH, dp(3), padH, dp(3))
-            isClickable = true
-            isFocusable = true
-            setOnClickListener {
-                Haptics.key(it)
-                if (candidate.kind != CandidateKind.STATUS) onCandidateSelected?.invoke(candidate)
-            }
-        }
-        chip.layoutParams = LinearLayout.LayoutParams(
-            LinearLayout.LayoutParams.WRAP_CONTENT,
-            LinearLayout.LayoutParams.MATCH_PARENT
-        )
-
-        // The first candidate is the only blue element in this row.
-        chip.addView(TextView(context).apply {
-            text = candidate.text
-            textLocale = java.util.Locale.JAPAN // force Japanese glyph variants
-            setTextSize(TypedValue.COMPLEX_UNIT_SP, 24f)
-            setTypeface(typeface, Typeface.BOLD)
-            gravity = Gravity.CENTER
-            setTextColor(
+            primary.text = value.text
+            primary.setTextColor(
                 color(if (highlight) R.color.kbd_accent else R.color.kbd_on_surface)
             )
-        })
-
-        // Reading (small), unless OFF.
-        val reading = readingText(candidate)
-        if (readingMode != ReadingMode.OFF && reading.isNotEmpty()) {
-            chip.addView(TextView(context).apply {
-                text = reading
-                textLocale = java.util.Locale.JAPAN
-                setTextSize(TypedValue.COMPLEX_UNIT_SP, 11f)
-                gravity = Gravity.CENTER
-                maxLines = 1
-                setTextColor(color(R.color.kbd_on_surface_secondary))
-            })
+            val readingText = readingText(value)
+            reading.text = readingText
+            reading.visibility = if (readingMode == ReadingMode.OFF || readingText.isEmpty()) {
+                View.GONE
+            } else View.VISIBLE
+            isClickable = value.kind != CandidateKind.STATUS
+            isFocusable = isClickable
+            contentDescription = buildString {
+                append(value.text)
+                if (readingText.isNotEmpty()) append(", ").append(readingText)
+            }
         }
-        return chip
+
+        fun unbind() {
+            candidate = null
+            primary.text = ""
+            reading.text = ""
+            isClickable = false
+            isFocusable = false
+            contentDescription = null
+        }
     }
 
     /**
@@ -156,6 +193,7 @@ class CandidateBarView @JvmOverloads constructor(
     ).toInt()
 
     companion object {
+        private const val MAX_CANDIDATES = 10
         // Cap readings per chip so the bar stays scannable.
         private const val MAX_READINGS = 3
     }

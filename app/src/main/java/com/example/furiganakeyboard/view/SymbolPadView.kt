@@ -45,7 +45,7 @@ class SymbolPadView(context: Context) : LinearLayout(context) {
                 GridLayout.spec(GridLayout.UNDEFINED, 1f)
             ).apply {
                 width = 0
-                height = KeyFactory.dp(context, 44)
+                height = KeyFactory.dp(context, 48)
                 val m = KeyFactory.dp(context, 2)
                 setMargins(m, m, m, m)
             }
@@ -86,7 +86,7 @@ class SymbolPadView(context: Context) : LinearLayout(context) {
         }
         row.addView(enterKey, KeyFactory.rowParams(context, 2f))
 
-        addView(row, LayoutParams(LayoutParams.MATCH_PARENT, KeyFactory.dp(context, 48)))
+        addView(row, LayoutParams(LayoutParams.MATCH_PARENT, KeyFactory.dp(context, 52)))
     }
 
     companion object {

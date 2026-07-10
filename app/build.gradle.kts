@@ -66,6 +66,8 @@ dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
     implementation("androidx.appcompat:appcompat:1.7.0")
     implementation("com.google.android.material:material:1.12.0")
+    // 18.1.0 is the latest line compatible with this project's Kotlin 1.9 toolchain.
+    implementation("com.google.mlkit:digital-ink-recognition:18.1.0")
 
     // Local unit tests for the pure Kotlin logic (romaji / dictionary).
     testImplementation("junit:junit:4.13.2")

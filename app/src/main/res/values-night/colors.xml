@@ -9,6 +9,7 @@
     <color name="kbd_key_pressed">#FF454545</color>
     <color name="kbd_key_function">#FF232323</color>
     <color name="kbd_key_function_pressed">#FF3A3A3A</color>
+    <color name="kbd_key_selected">#FF294563</color>
     <color name="kbd_accent">#FF609CF1</color>
     <color name="kbd_accent_pressed">#FF4B88DE</color>
     <color name="kbd_on_accent">#FFFFFFFF</color>

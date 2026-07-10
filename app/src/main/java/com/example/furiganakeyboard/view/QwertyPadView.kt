@@ -117,6 +117,7 @@ class QwertyPadView(context: Context) : LinearLayout(context) {
     /** Toggle shift: relabel letter keys and tint the shift key. */
     private fun toggleShift() {
         shifted = !shifted
+        shiftKey?.isSelected = shifted
         for (key in letterKeys) {
             val t = key.text.toString()
             key.text = if (shifted) t.uppercase() else t.lowercase()

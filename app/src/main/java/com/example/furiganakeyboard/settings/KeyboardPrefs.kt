@@ -47,12 +47,18 @@ class KeyboardPrefs(context: Context) {
         get() = prefs.getString(KEY_LOCALE, "") ?: ""
         set(value) = prefs.edit().putString(KEY_LOCALE, value).apply()
 
+    /** Optional ML Kit recognition with bundled Zinnia as its fallback. */
+    var plusRecognition: Boolean
+        get() = prefs.getBoolean(KEY_PLUS_RECOGNITION, true)
+        set(value) = prefs.edit().putBoolean(KEY_PLUS_RECOGNITION, value).apply()
+
     companion object {
         private const val FILE = "furigana_keyboard_prefs"
         private const val KEY_READING_MODE = "reading_mode"
         private const val KEY_AUTO_COMMIT = "auto_commit"
         private const val KEY_HAPTICS = "haptics"
         private const val KEY_LOCALE = "app_locale"
+        private const val KEY_PLUS_RECOGNITION = "plus_recognition"
 
     }
 }

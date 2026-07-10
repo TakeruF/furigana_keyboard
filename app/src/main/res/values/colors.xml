@@ -10,6 +10,7 @@
     <color name="kbd_key_pressed">#FFD8D8D8</color>
     <color name="kbd_key_function">#FFE4E5E7</color>
     <color name="kbd_key_function_pressed">#FFCDCED0</color>
+    <color name="kbd_key_selected">#FFDCE9FA</color>
     <!-- Blue is reserved for the selected candidate and editor action. -->
     <color name="kbd_accent">#FF4E8FE8</color>
     <color name="kbd_accent_pressed">#FF3E7FD5</color>

@@ -49,7 +49,20 @@ object RomajiKanaConverter {
         "la" to "ぁ", "li" to "ぃ", "lu" to "ぅ", "le" to "ぇ", "lo" to "ぉ",
         "xtsu" to "っ", "ltsu" to "っ", "xtu" to "っ", "ltu" to "っ"
     )
-    private val keysByLength = syllables.keys.sortedByDescending(String::length)
+    private class TrieNode {
+        val children = HashMap<Char, TrieNode>()
+        var kana: String? = null
+    }
+
+    private val syllableTrie = TrieNode().also { root ->
+        syllables.forEach { (romaji, kana) ->
+            var node = root
+            romaji.forEach { character ->
+                node = node.children.getOrPut(character, ::TrieNode)
+            }
+            node.kana = kana
+        }
+    }
 
     fun convert(rawInput: String): Result {
         val input = rawInput.lowercase()
@@ -67,10 +80,10 @@ object RomajiKanaConverter {
                 continue
             }
 
-            val matched = keysByLength.firstOrNull { key -> input.startsWith(key, index) }
+            val matched = longestMatch(input, index)
             if (matched != null) {
-                kana.append(syllables.getValue(matched))
-                index += matched.length
+                kana.append(matched.first)
+                index += matched.second
                 continue
             }
 
@@ -102,6 +115,23 @@ object RomajiKanaConverter {
             return Result(kana.toString(), pending)
         }
         return Result(kana.toString(), "")
+    }
+
+    /** Longest-prefix lookup is bounded by the longest supported syllable. */
+    private fun longestMatch(input: String, start: Int): Pair<String, Int>? {
+        var node = syllableTrie
+        var index = start
+        var bestKana: String? = null
+        var bestLength = 0
+        while (index < input.length) {
+            node = node.children[input[index]] ?: break
+            index++
+            node.kana?.let {
+                bestKana = it
+                bestLength = index - start
+            }
+        }
+        return bestKana?.let { it to bestLength }
     }
 
     private fun Char.isConsonant(): Boolean = this in 'a'..'z' && this !in "aiueo"

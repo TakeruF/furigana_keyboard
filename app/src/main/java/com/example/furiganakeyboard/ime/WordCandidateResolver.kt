@@ -28,6 +28,28 @@ object WordCandidateResolver {
             .take(limit)
     }
 
+    /** Batched equivalent used by the asynchronous candidate pipeline. */
+    fun resolve(
+        surfaces: List<String>,
+        exactReadings: Map<String, List<String>>,
+        suggestions: Map<String, List<WordReadingCandidate>>,
+        limit: Int = 8
+    ): List<WordReadingCandidate> {
+        val normalized = surfaces.asSequence()
+            .filter(String::isNotEmpty)
+            .distinct()
+            .take(MAX_SURFACES)
+            .toList()
+        val exact = normalized.mapNotNull { surface ->
+            exactReadings[surface]?.takeIf(List<String>::isNotEmpty)
+                ?.let { WordReadingCandidate(surface, it) }
+        }
+        val completions = normalized.flatMap { prefix ->
+            suggestions[prefix].orEmpty().filter { it.surface != prefix }
+        }
+        return (exact + completions).distinctBy { it.surface }.take(limit)
+    }
+
     /** Recognition-order-preserving cross product, with the top/top pair first. */
     fun combine(
         root: String,

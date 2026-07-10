@@ -23,11 +23,27 @@ class HandwritingInk {
     val isEmpty: Boolean get() = strokes.isEmpty()
 
     /** Immutable-by-convention deep copy safe to pass to a worker thread. */
-    fun snapshot(canvasWidth: Int, canvasHeight: Int): HandwritingInk = HandwritingInk().also { copy ->
+    fun snapshot(
+        canvasWidth: Int,
+        canvasHeight: Int,
+        maxPointsPerStroke: Int = Int.MAX_VALUE
+    ): HandwritingInk = HandwritingInk().also { copy ->
         copy.width = canvasWidth.coerceAtLeast(1)
         copy.height = canvasHeight.coerceAtLeast(1)
         strokes.forEach { sourceStroke ->
-            copy.strokes += Stroke().also { it.points += sourceStroke.points }
+            copy.strokes += Stroke().also {
+                it.points += resample(sourceStroke.points, maxPointsPerStroke)
+            }
+        }
+    }
+
+    private fun resample(points: List<Point>, maximum: Int): List<Point> {
+        if (maximum <= 1 || points.size <= maximum) return points
+        if (maximum == 2) return listOf(points.first(), points.last())
+        val lastIndex = points.lastIndex
+        return List(maximum) { outputIndex ->
+            val sourceIndex = (outputIndex.toLong() * lastIndex / (maximum - 1)).toInt()
+            points[sourceIndex]
         }
     }
 }

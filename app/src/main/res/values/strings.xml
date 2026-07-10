@@ -25,7 +25,7 @@
     <string name="mode_kana">Kana</string>
     <string name="mode_romaji">Romaji</string>
     <string name="mode_off">Off</string>
-    <string name="hint_write">Write here</string>
+    <string name="hint_write">Write 1–2 characters side by side</string>
     <string name="status_model_preparing">Preparing offline handwriting…</string>
     <string name="status_model_error">Offline model unavailable</string>
     <string name="reading_unavailable">No reading data</string>
@@ -57,6 +57,10 @@
     <string name="settings_behavior">Input behavior</string>
     <string name="settings_auto_commit">Continuous handwriting</string>
     <string name="settings_auto_commit_desc">Add recognized characters automatically and show word candidates after two characters</string>
+    <string name="settings_section_plus" translatable="false">Furigana Plus</string>
+    <string name="settings_plus_recognition">High-accuracy recognition</string>
+    <string name="settings_plus_recognition_desc">Use Google’s on-device Japanese model with automatic bundled fallback</string>
+    <string name="settings_plus_note">On by default for everyone. The first use downloads about 20 MB; turn this off if the download or recognition does not work reliably in your region.</string>
     <string name="settings_haptics">Haptic feedback</string>
     <string name="settings_haptics_desc">Vibrate gently for key presses and pen-down</string>
     <string name="settings_enable_ime">Enable keyboard in system settings</string>
@@ -77,6 +81,8 @@
     <string name="about_zinnia">Recognition engine: Zinnia 0.07, New BSD License.</string>
     <string name="about_tegaki">Japanese handwriting model: Tegaki 0.3, LGPL 2.1.</string>
     <string name="about_app_libraries">AndroidX, Material Components and Kotlin, Apache 2.0.</string>
+    <string name="about_plus_title" translatable="false">Furigana Plus</string>
+    <string name="about_plus_desc">Optional Google ML Kit on-device recognition; subject to Google’s ML Kit terms.</string>
     <string name="license_edrdg">EDRDG source and license</string>
     <string name="license_zinnia">View Zinnia license</string>
     <string name="license_tegaki">View Tegaki model license</string>
@@ -97,7 +103,7 @@
     <string name="settings_dictionary_data">Reading dictionary</string>
     <string name="settings_status_ready">Ready</string>
     <string name="settings_status_on_device">On device</string>
-    <string name="settings_offline_note">The handwriting model and dictionaries are bundled with the app and work without a network connection.</string>
+    <string name="settings_offline_note">Bundled handwriting recognition and dictionaries remain available offline. Furigana Plus uses its downloaded model on device.</string>
     <string name="settings_language_note">The selected language is used in settings and the keyboard the next time it is shown.</string>
     <string name="settings_enable_ime_desc">Open Android’s keyboard management screen</string>
     <string name="settings_choose_ime_desc">Switch the active input method</string>
@@ -113,7 +119,8 @@
     <string name="privacy_input_desc">Processed temporarily on this device; never collected by the app developer</string>
     <string name="privacy_not_collected">Not collected</string>
     <string name="privacy_network_title">Network communication</string>
-    <string name="privacy_network_desc">The app has no INTERNET permission and sends no data to a server</string>
+    <string name="privacy_network_desc">Furigana Plus uses the network for its optional model and ML Kit service data; handwriting and typed text are not sent</string>
+    <string name="privacy_model_only">Model only</string>
     <string name="privacy_none">None</string>
     <string name="privacy_storage_title">Local storage</string>
     <string name="privacy_storage_desc">Only preferences, the offline model and dictionaries are stored</string>

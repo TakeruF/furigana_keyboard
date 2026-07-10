@@ -11,8 +11,21 @@ data class KanjiUsagePriority(val grade: Int, val frequency: Int) {
     val isJinmeiyo: Boolean get() = grade == 9 || grade == 10
 }
 
+/** Query surface used by the IME candidate worker. Implementations are worker-confined. */
+interface ReadingDataSource : AutoCloseable {
+    fun readingsFor(surface: String, limit: Int = 3): List<String>
+    fun readingsForMany(surfaces: List<String>, limit: Int = 3): Map<String, List<String>>
+    fun suggest(prefix: String, limit: Int = 8): List<WordReadingCandidate>
+    fun suggestByReading(prefix: String, limit: Int = 8): List<WordReadingCandidate>
+    fun suggestForPrefixes(
+        prefixes: List<String>,
+        limitPerPrefix: Int = 8
+    ): Map<String, List<WordReadingCandidate>>
+    fun kanjiPriorities(literals: List<String>): Map<String, KanjiUsagePriority>
+}
+
 /** Read-only access to the bundled KANJIDIC2 and JMdict snapshot. */
-class ReadingRepository(context: Context) : AutoCloseable {
+class ReadingRepository(context: Context) : ReadingDataSource {
     private val database: SQLiteDatabase
 
     init {
@@ -30,28 +43,48 @@ class ReadingRepository(context: Context) : AutoCloseable {
         )
     }
 
-    fun readingsFor(surface: String, limit: Int = 3): List<String> {
-        if (surface.isEmpty()) return emptyList()
-        val isSingleCodePoint = surface.codePointCount(0, surface.length) == 1
-        val sql: String
-        val args: Array<String>
-        if (isSingleCodePoint) {
-            sql = """SELECT reading FROM kanji_reading
-                WHERE literal=? ORDER BY kind, position LIMIT ?"""
-            args = arrayOf(surface, limit.toString())
-        } else {
-            sql = """SELECT reading FROM word_reading
-                WHERE surface=? ORDER BY priority, reading LIMIT ?"""
-            args = arrayOf(surface, limit.toString())
-        }
-        return database.rawQuery(sql, args).use { cursor ->
-            buildList {
-                while (cursor.moveToNext()) add(cursor.getString(0))
+    override fun readingsFor(surface: String, limit: Int): List<String> =
+        readingsForMany(listOf(surface), limit)[surface].orEmpty()
+
+    /** Load readings for an arbitrary mix of single kanji and word surfaces in one query. */
+    override fun readingsForMany(surfaces: List<String>, limit: Int): Map<String, List<String>> {
+        if (limit <= 0) return emptyMap()
+        val unique = surfaces.asSequence().filter(String::isNotEmpty).distinct().toList()
+        if (unique.isEmpty()) return emptyMap()
+        val singles = unique.filter { it.codePointCount(0, it.length) == 1 }
+        val words = unique.filterNot { it.codePointCount(0, it.length) == 1 }
+        val selects = buildList {
+            if (singles.isNotEmpty()) {
+                val placeholders = List(singles.size) { "?" }.joinToString(",")
+                add(
+                    """SELECT literal AS surface, reading, kind AS rank1, position AS rank2
+                       FROM kanji_reading WHERE literal IN ($placeholders)""".trimIndent()
+                )
             }
+            if (words.isNotEmpty()) {
+                val placeholders = List(words.size) { "?" }.joinToString(",")
+                add(
+                    """SELECT surface, reading, priority AS rank1, 0 AS rank2
+                       FROM word_reading WHERE surface IN ($placeholders)""".trimIndent()
+                )
+            }
+        }
+        val args = (singles + words).toTypedArray()
+        return database.rawQuery(
+            selects.joinToString(" UNION ALL ") + " ORDER BY surface, rank1, rank2, reading",
+            args
+        ).use { cursor ->
+            val output = LinkedHashMap<String, MutableList<String>>()
+            while (cursor.moveToNext()) {
+                val surface = cursor.getString(0)
+                val readings = output.getOrPut(surface) { mutableListOf() }
+                if (readings.size < limit) readings += cursor.getString(1)
+            }
+            output
         }
     }
 
-    fun suggest(prefix: String, limit: Int = 8): List<WordReadingCandidate> {
+    override fun suggest(prefix: String, limit: Int): List<WordReadingCandidate> {
         if (prefix.isEmpty()) return emptyList()
         val upperBound = prefix + String(Character.toChars(Character.MAX_CODE_POINT))
         val surfaces = database.rawQuery(
@@ -68,11 +101,12 @@ class ReadingRepository(context: Context) : AutoCloseable {
                 while (cursor.moveToNext()) add(cursor.getString(0))
             }
         }
-        return surfaces.map { WordReadingCandidate(it, readingsFor(it)) }
+        val readings = readingsForMany(surfaces)
+        return surfaces.map { WordReadingCandidate(it, readings[it].orEmpty()) }
     }
 
     /** JMdict conversion candidates whose kana reading starts with [prefix]. */
-    fun suggestByReading(prefix: String, limit: Int = 8): List<WordReadingCandidate> {
+    override fun suggestByReading(prefix: String, limit: Int): List<WordReadingCandidate> {
         if (prefix.isEmpty()) return emptyList()
         val upperBound = prefix + String(Character.toChars(Character.MAX_CODE_POINT))
         val surfaces = database.rawQuery(
@@ -89,24 +123,78 @@ class ReadingRepository(context: Context) : AutoCloseable {
                 while (cursor.moveToNext()) add(cursor.getString(0))
             }
         }
-        return surfaces.map { surface ->
-            val matchingReadings = database.rawQuery(
-                """SELECT reading FROM word_reading
-                   WHERE surface=? AND reading>=? AND reading<?
-                   ORDER BY CASE WHEN reading=? THEN 0 ELSE 1 END, priority, reading
-                   LIMIT 3""",
-                arrayOf(surface, prefix, upperBound, prefix)
-            ).use { cursor ->
-                buildList {
-                    while (cursor.moveToNext()) add(cursor.getString(0))
-                }
+        val matchingReadings = matchingWordReadings(surfaces, prefix, upperBound)
+        return surfaces.map { WordReadingCandidate(it, matchingReadings[it].orEmpty()) }
+    }
+
+    /** Resolve completion candidates for several recognition alternatives in two queries. */
+    override fun suggestForPrefixes(
+        prefixes: List<String>,
+        limitPerPrefix: Int
+    ): Map<String, List<WordReadingCandidate>> {
+        if (limitPerPrefix <= 0) return emptyMap()
+        val unique = prefixes.asSequence().filter(String::isNotEmpty).distinct().toList()
+        if (unique.isEmpty()) return emptyMap()
+
+        val branches = unique.mapIndexed { index, _ ->
+            """SELECT * FROM (
+                   SELECT $index AS prefix_rank, surface, min(priority) AS best_priority
+                   FROM word_reading
+                   WHERE surface>=? AND surface<?
+                   GROUP BY surface
+                   ORDER BY CASE WHEN surface=? THEN 0 ELSE 1 END,
+                            best_priority, length(surface), surface
+                   LIMIT ?
+               )""".trimIndent()
+        }
+        val args = unique.flatMap { prefix ->
+            listOf(prefix, upperBound(prefix), prefix, limitPerPrefix.toString())
+        }.toTypedArray()
+        val surfacesByPrefix = database.rawQuery(
+            branches.joinToString(" UNION ALL ") + " ORDER BY prefix_rank",
+            args
+        ).use { cursor ->
+            val output = unique.associateWith { mutableListOf<String>() }.toMutableMap()
+            while (cursor.moveToNext()) {
+                output.getValue(unique[cursor.getInt(0)]) += cursor.getString(1)
             }
-            WordReadingCandidate(surface, matchingReadings)
+            output
+        }
+        val allSurfaces = surfacesByPrefix.values.flatten().distinct()
+        val readings = readingsForMany(allSurfaces)
+        return unique.associateWith { prefix ->
+            surfacesByPrefix.getValue(prefix).map { surface ->
+                WordReadingCandidate(surface, readings[surface].orEmpty())
+            }
+        }
+    }
+
+    private fun matchingWordReadings(
+        surfaces: List<String>,
+        prefix: String,
+        upperBound: String,
+        limit: Int = 3
+    ): Map<String, List<String>> {
+        if (surfaces.isEmpty()) return emptyMap()
+        val placeholders = List(surfaces.size) { "?" }.joinToString(",")
+        val args = (surfaces + listOf(prefix, upperBound, prefix)).toTypedArray()
+        return database.rawQuery(
+            """SELECT surface, reading FROM word_reading
+               WHERE surface IN ($placeholders) AND reading>=? AND reading<?
+               ORDER BY surface, CASE WHEN reading=? THEN 0 ELSE 1 END, priority, reading""",
+            args
+        ).use { cursor ->
+            val output = LinkedHashMap<String, MutableList<String>>()
+            while (cursor.moveToNext()) {
+                val readings = output.getOrPut(cursor.getString(0)) { mutableListOf() }
+                if (readings.size < limit) readings += cursor.getString(1)
+            }
+            output
         }
     }
 
     /** Batch-load KANJIDIC grade/frequency for recognition candidate re-ranking. */
-    fun kanjiPriorities(literals: List<String>): Map<String, KanjiUsagePriority> {
+    override fun kanjiPriorities(literals: List<String>): Map<String, KanjiUsagePriority> {
         val unique = literals.asSequence()
             .filter { it.codePointCount(0, it.length) == 1 }
             .distinct()
@@ -133,6 +221,9 @@ class ReadingRepository(context: Context) : AutoCloseable {
     ).use { cursor -> if (cursor.moveToFirst()) cursor.getString(0) else null }
 
     override fun close() = database.close()
+
+    private fun upperBound(prefix: String): String =
+        prefix + String(Character.toChars(Character.MAX_CODE_POINT))
 
     companion object {
         private const val DB_ASSET = "reading.db"

@@ -53,7 +53,11 @@ class ZinniaInkRecognizer(context: Context) : InkRecognizer {
         }
     }
 
-    override fun recognize(ink: HandwritingInk, callback: (List<RecognitionCandidate>) -> Unit) {
+    override fun recognize(
+        ink: HandwritingInk,
+        preContext: String,
+        callback: (List<RecognitionCandidate>) -> Unit
+    ) {
         if (ink.isEmpty || closed) {
             callback(emptyList())
             return
@@ -89,6 +93,10 @@ class ZinniaInkRecognizer(context: Context) : InkRecognizer {
     private fun postState(newState: InkRecognizer.State) {
         state = newState
         main.post { if (!closed) onStateChanged?.invoke(newState) }
+    }
+
+    override fun cancelPending() {
+        latestRequest.incrementAndGet()
     }
 
     override fun close() {

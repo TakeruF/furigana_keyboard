@@ -7,6 +7,12 @@
             <corners android:radius="12dp" />
         </shape>
     </item>
+    <item android:state_selected="true">
+        <shape android:shape="rectangle">
+            <solid android:color="@color/kbd_key_selected" />
+            <corners android:radius="12dp" />
+        </shape>
+    </item>
     <item>
         <shape android:shape="rectangle">
             <solid android:color="@color/kbd_key_function" />

@@ -2,9 +2,12 @@ package com.example.furiganakeyboard.view
 
 import android.content.Context
 import android.util.TypedValue
+import android.view.MotionEvent
 import android.widget.Button
 import android.widget.LinearLayout
+import androidx.appcompat.widget.AppCompatButton
 import androidx.core.content.ContextCompat
+import androidx.core.widget.TextViewCompat
 import com.example.furiganakeyboard.R
 
 /**
@@ -22,7 +25,7 @@ internal object KeyFactory {
         kind: Kind = Kind.PLAIN,
         textSizeSp: Float = 17f,
         onClick: (() -> Unit)? = null
-    ): Button = Button(context).apply {
+    ): Button = ImmediateKeyButton(context).apply {
         text = label
         isAllCaps = false
         // Force Japanese glyph variants for Han characters (Han unification).
@@ -34,6 +37,14 @@ internal object KeyFactory {
         setPadding(0, 0, 0, 0)
         stateListAnimator = null // kill Material elevation animation
         setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp)
+        maxLines = 1
+        TextViewCompat.setAutoSizeTextTypeUniformWithConfiguration(
+            this,
+            10,
+            textSizeSp.toInt().coerceAtLeast(10),
+            1,
+            TypedValue.COMPLEX_UNIT_SP
+        )
         background = ContextCompat.getDrawable(
             context,
             when (kind) {
@@ -48,12 +59,7 @@ internal object KeyFactory {
                 if (kind == Kind.ACCENT) R.color.kbd_on_accent else R.color.kbd_on_surface
             )
         )
-        onClick?.let { cb ->
-            setOnClickListener {
-                Haptics.key(it)
-                cb()
-            }
-        }
+        onClick?.let(::setOnKeyPress)
     }
 
     /** LayoutParams for a key in a horizontal row: weighted width, 2dp margin. */
@@ -66,4 +72,56 @@ internal object KeyFactory {
     fun dp(context: Context, v: Int): Int = TypedValue.applyDimension(
         TypedValue.COMPLEX_UNIT_DIP, v.toFloat(), context.resources.displayMetrics
     ).toInt()
+
+    /**
+     * Keyboard keys must accept the press before another finger can cancel the
+     * normal Button click on ACTION_UP. Accessibility-triggered clicks still
+     * dispatch the same action through [performClick].
+     */
+    private class ImmediateKeyButton(context: Context) : AppCompatButton(context) {
+        private var keyPress: (() -> Unit)? = null
+        private var skipNextPerformAction = false
+
+        fun setOnKeyPress(action: () -> Unit) {
+            keyPress = action
+            isClickable = true
+        }
+
+        override fun onTouchEvent(event: MotionEvent): Boolean {
+            if (!isEnabled || keyPress == null) return super.onTouchEvent(event)
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN,
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    isPressed = true
+                    Haptics.key(this)
+                    keyPress?.invoke()
+                }
+                MotionEvent.ACTION_UP -> {
+                    isPressed = false
+                    skipNextPerformAction = true
+                    performClick()
+                }
+                MotionEvent.ACTION_CANCEL -> {
+                    isPressed = false
+                    skipNextPerformAction = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    isPressed = event.x >= 0 && event.x < width &&
+                        event.y >= 0 && event.y < height
+                }
+            }
+            return true
+        }
+
+        override fun performClick(): Boolean {
+            super.performClick()
+            if (skipNextPerformAction) {
+                skipNextPerformAction = false
+            } else {
+                Haptics.key(this)
+                keyPress?.invoke()
+            }
+            return true
+        }
+    }
 }

@@ -8,6 +8,7 @@ import java.security.DigestInputStream
 
 /** Installs a compressed APK asset atomically and verifies its published hash. */
 object AssetInstaller {
+    @Synchronized
     fun ensure(context: Context, assetName: String, outputName: String, sha256: String): File {
         val target = File(context.noBackupFilesDir, outputName)
         val marker = File(context.noBackupFilesDir, "$outputName.sha256")

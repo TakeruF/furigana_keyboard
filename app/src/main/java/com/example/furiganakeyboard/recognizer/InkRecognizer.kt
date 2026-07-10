@@ -5,7 +5,8 @@ data class RecognitionCandidate(val text: String, val score: Float)
 /**
  * Abstraction over a handwriting recognition engine.
  *
- * Recognition always runs locally against the model bundled in the APK.
+ * Recognition always runs locally. Implementations may use either the model
+ * bundled in the APK or an optional model downloaded to the device.
  */
 interface InkRecognizer {
 
@@ -18,7 +19,14 @@ interface InkRecognizer {
      * thread with candidates and their native scores (best first), or an empty
      * list on failure. Higher scores are better.
      */
-    fun recognize(ink: HandwritingInk, callback: (List<RecognitionCandidate>) -> Unit)
+    fun recognize(
+        ink: HandwritingInk,
+        preContext: String = "",
+        callback: (List<RecognitionCandidate>) -> Unit
+    )
+
+    /** Discard callbacks from recognition work that is no longer relevant. */
+    fun cancelPending() {}
 
     /** Release any native/model resources. Safe to call multiple times. */
     fun close() {}

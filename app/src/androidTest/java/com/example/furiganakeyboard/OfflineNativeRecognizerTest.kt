@@ -2,6 +2,7 @@ package com.example.furiganakeyboard
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import android.util.Log
 import com.example.furiganakeyboard.data.AssetInstaller
 import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.recognizer.NativeZinnia
@@ -52,6 +53,7 @@ class OfflineNativeRecognizerTest {
                 } / 1_000_000.0
             }.sorted()
             val p95 = durationsMs[18]
+            Log.i("RecognizerPerformance", "native_recognition_p95_ms=$p95")
             assertTrue("recognition p95 was ${p95}ms", p95 <= 250.0)
         } finally {
             NativeZinnia.nativeDestroy(handle)
@@ -76,8 +78,8 @@ class OfflineNativeRecognizerTest {
     @Test
     fun bundledDictionaryPreparesWithinBudget() {
         val context = ApplicationProvider.getApplicationContext<android.content.Context>()
-        File(context.noBackupFilesDir, "reading-v2.db").delete()
-        File(context.noBackupFilesDir, "reading-v2.db.sha256").delete()
+        File(context.noBackupFilesDir, "reading-v3.db").delete()
+        File(context.noBackupFilesDir, "reading-v3.db.sha256").delete()
         var date: String? = null
         lateinit var exactWord: String
         lateinit var exactReadings: List<String>

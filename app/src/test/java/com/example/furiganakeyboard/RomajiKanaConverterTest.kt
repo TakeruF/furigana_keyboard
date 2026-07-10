@@ -28,4 +28,12 @@ class RomajiKanaConverterTest {
             RomajiKanaConverter.convert("nih")
         )
     }
+
+    @Test
+    fun convertsLongRapidInputWithoutChangingSyllablePrecedence() {
+        val source = "konnichiha".repeat(100)
+        assertEquals("こんにちは".repeat(100), RomajiKanaConverter.convert(source).displayText)
+        assertEquals("っちゃ", RomajiKanaConverter.convert("tcha").displayText)
+        assertEquals("しぇ", RomajiKanaConverter.convert("she").displayText)
+    }
 }

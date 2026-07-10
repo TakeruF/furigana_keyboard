@@ -15,7 +15,8 @@ import android.widget.FrameLayout
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.recognizer.InkRecognizer
-import com.example.furiganakeyboard.recognizer.KanjiCandidateRanker
+import com.example.furiganakeyboard.recognizer.PlusInkRecognizer
+import com.example.furiganakeyboard.recognizer.SideBySideInkRecognizer
 import com.example.furiganakeyboard.recognizer.ZinniaInkRecognizer
 import com.example.furiganakeyboard.settings.KeyboardPrefs
 import com.example.furiganakeyboard.settings.AppLocale
@@ -29,28 +30,34 @@ import com.example.furiganakeyboard.view.QwertyPadView
 import com.example.furiganakeyboard.view.RepeatOnTouchListener
 import com.example.furiganakeyboard.view.SymbolPadView
 
-/** Japanese handwriting IME with fully bundled recognition and reading data. */
+/** Japanese handwriting IME with optional Plus recognition and bundled fallback. */
 class FuriganaImeService : InputMethodService() {
     private enum class Panel { HANDWRITING, SYMBOLS, ENGLISH, ROMAJI }
 
     private lateinit var prefs: KeyboardPrefs
-    private lateinit var readings: ReadingRepository
+    private lateinit var candidatePipeline: CandidatePipeline
     private lateinit var candidateBar: CandidateBarView
     private lateinit var handwritingView: HandwritingView
     private lateinit var handwritingPanel: View
-    private lateinit var symbolPad: SymbolPadView
-    private lateinit var englishPad: QwertyPadView
-    private lateinit var romajiPad: QwertyPadView
+    private lateinit var panelContainer: FrameLayout
+    private var symbolPad: SymbolPadView? = null
+    private var englishPad: QwertyPadView? = null
+    private var romajiPad: QwertyPadView? = null
     private lateinit var enterKey: Button
+    private lateinit var symbolModeKey: Button
+    private lateinit var englishModeKey: Button
+    private lateinit var romajiModeKey: Button
 
     private val composition = CompositionBuffer()
     private var recognizer: InkRecognizer? = null
+    private var recognizerUsesPlus = false
     private var currentPanel = Panel.HANDWRITING
     private var appliedLocaleTag = ""
     private var latestCharacterAlternatives: List<String> = emptyList()
     private var wordRootBeforeLastCharacter = ""
     private var lastCharacterAlternatives: List<String> = emptyList()
-    private var romajiRaw = ""
+    private val romajiRaw = StringBuilder()
+    private var currentEnterLabel = ""
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -60,21 +67,29 @@ class FuriganaImeService : InputMethodService() {
         super.onCreate()
         prefs = KeyboardPrefs(this)
         appliedLocaleTag = prefs.localeTag
-        readings = ReadingRepository(this)
+        candidatePipeline = CandidatePipeline({ ReadingRepository(this) })
+        candidatePipeline.prewarm()
         Haptics.enabled = prefs.haptics
     }
 
     @SuppressLint("InflateParams")
     override fun onCreateInputView(): View {
+        // A locale change creates a new root; lazily rebuild panels against that root.
+        symbolPad = null
+        englishPad = null
+        romajiPad = null
         val root = layoutInflater.inflate(R.layout.keyboard_view, null)
         candidateBar = root.findViewById(R.id.candidateBar)
         handwritingView = root.findViewById(R.id.handwritingView)
         handwritingPanel = root.findViewById(R.id.handwritingPanel)
+        panelContainer = root.findViewById(R.id.panelContainer)
         enterKey = root.findViewById(R.id.keyEnter)
+        symbolModeKey = root.findViewById(R.id.keySymbol)
+        englishModeKey = root.findViewById(R.id.keyEnglish)
+        romajiModeKey = root.findViewById(R.id.keyRomaji)
 
         wireHandwriting()
         wireControlKeys(root)
-        buildExtraPanels(root.findViewById(R.id.panelContainer))
         applyReadingMode(prefs.readingMode)
         ensureRecognizer()
         return root
@@ -86,8 +101,10 @@ class FuriganaImeService : InputMethodService() {
             setInputView(onCreateInputView())
         }
         composition.clear()
-        romajiRaw = ""
+        romajiRaw.setLength(0)
         clearAlternativeContext()
+        candidatePipeline.invalidate()
+        recognizer?.cancelPending()
         Haptics.enabled = prefs.haptics
         applyReadingMode(prefs.readingMode)
         updateEnterLabel(info)
@@ -120,8 +137,15 @@ class FuriganaImeService : InputMethodService() {
     }
 
     private fun ensureRecognizer(): InkRecognizer {
-        recognizer?.let { return it }
-        return ZinniaInkRecognizer(this).also { engine ->
+        val usePlus = prefs.plusRecognition
+        recognizer?.let { existing ->
+            if (recognizerUsesPlus == usePlus) return existing
+            existing.close()
+            recognizer = null
+        }
+        val baseRecognizer = if (usePlus) PlusInkRecognizer(this) else ZinniaInkRecognizer(this)
+        val created = SideBySideInkRecognizer(baseRecognizer)
+        return created.also { engine ->
             engine.onStateChanged = { state ->
                 if (this::candidateBar.isInitialized) {
                     when (state) {
@@ -137,35 +161,8 @@ class FuriganaImeService : InputMethodService() {
                 }
             }
             recognizer = engine
+            recognizerUsesPlus = usePlus
         }
-    }
-
-    private fun buildExtraPanels(container: FrameLayout) {
-        symbolPad = SymbolPadView(this)
-        englishPad = QwertyPadView(this)
-        romajiPad = QwertyPadView(this)
-        for (pad in listOf<View>(symbolPad, englishPad, romajiPad)) {
-            pad.visibility = View.GONE
-            container.addView(
-                pad,
-                ViewGroup.LayoutParams(
-                    ViewGroup.LayoutParams.MATCH_PARENT,
-                    ViewGroup.LayoutParams.MATCH_PARENT
-                )
-            )
-        }
-        symbolPad.onText = { commitDirect(it) }
-        englishPad.onText = { commitDirect(it) }
-        romajiPad.onText = { appendRomajiInput(it) }
-        symbolPad.onDelete = { deleteBeforeCursor() }
-        englishPad.onDelete = { deleteBeforeCursor() }
-        romajiPad.onDelete = { deleteRomajiInput() }
-        symbolPad.onEnter = { sendEnter() }
-        englishPad.onEnter = { sendEnter() }
-        romajiPad.onEnter = { sendEnter() }
-        symbolPad.onBack = { switchPanel(Panel.HANDWRITING) }
-        englishPad.onBack = { switchPanel(Panel.HANDWRITING) }
-        romajiPad.onBack = { switchPanel(Panel.HANDWRITING) }
     }
 
     private fun switchPanel(panel: Panel) {
@@ -174,39 +171,90 @@ class FuriganaImeService : InputMethodService() {
     }
 
     private fun showPanel(panel: Panel) {
+        ensurePanel(panel)
         currentPanel = panel
         handwritingPanel.visibility = if (panel == Panel.HANDWRITING) View.VISIBLE else View.GONE
-        symbolPad.visibility = if (panel == Panel.SYMBOLS) View.VISIBLE else View.GONE
-        englishPad.visibility = if (panel == Panel.ENGLISH) View.VISIBLE else View.GONE
-        romajiPad.visibility = if (panel == Panel.ROMAJI) View.VISIBLE else View.GONE
+        symbolPad?.visibility = if (panel == Panel.SYMBOLS) View.VISIBLE else View.GONE
+        englishPad?.visibility = if (panel == Panel.ENGLISH) View.VISIBLE else View.GONE
+        romajiPad?.visibility = if (panel == Panel.ROMAJI) View.VISIBLE else View.GONE
+        if (this::symbolModeKey.isInitialized) {
+            symbolModeKey.isSelected = panel == Panel.SYMBOLS
+            englishModeKey.isSelected = panel == Panel.ENGLISH
+            romajiModeKey.isSelected = panel == Panel.ROMAJI
+        }
+    }
+
+    /** Heavy key grids are created only when the user first opens that mode. */
+    private fun ensurePanel(panel: Panel) {
+        when (panel) {
+            Panel.HANDWRITING -> Unit
+            Panel.SYMBOLS -> if (symbolPad == null) {
+                symbolPad = SymbolPadView(this).also { pad ->
+                    addPanel(pad)
+                    pad.onText = { commitDirect(it) }
+                    pad.onDelete = { deleteBeforeCursor() }
+                    pad.onEnter = { sendEnter() }
+                    pad.onBack = { switchPanel(Panel.HANDWRITING) }
+                    pad.setEnterLabel(currentEnterLabel)
+                }
+            }
+            Panel.ENGLISH -> if (englishPad == null) {
+                englishPad = QwertyPadView(this).also { pad ->
+                    addPanel(pad)
+                    pad.onText = { commitDirect(it) }
+                    pad.onDelete = { deleteBeforeCursor() }
+                    pad.onEnter = { sendEnter() }
+                    pad.onBack = { switchPanel(Panel.HANDWRITING) }
+                    pad.setEnterLabel(currentEnterLabel)
+                }
+            }
+            Panel.ROMAJI -> if (romajiPad == null) {
+                romajiPad = QwertyPadView(this).also { pad ->
+                    addPanel(pad)
+                    pad.onText = { appendRomajiInput(it) }
+                    pad.onDelete = { deleteRomajiInput() }
+                    pad.onEnter = { sendEnter() }
+                    pad.onBack = { switchPanel(Panel.HANDWRITING) }
+                    pad.setEnterLabel(currentEnterLabel)
+                }
+            }
+        }
+    }
+
+    private fun addPanel(panel: View) {
+        panel.visibility = View.GONE
+        panelContainer.addView(
+            panel,
+            ViewGroup.LayoutParams(
+                ViewGroup.LayoutParams.MATCH_PARENT,
+                ViewGroup.LayoutParams.MATCH_PARENT
+            )
+        )
     }
 
     private fun wireHandwriting() {
         handwritingView.onRecognize = { ink ->
-            ensureRecognizer().recognize(ink) { values ->
-                val rankedValues = KanjiCandidateRanker.rank(
-                    values,
-                    readings.kanjiPriorities(values.map { it.text })
-                )
-                val candidates = rankedValues.map { value ->
-                    val resolved = readings.readingsFor(value.text)
-                    CandidateUiModel(
-                        text = value.text,
-                        readings = if (resolved.isEmpty() && isHan(value.text)) {
-                            listOf(getString(R.string.reading_unavailable))
-                        } else resolved,
-                        kind = CandidateKind.CHARACTER
+            ensureRecognizer().recognize(ink, composition.text.takeLast(MAX_RECOGNITION_CONTEXT)) { values ->
+                if (values.isEmpty()) return@recognize
+                val stageContext = if (prefs.autoCommit && !composition.isEmpty) {
+                    HandwritingStageContext(
+                        baseBeforeCurrent = composition.text,
+                        wordRootBeforeLast = wordRootBeforeLastCharacter,
+                        previousAlternatives = lastCharacterAlternatives
                     )
-                }
-                if (candidates.isEmpty()) return@recognize
-                if (prefs.autoCommit && !composition.isEmpty) {
-                    stageRecognizedCharacter(candidates)
-                } else {
-                    latestCharacterAlternatives = candidates.map { it.text }
-                    candidateBar.setCandidates(candidates)
-                    handwritingView.markResultsDelivered()
-                }
+                } else null
+                candidatePipeline.submitHandwriting(
+                    values,
+                    stageContext,
+                    MAX_WORD_CANDIDATES,
+                    ::applyHandwritingResult
+                )
             }
+        }
+
+        handwritingView.onInkChanged = {
+            recognizer?.cancelPending()
+            candidatePipeline.invalidate()
         }
 
         handwritingView.onNewCharacterGate = gate@{
@@ -238,71 +286,67 @@ class FuriganaImeService : InputMethodService() {
         val value = composition.append(text)
         currentInputConnection?.setComposingText(value, 1)
         latestCharacterAlternatives = emptyList()
-        candidateBar.clear()
         showWordSuggestions()
     }
 
-    /**
-     * Once at least one character is composing, the next recognized character
-     * is staged automatically and the alternative cross-product is resolved
-     * against JMdict. This makes two sequential handwritten characters behave
-     * as a word without requiring a tap on the second character.
-     */
-    private fun stageRecognizedCharacter(characters: List<CandidateUiModel>) {
-        val baseBeforeCurrent = composition.text
-        val currentAlternatives = characters.map { it.text }.distinct()
-        val possibleSurfaces = WordCandidateResolver.combine(
-            root = if (lastCharacterAlternatives.isEmpty()) baseBeforeCurrent else wordRootBeforeLastCharacter,
-            previousCharacters = lastCharacterAlternatives,
-            currentCharacters = currentAlternatives
-        )
-
-        val topSurface = composition.append(currentAlternatives.first())
-        currentInputConnection?.setComposingText(topSurface, 1)
-        val resolved = WordCandidateResolver.resolve(
-            surfaces = possibleSurfaces,
-            exactReadings = readings::readingsFor,
-            suggestions = readings::suggest
-        ).map { CandidateUiModel(it.surface, it.readings, CandidateKind.WORD) }
-
-        val fallback = CandidateUiModel(
-            text = topSurface,
-            readings = readings.readingsFor(topSurface).ifEmpty {
-                listOf(getString(R.string.reading_not_in_dictionary))
-            },
-            kind = CandidateKind.WORD
-        )
-        candidateBar.setCandidates(
-            (resolved + fallback).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
-        )
-
-        wordRootBeforeLastCharacter = baseBeforeCurrent
-        lastCharacterAlternatives = currentAlternatives
-        latestCharacterAlternatives = emptyList()
-        handwritingView.clear()
-        Haptics.selection(handwritingView)
+    private fun applyHandwritingResult(result: HandwritingPipelineResult) {
+        when (result) {
+            is HandwritingPipelineResult.Characters -> {
+                val candidates = result.candidates.map { value ->
+                    CandidateUiModel(
+                        text = value.text,
+                        readings = if (value.readings.isEmpty() && isHan(value.text)) {
+                            listOf(getString(R.string.reading_unavailable))
+                        } else value.readings,
+                        kind = CandidateKind.CHARACTER
+                    )
+                }
+                latestCharacterAlternatives = candidates.map { it.text }
+                candidateBar.setCandidates(candidates)
+                handwritingView.markResultsDelivered()
+            }
+            is HandwritingPipelineResult.Staged -> {
+                val baseBeforeCurrent = composition.text
+                composition.replace(result.topSurface)
+                currentInputConnection?.setComposingText(result.topSurface, 1)
+                val resolved = result.candidates.map {
+                    CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
+                }
+                val fallback = CandidateUiModel(
+                    result.topSurface,
+                    listOf(getString(R.string.reading_not_in_dictionary)),
+                    CandidateKind.WORD
+                )
+                candidateBar.setCandidates(
+                    (resolved + fallback).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
+                )
+                wordRootBeforeLastCharacter = baseBeforeCurrent
+                lastCharacterAlternatives = result.currentAlternatives
+                latestCharacterAlternatives = emptyList()
+                handwritingView.clear()
+                Haptics.selection(handwritingView)
+            }
+        }
     }
 
     private fun showWordSuggestions() {
         if (composition.isEmpty) {
+            candidatePipeline.invalidate()
             candidateBar.clear()
             return
         }
-        val suggestions = readings.suggest(composition.text).map {
-            CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
-        }
-        if (suggestions.isEmpty()) {
-            candidateBar.setCandidates(
-                listOf(
-                    CandidateUiModel(
-                        composition.text,
-                        listOf(getString(R.string.reading_not_in_dictionary)),
-                        CandidateKind.WORD
-                    )
-                )
-            )
-        } else {
-            candidateBar.setCandidates(suggestions)
+        val prefix = composition.text
+        val fallback = CandidateUiModel(
+            prefix,
+            listOf(getString(R.string.reading_not_in_dictionary)),
+            CandidateKind.WORD
+        )
+        candidateBar.setCandidates(listOf(fallback))
+        candidatePipeline.submitSurface(prefix, MAX_WORD_CANDIDATES) { values ->
+            val suggestions = values.map {
+                CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
+            }
+            candidateBar.setCandidates(if (suggestions.isEmpty()) listOf(fallback) else suggestions)
         }
     }
 
@@ -350,15 +394,16 @@ class FuriganaImeService : InputMethodService() {
             EditorInfo.IME_ACTION_SEARCH -> getString(R.string.key_search)
             else -> getString(R.string.key_enter)
         }
+        currentEnterLabel = label
         enterKey.text = label
-        symbolPad.setEnterLabel(label)
-        englishPad.setEnterLabel(label)
-        romajiPad.setEnterLabel(label)
+        symbolPad?.setEnterLabel(label)
+        englishPad?.setEnterLabel(label)
+        romajiPad?.setEnterLabel(label)
     }
 
     private fun appendRomajiInput(text: String) {
         if (text.length == 1 && text[0].isLetter() && text[0].code < 128) {
-            romajiRaw += text.lowercase()
+            romajiRaw.append(text.lowercase())
             updateRomajiComposition()
         } else {
             commitDirect(text)
@@ -366,7 +411,8 @@ class FuriganaImeService : InputMethodService() {
     }
 
     private fun updateRomajiComposition() {
-        val converted = RomajiKanaConverter.convert(romajiRaw)
+        candidatePipeline.invalidate()
+        val converted = RomajiKanaConverter.convert(romajiRaw.toString())
         val display = converted.displayText
         composition.replace(display)
         clearAlternativeContext()
@@ -379,20 +425,20 @@ class FuriganaImeService : InputMethodService() {
             return
         }
 
-        val dictionaryCandidates = readings.suggestByReading(
-            converted.kana,
-            MAX_WORD_CANDIDATES - 1
-        ).map {
-            CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
-        }
         val kanaCandidate = CandidateUiModel(
             converted.kana,
             listOf(converted.kana),
             CandidateKind.WORD
         )
-        candidateBar.setCandidates(
-            (dictionaryCandidates + kanaCandidate).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
-        )
+        candidateBar.setCandidates(listOf(kanaCandidate))
+        candidatePipeline.submitRomaji(converted.kana, MAX_WORD_CANDIDATES - 1) { values ->
+            val dictionaryCandidates = values.map {
+                CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
+            }
+            candidateBar.setCandidates(
+                (dictionaryCandidates + kanaCandidate).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
+            )
+        }
     }
 
     private fun deleteRomajiInput() {
@@ -400,8 +446,9 @@ class FuriganaImeService : InputMethodService() {
             deleteBeforeCursor()
             return
         }
-        romajiRaw = romajiRaw.dropLast(1)
+        romajiRaw.setLength(romajiRaw.length - 1)
         if (romajiRaw.isEmpty()) {
+            candidatePipeline.invalidate()
             composition.clear()
             currentInputConnection?.setComposingText("", 1)
             currentInputConnection?.finishComposingText()
@@ -419,8 +466,10 @@ class FuriganaImeService : InputMethodService() {
     private fun finishComposition(clearCandidates: Boolean = true) {
         if (!composition.isEmpty) currentInputConnection?.finishComposingText()
         composition.clear()
-        romajiRaw = ""
+        romajiRaw.setLength(0)
         clearAlternativeContext()
+        candidatePipeline.invalidate()
+        recognizer?.cancelPending()
         if (clearCandidates && this::candidateBar.isInitialized) candidateBar.clear()
     }
 
@@ -474,11 +523,12 @@ class FuriganaImeService : InputMethodService() {
     override fun onDestroy() {
         recognizer?.close()
         recognizer = null
-        readings.close()
+        candidatePipeline.close()
         super.onDestroy()
     }
 
     companion object {
         private const val MAX_WORD_CANDIDATES = 8
+        private const val MAX_RECOGNITION_CONTEXT = 20
     }
 }

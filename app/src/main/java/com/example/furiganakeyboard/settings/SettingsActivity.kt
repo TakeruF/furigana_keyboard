@@ -20,7 +20,6 @@ import android.widget.ImageView
 import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.TextView
-import androidx.appcompat.app.AlertDialog
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -39,7 +38,7 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var headerIcon: ImageView
     private lateinit var headerTitle: TextView
     private lateinit var contentHost: LinearLayout
-    private var showingDetail = false
+    private var backAction: (() -> Unit)? = null
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -67,7 +66,7 @@ class SettingsActivity : AppCompatActivity() {
 
     @Suppress("DEPRECATION")
     override fun onBackPressed() {
-        if (showingDetail) showHub() else super.onBackPressed()
+        backAction?.invoke() ?: super.onBackPressed()
     }
 
     private fun buildScreen(): View {
@@ -87,7 +86,7 @@ class SettingsActivity : AppCompatActivity() {
             contentDescription = getString(R.string.settings_back)
             setOnClickListener {
                 Haptics.click(it)
-                showHub()
+                backAction?.invoke()
             }
         }
         header.addView(backButton, LinearLayout.LayoutParams(dp(44), dp(44)))
@@ -117,7 +116,7 @@ class SettingsActivity : AppCompatActivity() {
     }
 
     private fun showHub() {
-        showingDetail = false
+        backAction = null
         backButton.visibility = View.GONE
         headerIcon.visibility = View.VISIBLE
         headerTitle.setText(R.string.app_name)
@@ -253,8 +252,14 @@ class SettingsActivity : AppCompatActivity() {
         })
     }
 
-    private fun showDetail(title: String, descriptionRes: Int, iconRes: Int, content: LinearLayout) {
-        showingDetail = true
+    private fun showDetail(
+        title: String,
+        descriptionRes: Int,
+        iconRes: Int,
+        content: LinearLayout,
+        onBack: (() -> Unit)? = null
+    ) {
+        backAction = onBack ?: ::showHub
         backButton.visibility = View.VISIBLE
         headerIcon.visibility = View.GONE
         headerTitle.text = title.removeSuffix(" ›")
@@ -284,6 +289,15 @@ class SettingsActivity : AppCompatActivity() {
 
     private fun showHandwritingDetails() {
         val body = detailBody()
+        body.addView(sectionLabel(R.string.settings_section_plus))
+        body.addView(groupCard(listOf(
+            toggleRow(
+                R.string.settings_plus_recognition,
+                R.string.settings_plus_recognition_desc,
+                prefs.plusRecognition
+            ) { prefs.plusRecognition = it }
+        )))
+        body.addView(footerNote(getString(R.string.settings_plus_note)))
         body.addView(sectionLabel(R.string.settings_section_input))
         body.addView(groupCard(listOf(
             toggleRow(
@@ -402,7 +416,7 @@ class SettingsActivity : AppCompatActivity() {
             infoRow(
                 getString(R.string.privacy_network_title),
                 getString(R.string.privacy_network_desc),
-                getString(R.string.privacy_none)
+                getString(R.string.privacy_model_only)
             ),
             infoRow(
                 getString(R.string.privacy_storage_title),
@@ -440,14 +454,26 @@ class SettingsActivity : AppCompatActivity() {
                 summary = getString(R.string.privacy_policy_desc),
                 iconRes = R.drawable.ic_settings_privacy
             ) {
-                showAsset(R.string.privacy_policy_title, localizedLegalAsset("privacy-policy"))
+                showAsset(
+                    R.string.privacy_policy_title,
+                    R.string.privacy_policy_desc,
+                    R.drawable.ic_settings_privacy,
+                    ::showLegalDetails,
+                    localizedLegalAsset("privacy-policy")
+                )
             },
             actionRow(
                 R.string.terms_title,
                 summary = getString(R.string.terms_desc),
                 iconRes = R.drawable.ic_settings_legal
             ) {
-                showAsset(R.string.terms_title, localizedLegalAsset("terms"))
+                showAsset(
+                    R.string.terms_title,
+                    R.string.terms_desc,
+                    R.drawable.ic_settings_legal,
+                    ::showLegalDetails,
+                    localizedLegalAsset("terms")
+                )
             }
         )))
         body.addView(sectionLabel(R.string.settings_section_notices))
@@ -459,6 +485,9 @@ class SettingsActivity : AppCompatActivity() {
             ) {
                 showAssets(
                     R.string.third_party_notices_title,
+                    R.string.third_party_notices_desc,
+                    R.drawable.ic_settings_info,
+                    ::showLegalDetails,
                     "licenses/EDRDG-CC-BY-SA-4.0.txt",
                     "licenses/ZINNIA-BSD.txt",
                     "licenses/TEGAKI-MODEL-README.txt",
@@ -494,18 +523,43 @@ class SettingsActivity : AppCompatActivity() {
         )))
         body.addView(sectionLabel(R.string.settings_section_open_source))
         body.addView(groupCard(listOf(
+            infoRow(
+                getString(R.string.about_plus_title),
+                getString(R.string.about_plus_desc)
+            ),
             actionRow(R.string.license_edrdg, summary = getString(R.string.about_edrdg)) {
-                showAsset(R.string.license_edrdg, "licenses/EDRDG-CC-BY-SA-4.0.txt")
+                showAsset(
+                    R.string.license_edrdg,
+                    R.string.about_edrdg,
+                    R.drawable.ic_settings_info,
+                    ::showAboutDetails,
+                    "licenses/EDRDG-CC-BY-SA-4.0.txt"
+                )
             },
             actionRow(R.string.license_zinnia, summary = getString(R.string.about_zinnia)) {
-                showAsset(R.string.license_zinnia, "licenses/ZINNIA-BSD.txt")
+                showAsset(
+                    R.string.license_zinnia,
+                    R.string.about_zinnia,
+                    R.drawable.ic_settings_info,
+                    ::showAboutDetails,
+                    "licenses/ZINNIA-BSD.txt"
+                )
             },
             actionRow(R.string.license_tegaki, summary = getString(R.string.about_tegaki)) {
-                showAsset(R.string.license_tegaki, "licenses/TEGAKI-MODEL-LGPL-2.1.txt")
+                showAsset(
+                    R.string.license_tegaki,
+                    R.string.about_tegaki,
+                    R.drawable.ic_settings_info,
+                    ::showAboutDetails,
+                    "licenses/TEGAKI-MODEL-LGPL-2.1.txt"
+                )
             },
             actionRow(R.string.license_app_libraries, summary = getString(R.string.about_app_libraries)) {
                 showAssets(
                     R.string.license_app_libraries,
+                    R.string.about_app_libraries,
+                    R.drawable.ic_settings_info,
+                    ::showAboutDetails,
                     "licenses/THIRD-PARTY-NOTICES.txt",
                     "licenses/APACHE-2.0.txt"
                 )
@@ -572,33 +626,43 @@ class SettingsActivity : AppCompatActivity() {
         return "legal/$baseName-$suffix.txt"
     }
 
-    private fun showAsset(titleRes: Int, name: String) {
-        showAssets(titleRes, name)
+    private fun showAsset(
+        titleRes: Int,
+        descriptionRes: Int,
+        iconRes: Int,
+        onBack: () -> Unit,
+        name: String
+    ) {
+        showAssets(titleRes, descriptionRes, iconRes, onBack, name)
     }
 
-    private fun showAssets(titleRes: Int, vararg names: String) {
+    private fun showAssets(
+        titleRes: Int,
+        descriptionRes: Int,
+        iconRes: Int,
+        onBack: () -> Unit,
+        vararg names: String
+    ) {
         val text = names.joinToString("\n\n────────────────────\n\n") { name ->
             assets.open(name).bufferedReader().use { it.readText() }
         }
-        val scroll = ScrollView(this).apply {
+        val body = detailBody()
+        body.addView(MaterialCardView(this).apply {
+            radius = dp(16).toFloat()
+            cardElevation = 0f
+            strokeWidth = dp(1)
+            strokeColor = color(R.color.settings_card_stroke)
+            setCardBackgroundColor(color(R.color.settings_card))
             addView(detailText(text).apply {
                 setTextColor(color(R.color.settings_text))
                 setTextIsSelectable(true)
-                setPadding(dp(20), dp(12), dp(20), dp(12))
+                setPadding(dp(16), dp(14), dp(16), dp(18))
             })
-        }
-        val dialog = AlertDialog.Builder(this)
-            .setTitle(titleRes)
-            .setView(scroll)
-            .setPositiveButton(R.string.license_close, null)
-            .create()
-        dialog.setOnShowListener {
-            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener { button ->
-                Haptics.click(button)
-                dialog.dismiss()
-            }
-        }
-        dialog.show()
+        }, LinearLayout.LayoutParams(
+            LinearLayout.LayoutParams.MATCH_PARENT,
+            LinearLayout.LayoutParams.WRAP_CONTENT
+        ).apply { topMargin = dp(10) })
+        showDetail(getString(titleRes), descriptionRes, iconRes, body, onBack)
     }
 
     private fun detailBody() = LinearLayout(this).apply {
