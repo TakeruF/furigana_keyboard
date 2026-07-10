@@ -118,6 +118,5 @@ class KeyboardPrefs(context: Context) {
         private const val KEY_ACCENT_COLOR = "accent_color"
         private const val KEY_KEYBOARD_HEIGHT = "keyboard_height"
         private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
-
     }
 }

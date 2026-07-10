@@ -187,4 +187,10 @@
     <string name="help_support_title">Support and inquiries</string>
     <string name="help_support_desc">Email support@hanlu.app for help or to report a problem</string>
     <string name="support_email" translatable="false">support@hanlu.app</string>
+
+    <string name="onboarding_title">Set up Furigana Keyboard</string>
+    <string name="onboarding_description">Complete these two Android settings to start using the keyboard.</string>
+    <string name="onboarding_step_enable">Step 1  Enable the system keyboard</string>
+    <string name="onboarding_step_select">Step 2  Switch to this keyboard</string>
+    <string name="onboarding_privacy_note">Android shows a standard keyboard-access warning when enabling any input method. Input is processed on this device.</string>
 </resources>

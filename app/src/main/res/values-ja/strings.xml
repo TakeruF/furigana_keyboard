@@ -36,4 +36,9 @@
     <string name="settings_plus_recognition_desc">Googleの端末内日本語モデルを使用し、失敗時は同梱モデルへ自動で切り替えます</string>
     <string name="settings_plus_note">すべての利用者で初期状態はオンです。初回に約20 MBを取得します。地域によって取得や認識が安定しない場合はオフにしてください。</string>
     <string name="about_plus_desc">任意のGoogle ML Kit端末内認識。GoogleのML Kit規約が適用されます。</string>
+    <string name="onboarding_title">ふりがなキーボードを設定</string>
+    <string name="onboarding_description">キーボードを使い始めるには、Androidで次の2つを設定してください。</string>
+    <string name="onboarding_step_enable">ステップ1　システム入力を有効にする</string>
+    <string name="onboarding_step_select">ステップ2　このキーボードに切り替える</string>
+    <string name="onboarding_privacy_note">入力方法を有効にすると、Android共通の注意事項が表示されます。入力内容は端末内で処理されます。</string>
 </resources>

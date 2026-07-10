@@ -20,4 +20,9 @@
     <string name="settings_plus_recognition_desc">Google 기기 내 일본어 모델을 사용하고 실패하면 내장 모델로 자동 전환합니다</string>
     <string name="settings_plus_note">모든 사용자에게 기본으로 켜집니다. 처음 약 20 MB를 다운로드하며, 지역에 따라 다운로드나 인식이 불안정하면 꺼 주세요.</string>
     <string name="about_plus_desc">선택형 Google ML Kit 기기 내 인식이며 Google ML Kit 약관이 적용됩니다.</string>
+    <string name="onboarding_title">후리가나 키보드 설정</string>
+    <string name="onboarding_description">키보드를 사용하려면 다음 두 가지 Android 설정을 완료하세요.</string>
+    <string name="onboarding_step_enable">1단계　시스템 입력기 활성화</string>
+    <string name="onboarding_step_select">2단계　이 키보드로 전환</string>
+    <string name="onboarding_privacy_note">입력 방법을 활성화하면 Android의 표준 보안 안내가 표시됩니다. 입력 내용은 기기에서 처리됩니다.</string>
 </resources>

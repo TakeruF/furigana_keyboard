@@ -57,6 +57,10 @@ class SettingsActivity : AppCompatActivity() {
             )
         }
         super.onCreate(savedInstanceState)
+        if (!KeyboardSetupState.isSelected(this)) {
+            showKeyboardSetup()
+            return
+        }
         Haptics.enabled = prefs.haptics
         Haptics.strength = prefs.hapticStrength
         KeySounds.enabled = prefs.keySound
@@ -72,6 +76,18 @@ class SettingsActivity : AppCompatActivity() {
         }
         setContentView(buildScreen())
         showHub()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (!isFinishing && !KeyboardSetupState.isSelected(this)) showKeyboardSetup()
+    }
+
+    private fun showKeyboardSetup() {
+        startActivity(Intent(this, OnboardingActivity::class.java).apply {
+            addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP or Intent.FLAG_ACTIVITY_SINGLE_TOP)
+        })
+        finish()
     }
 
     @Suppress("DEPRECATION")

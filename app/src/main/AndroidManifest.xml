@@ -36,7 +36,13 @@
         <activity
             android:name=".settings.SettingsActivity"
             android:exported="true"
-            android:label="@string/settings_title">
+            android:label="@string/settings_title" />
+
+        <!-- First-launch guide for enabling and selecting the Android IME. -->
+        <activity
+            android:name=".settings.OnboardingActivity"
+            android:exported="true"
+            android:label="@string/onboarding_title">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

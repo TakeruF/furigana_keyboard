@@ -23,4 +23,9 @@
     <string name="settings_plus_recognition_desc">使用Google设备端日语模型，失败时自动切换到内置模型</string>
     <string name="settings_plus_note">所有用户均默认开启。首次使用需下载约20 MB；如所在地区下载或识别不稳定，请将其关闭。</string>
     <string name="about_plus_desc">可选的Google ML Kit设备端识别，适用Google ML Kit条款。</string>
+    <string name="onboarding_title">设置假名注音键盘</string>
+    <string name="onboarding_description">请完成以下两项Android设置，即可开始使用键盘。</string>
+    <string name="onboarding_step_enable">第一步　启用系统输入法</string>
+    <string name="onboarding_step_select">第二步　切换到此输入法</string>
+    <string name="onboarding_privacy_note">启用任何输入法时，Android都会显示标准安全提示。输入内容仅在设备上处理。</string>
 </resources>
