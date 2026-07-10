@@ -23,7 +23,7 @@ class QwertyPadView(
 
     /** Input callbacks wired by the IME service. */
     var onText: ((String) -> Unit)? = null
-    var onDelete: (() -> Unit)? = null
+    var onDelete: (() -> Boolean)? = null
     var onEnter: (() -> Unit)? = null
     var onBack: (() -> Unit)? = null
 
@@ -103,7 +103,7 @@ class QwertyPadView(
             row.addView(key, KeyFactory.rowParams(context, 1f))
         }
         val delete = KeyFactory.key(context, context.getString(R.string.key_delete), Kind.FUNCTION, 18f)
-        delete.setOnTouchListener(RepeatOnTouchListener { onDelete?.invoke() })
+        delete.setOnTouchListener(RepeatOnTouchListener { onDelete?.invoke() == true })
         row.addView(delete, KeyFactory.rowParams(context, 1.5f))
         return row
     }

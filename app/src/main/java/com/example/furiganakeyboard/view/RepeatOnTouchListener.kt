@@ -14,16 +14,18 @@ import android.view.View
 class RepeatOnTouchListener(
     private val initialDelayMs: Long = 400,
     private val intervalMs: Long = 60,
-    private val action: () -> Unit
+    private val action: () -> Boolean
 ) : View.OnTouchListener {
 
     private val handler = Handler(Looper.getMainLooper())
     private var heldView: View? = null
     private val repeater = object : Runnable {
         override fun run() {
-            heldView?.let { Haptics.tick(it) } // subtle feedback per repeat
-            action()
-            handler.postDelayed(this, intervalMs)
+            val view = heldView ?: return
+            if (action()) {
+                Haptics.tick(view) // subtle feedback only when something was deleted
+                handler.postDelayed(this, intervalMs)
+            }
         }
     }
 
@@ -33,9 +35,10 @@ class RepeatOnTouchListener(
             MotionEvent.ACTION_DOWN -> {
                 v.isPressed = true
                 heldView = v
-                Haptics.key(v)
-                action()
-                handler.postDelayed(repeater, initialDelayMs)
+                if (action()) {
+                    Haptics.key(v)
+                    handler.postDelayed(repeater, initialDelayMs)
+                }
             }
             MotionEvent.ACTION_UP -> {
                 v.isPressed = false

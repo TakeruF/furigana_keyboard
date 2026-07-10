@@ -473,7 +473,7 @@ class FuriganaImeService : InputMethodService() {
         currentInputConnection?.setComposingText(display, 1)
         updateEnterLabel(currentInputEditorInfo)
 
-        if (converted.pending.isNotEmpty() || converted.kana.isEmpty()) {
+        if (converted.hasUnresolvedInput || converted.kana.isEmpty()) {
             candidateBar.setCandidates(
                 listOf(CandidateUiModel(display, kind = CandidateKind.WORD))
             )
@@ -496,10 +496,9 @@ class FuriganaImeService : InputMethodService() {
         }
     }
 
-    private fun deleteRomajiInput() {
+    private fun deleteRomajiInput(): Boolean {
         if (romajiRaw.isEmpty()) {
-            deleteBeforeCursor()
-            return
+            return deleteBeforeCursor()
         }
         val remainingRaw = RomajiKanaConverter.deleteLastUnit(romajiRaw.toString())
         romajiRaw.setLength(0)
@@ -514,6 +513,7 @@ class FuriganaImeService : InputMethodService() {
         } else {
             updateRomajiComposition()
         }
+        return true
     }
 
     private fun commitDirect(text: String) {
@@ -532,8 +532,8 @@ class FuriganaImeService : InputMethodService() {
         if (this::enterKey.isInitialized) updateEnterLabel(currentInputEditorInfo)
     }
 
-    private fun deleteBeforeCursor() {
-        val connection = currentInputConnection ?: return
+    private fun deleteBeforeCursor(): Boolean {
+        val connection = currentInputConnection ?: return false
         if (!composition.isEmpty) {
             val remaining = composition.deleteLastCodePoint()
             clearAlternativeContext()
@@ -544,11 +544,13 @@ class FuriganaImeService : InputMethodService() {
             else connection.setComposingText(remaining, 1)
             updateEnterLabel(currentInputEditorInfo)
             showWordSuggestions()
-            return
+            return true
         }
         val selected = connection.getSelectedText(0)
-        if (selected.isNullOrEmpty()) connection.deleteSurroundingText(1, 0)
-        else connection.commitText("", 1)
+        if (!selected.isNullOrEmpty()) return connection.commitText("", 1)
+
+        if (connection.getTextBeforeCursor(1, 0).isNullOrEmpty()) return false
+        return connection.deleteSurroundingTextInCodePoints(1, 0)
     }
 
     private fun editorAction(info: EditorInfo?): Int {

@@ -17,7 +17,7 @@ class SymbolPadView(context: Context) : LinearLayout(context) {
 
     /** Input callbacks wired by the IME service. */
     var onText: ((String) -> Unit)? = null
-    var onDelete: (() -> Unit)? = null
+    var onDelete: (() -> Boolean)? = null
     var onEnter: (() -> Unit)? = null
     var onBack: (() -> Unit)? = null
 
@@ -72,7 +72,7 @@ class SymbolPadView(context: Context) : LinearLayout(context) {
     @SuppressLint("ClickableViewAccessibility")
     private fun deleteKey(): Button {
         val delete = KeyFactory.key(context, context.getString(R.string.key_delete), Kind.FUNCTION, 18f)
-        delete.setOnTouchListener(RepeatOnTouchListener { onDelete?.invoke() })
+        delete.setOnTouchListener(RepeatOnTouchListener { onDelete?.invoke() == true })
         return delete
     }
 

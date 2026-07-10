@@ -23,6 +23,26 @@ class RomajiKanaConverterTest {
             RomajiKanaConverter.convert("nn")
         )
         assertEquals("んな", RomajiKanaConverter.convert("nna").displayText)
+        assertEquals("んに", RomajiKanaConverter.convert("nni").displayText)
+        assertEquals("んにゃ", RomajiKanaConverter.convert("nnya").displayText)
+        assertEquals("んな", RomajiKanaConverter.convert("nnna").displayText)
+        assertEquals("ん", RomajiKanaConverter.convert("n'").displayText)
+    }
+
+    @Test
+    fun keepsAnUnpairedTerminalNAmbiguousWithoutShowingRawRomaji() {
+        assertEquals(
+            RomajiKanaConverter.Result("ん", "", hasAmbiguousTerminalN = true),
+            RomajiKanaConverter.convert("n")
+        )
+        assertEquals(
+            RomajiKanaConverter.Result("んん", "", hasAmbiguousTerminalN = true),
+            RomajiKanaConverter.convert("nnn")
+        )
+        assertEquals("んん", RomajiKanaConverter.convert("nnnn").displayText)
+        assertEquals("な", RomajiKanaConverter.convert("na").displayText)
+        assertEquals("にゃ", RomajiKanaConverter.convert("nya").displayText)
+        assertEquals("んか", RomajiKanaConverter.convert("nka").displayText)
     }
 
     @Test

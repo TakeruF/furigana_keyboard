@@ -2,8 +2,13 @@ package com.example.furiganakeyboard.ime
 
 /** Incremental, offline romaji-to-hiragana conversion for the Japanese QWERTY panel. */
 object RomajiKanaConverter {
-    data class Result(val kana: String, val pending: String) {
+    data class Result(
+        val kana: String,
+        val pending: String,
+        val hasAmbiguousTerminalN: Boolean = false
+    ) {
         val displayText: String get() = kana + pending
+        val hasUnresolvedInput: Boolean get() = pending.isNotEmpty() || hasAmbiguousTerminalN
     }
 
     private val syllables = mapOf(
@@ -104,10 +109,15 @@ object RomajiKanaConverter {
             }
 
             if (current == 'n') {
-                if (index + 1 == input.length) {
-                    kana.append('ん')
-                    index++
-                    continue
+                val runEnd = input.indexOfFirstFrom(index) { it != 'n' }
+                val runLength = runEnd - index
+                if (runEnd == input.length) {
+                    repeat((runLength + 1) / 2) { kana.append('ん') }
+                    return Result(
+                        kana.toString(),
+                        "",
+                        hasAmbiguousTerminalN = runLength % 2 != 0
+                    )
                 }
                 val next = input[index + 1]
                 if (next == '\'') {
@@ -115,9 +125,15 @@ object RomajiKanaConverter {
                     index += 2
                     continue
                 }
-                if (next == 'n') {
-                    kana.append('ん')
-                    index += if (index + 2 == input.length) 2 else 1
+                if (runLength > 1) {
+                    val afterRun = input[runEnd]
+                    if (afterRun.isVowel() || afterRun == 'y') {
+                        repeat(runLength / 2) { kana.append('ん') }
+                        index = runEnd - 1
+                    } else {
+                        repeat((runLength + 1) / 2) { kana.append('ん') }
+                        index = runEnd
+                    }
                     continue
                 }
                 if (next.isConsonant() && next != 'y') {
@@ -132,6 +148,16 @@ object RomajiKanaConverter {
         }
         return Result(kana.toString(), "")
     }
+
+    private fun String.indexOfFirstFrom(startIndex: Int, predicate: (Char) -> Boolean): Int {
+        for (index in startIndex until length) {
+            if (predicate(this[index])) return index
+        }
+        return length
+    }
+
+    private fun Char.isVowel(): Boolean = this == 'a' || this == 'i' || this == 'u' ||
+        this == 'e' || this == 'o'
 
     /**
      * Removes one visible input unit. Completed kana are removed as a whole
