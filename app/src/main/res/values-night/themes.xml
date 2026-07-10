@@ -1,0 +1,9 @@
+<resources>
+    <style name="Theme.FuriganaKeyboard" parent="Theme.Material3.DayNight.NoActionBar">
+        <item name="colorPrimary">@color/kbd_accent</item>
+        <item name="android:fontFamily">sans</item>
+        <item name="android:navigationBarColor">@color/settings_background</item>
+        <item name="android:statusBarColor">@color/settings_background</item>
+        <item name="android:windowLightStatusBar">false</item>
+    </style>
+</resources>

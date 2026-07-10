@@ -1,0 +1,10 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Input-method metadata. Declares a single Japanese handwriting subtype and
+     points the "settings" affordance at SettingsActivity. -->
+<input-method xmlns:android="http://schemas.android.com/apk/res/android"
+    android:settingsActivity="com.example.furiganakeyboard.settings.SettingsActivity">
+    <subtype
+        android:label="@string/subtype_ja"
+        android:imeSubtypeLocale="ja"
+        android:imeSubtypeMode="keyboard" />
+</input-method>

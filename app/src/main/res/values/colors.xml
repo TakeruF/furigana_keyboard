@@ -1,0 +1,33 @@
+<resources>
+    <!-- Light palette, modeled on WeChat IME (微信输入法) handwriting mode. -->
+    <color name="kbd_background">#FFF2F2F2</color>
+    <color name="kbd_canvas">#FFFFFFFF</color>
+    <color name="kbd_stroke">#FF1F1F1F</color>
+    <color name="kbd_on_surface">#FF191919</color>
+    <color name="kbd_on_surface_secondary">#FF9A9A9A</color>
+    <!-- Plain (letter/symbol) keys are white; function keys are light gray. -->
+    <color name="kbd_key">#FFFFFFFF</color>
+    <color name="kbd_key_pressed">#FFD8D8D8</color>
+    <color name="kbd_key_function">#FFE4E5E7</color>
+    <color name="kbd_key_function_pressed">#FFCDCED0</color>
+    <!-- WeChat signature green. -->
+    <color name="kbd_accent">#FF07C160</color>
+    <color name="kbd_accent_pressed">#FF06AD56</color>
+    <color name="kbd_on_accent">#FFFFFFFF</color>
+    <color name="kbd_hint">#FFC4C4C4</color>
+
+    <!-- Launcher icon background (not theme-dependent). -->
+    <color name="ic_launcher_background">#FFFFFFFF</color>
+
+    <color name="settings_background">#FFEAF8F5</color>
+    <color name="settings_card">#FFFFFFFF</color>
+    <color name="settings_text">#FF1D2524</color>
+    <color name="settings_secondary">#FF7C8987</color>
+    <color name="settings_icon">#FF4F5A58</color>
+    <color name="settings_card_stroke">#143C514D</color>
+    <color name="settings_divider">#1F61706D</color>
+    <color name="settings_accent">#FF167C69</color>
+    <color name="settings_accent_surface">#FFDDF2EC</color>
+    <color name="settings_success">#FF16705F</color>
+    <color name="settings_success_surface">#FFDDF3EB</color>
+</resources>

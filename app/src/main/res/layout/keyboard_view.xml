@@ -1,0 +1,132 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Root view of the IME, laid out after WeChat IME's handwriting mode:
+       top    : candidate bar (first candidate highlighted in green)
+       middle : [left function column] [big handwriting canvas] [right column]
+     The symbol / ABC panels are added to panelContainer at runtime. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:orientation="vertical"
+    android:background="@color/kbd_background"
+    android:paddingLeft="4dp"
+    android:paddingRight="4dp"
+    android:paddingBottom="6dp">
+
+    <!-- Candidate bar -->
+    <com.example.furiganakeyboard.view.CandidateBarView
+        android:id="@+id/candidateBar"
+        android:layout_width="match_parent"
+        android:layout_height="62dp" />
+
+    <!-- Panels (handwriting / symbols / qwerty) -->
+    <FrameLayout
+        android:id="@+id/panelContainer"
+        android:layout_width="match_parent"
+        android:layout_height="252dp">
+
+        <!-- Handwriting panel -->
+        <LinearLayout
+            android:id="@+id/handwritingPanel"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="horizontal">
+
+            <!-- Left function column: switchers -->
+            <LinearLayout
+                android:layout_width="62dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/keySymbol"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:text="@string/key_symbol" />
+
+                <Button
+                    android:id="@+id/keyAbc"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:text="@string/key_abc" />
+
+                <Button
+                    android:id="@+id/keyMode"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:text="@string/mode_kana" />
+
+                <Button
+                    android:id="@+id/keySettings"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:text="@string/key_settings" />
+            </LinearLayout>
+
+            <!-- Big handwriting canvas -->
+            <com.example.furiganakeyboard.view.HandwritingView
+                android:id="@+id/handwritingView"
+                android:layout_width="0dp"
+                android:layout_height="match_parent"
+                android:layout_weight="1"
+                android:layout_margin="2dp"
+                android:background="@drawable/canvas_background" />
+
+            <!-- Right function column: editing keys (WeChat order) -->
+            <LinearLayout
+                android:layout_width="62dp"
+                android:layout_height="match_parent"
+                android:orientation="vertical">
+
+                <Button
+                    android:id="@+id/keyDelete"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:textSize="18sp"
+                    android:text="@string/key_delete" />
+
+                <Button
+                    android:id="@+id/keyRewrite"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:textSize="12sp"
+                    android:text="@string/key_rewrite" />
+
+                <Button
+                    android:id="@+id/keySpace"
+                    style="@style/SideKey"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:text="@string/key_space" />
+
+                <Button
+                    android:id="@+id/keyEnter"
+                    style="@style/SideKey.Accent"
+                    android:layout_width="match_parent"
+                    android:layout_height="0dp"
+                    android:layout_weight="1"
+                    android:layout_margin="2dp"
+                    android:text="@string/key_enter" />
+            </LinearLayout>
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>
