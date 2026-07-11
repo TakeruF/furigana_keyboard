@@ -193,7 +193,7 @@ enum ReadingUpdatePackageValidator {
 
 @MainActor
 final class ReadingDataUpdater: ObservableObject {
-    @Published private(set) var status = "辞書更新を確認しています…"
+    @Published private(set) var status = AppStrings.text("update_checking")
     @Published private(set) var isUpdating = false
 
     func update() async {
@@ -203,7 +203,7 @@ final class ReadingDataUpdater: ObservableObject {
         do {
             status = try await performUpdate()
         } catch {
-            status = "辞書更新を確認できませんでした。同梱辞書を使用します。"
+            status = AppStrings.text("update_failed")
         }
     }
 
@@ -229,7 +229,7 @@ final class ReadingDataUpdater: ObservableObject {
            active.schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
            ReadingDataLocation.activeDatabaseURL(in: directory) != nil,
            active.dataVersion >= manifest.dataVersion {
-            return "辞書は最新です（\(active.dictionaryDate)）"
+            return "\(AppStrings.text("update_current"))（\(active.dictionaryDate)）"
         }
 
         let (temporaryDownload, response) = try await URLSession.shared.download(
@@ -259,7 +259,7 @@ final class ReadingDataUpdater: ObservableObject {
             in: directory
         )
         ReadingDataLocation.removeInactive(in: directory, keeping: fileName)
-        return "辞書を更新しました（\(manifest.dictionaryDate)）"
+        return "\(AppStrings.text("update_complete"))（\(manifest.dictionaryDate)）"
     }
 
     private func fetch(_ url: URL, maximumSize: Int) async throws -> Data {

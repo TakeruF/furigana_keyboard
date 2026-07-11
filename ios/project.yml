@@ -38,6 +38,10 @@ targets:
     sources:
       - Sources/App
       - Sources/Shared
+      - path: ../app/src/main/assets/legal
+        buildPhase: resources
+      - path: ../app/src/main/assets/licenses
+        buildPhase: resources
     info:
       path: Sources/App/Info.plist
       properties:
@@ -78,7 +82,7 @@ targets:
         CFBundleDisplayName: Furigana Keyboard
         NSExtension:
           NSExtensionAttributes:
-            IsASCIICapable: false
+            IsASCIICapable: true
             PrefersRightToLeft: false
             PrimaryLanguage: ja-JP
             RequestsOpenAccess: false
@@ -121,11 +125,16 @@ targets:
     hostApplication: FuriganaKeyboard
     sources:
       - Tests
+      - Sources/KeyboardExtension/BunsetsuState.swift
+      - Sources/KeyboardExtension/KanaKanjiConverter.swift
+      - Sources/KeyboardExtension/ReadingRepository.swift
     dependencies:
       - target: FuriganaKeyboard
       - sdk: libsqlite3.tbd
     settings:
       base:
+        GENERATE_INFOPLIST_FILE: true
         PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard.tests
+        SWIFT_ACTIVE_COMPILATION_CONDITIONS: "$(inherited) REPOSITORY_TEST_HOST"
         TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Furigana Keyboard.app/Furigana Keyboard"
         BUNDLE_LOADER: "$(TEST_HOST)"
