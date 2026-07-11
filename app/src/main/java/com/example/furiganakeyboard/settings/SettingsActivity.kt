@@ -103,7 +103,9 @@ class SettingsActivity : AppCompatActivity() {
             isAppearanceLightStatusBars = !darkMode
             isAppearanceLightNavigationBars = !darkMode
         }
-        setContentView(buildScreen())
+        val screen = buildScreen().apply { applySystemBarPadding() }
+        setContentView(screen)
+        screen.requestApplyInsets()
         showHub()
         requestUpdateNotificationPermissionOnce()
         if (intent.getBooleanExtra(AppUpdateNotifications.EXTRA_CHECK_FOR_UPDATE, false)) {

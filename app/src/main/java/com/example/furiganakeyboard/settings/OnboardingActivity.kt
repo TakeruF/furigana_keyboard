@@ -47,7 +47,9 @@ class OnboardingActivity : AppCompatActivity() {
             isAppearanceLightStatusBars = !darkMode
             isAppearanceLightNavigationBars = !darkMode
         }
-        setContentView(buildScreen())
+        val screen = buildScreen().apply { applySystemBarPadding() }
+        setContentView(screen)
+        screen.requestApplyInsets()
         initialized = true
         refreshState()
     }

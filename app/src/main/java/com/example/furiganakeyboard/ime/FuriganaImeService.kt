@@ -14,7 +14,10 @@ import java.util.Locale
 import android.widget.Button
 import android.widget.FrameLayout
 import androidx.core.content.ContextCompat
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
+import androidx.core.view.doOnAttach
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.recognizer.InkRecognizer
@@ -101,6 +104,7 @@ class FuriganaImeService : InputMethodService() {
         symbolModeKey = root.findViewById(R.id.keySymbol)
         englishModeKey = root.findViewById(R.id.keyEnglish)
         romajiModeKey = root.findViewById(R.id.keyRomaji)
+        applySystemKeyboardRaise(root)
         applyAccentColor()
         applyLayoutPreferences()
 
@@ -109,6 +113,32 @@ class FuriganaImeService : InputMethodService() {
         applyReadingMode(prefs.readingMode)
         ensureRecognizer()
         return root
+    }
+
+    /**
+     * Honors the bottom safe area supplied by gesture navigation and OEM
+     * "raise keyboard" settings while keeping that area keyboard-colored.
+     */
+    private fun applySystemKeyboardRaise(root: View) {
+        val initialLeft = root.paddingLeft
+        val initialTop = root.paddingTop
+        val initialRight = root.paddingRight
+        val initialBottom = root.paddingBottom
+        val bottomInsetTypes = WindowInsetsCompat.Type.navigationBars() or
+            WindowInsetsCompat.Type.mandatorySystemGestures() or
+            WindowInsetsCompat.Type.tappableElement()
+
+        ViewCompat.setOnApplyWindowInsetsListener(root) { view, windowInsets ->
+            val systemInsets = windowInsets.getInsets(bottomInsetTypes)
+            view.setPadding(
+                initialLeft + systemInsets.left,
+                initialTop,
+                initialRight + systemInsets.right,
+                initialBottom + systemInsets.bottom
+            )
+            windowInsets
+        }
+        root.doOnAttach { ViewCompat.requestApplyInsets(it) }
     }
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
