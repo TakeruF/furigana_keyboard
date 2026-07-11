@@ -19,7 +19,7 @@ import com.example.furiganakeyboard.settings.CandidateTextSize
 
 /**
  * Horizontal, scrollable candidate bar. The first (best) candidate is shown in
- * a compact white pill with blue text, while later candidates remain flat.
+ * with accent-colored text, while all candidate backgrounds remain flat.
  * Each chip shows the character large with its readings
  * underneath (kana / romaji / hidden). Tapping a chip fires [onCandidateSelected].
  */
@@ -96,7 +96,11 @@ class CandidateBarView @JvmOverloads constructor(
             val chip = row.getChildAt(index) as CandidateChipView
             if (index < candidates.size) {
                 chip.visibility = View.VISIBLE
-                chip.bind(candidates[index], highlight = index == 0)
+                chip.bind(
+                    candidates[index],
+                    highlight = index == 0,
+                    showDivider = index < candidates.lastIndex
+                )
             } else {
                 chip.visibility = View.GONE
                 chip.unbind()
@@ -128,7 +132,7 @@ class CandidateBarView @JvmOverloads constructor(
         init {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            val padH = dp(16)
+            val padH = dp(10)
             setPadding(padH, dp(3), padH, dp(3))
             minimumWidth = dp(48)
             minimumHeight = dp(48)
@@ -146,13 +150,12 @@ class CandidateBarView @JvmOverloads constructor(
             }
         }
 
-        fun bind(value: CandidateUiModel, highlight: Boolean) {
+        fun bind(value: CandidateUiModel, highlight: Boolean, showDivider: Boolean) {
             candidate = value
-            background = ContextCompat.getDrawable(
-                context,
-                if (highlight) R.drawable.candidate_selected_background
-                else R.drawable.candidate_background
-            )
+            background = ContextCompat.getDrawable(context, R.drawable.candidate_background)
+            foreground = if (showDivider) {
+                ContextCompat.getDrawable(context, R.drawable.candidate_divider)
+            } else null
             primary.text = value.text
             primary.setTextSize(TypedValue.COMPLEX_UNIT_SP, candidateTextSize.primarySp)
             reading.setTextSize(TypedValue.COMPLEX_UNIT_SP, candidateTextSize.readingSp)
@@ -176,6 +179,7 @@ class CandidateBarView @JvmOverloads constructor(
             candidate = null
             primary.text = ""
             reading.text = ""
+            foreground = null
             isClickable = false
             isFocusable = false
             contentDescription = null

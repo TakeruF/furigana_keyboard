@@ -34,6 +34,9 @@ class QwertyPadView(
 
     init {
         orientation = VERTICAL
+        if (!includeJapaneseLongVowelKey) {
+            setPadding(0, KeyFactory.dp(context, 4), 0, 0)
+        }
         addRow(buildCharRow("1234567890"))
         addRow(buildCharRow("qwertyuiop"))
         addRow(
@@ -108,7 +111,7 @@ class QwertyPadView(
         return row
     }
 
-    /** English: [手書き] [,] [space] [.] [改行]; Japanese keeps [、] / [。]. */
+    /** English uses [,] / [.]; Japanese uses [、] / [。]. Space stays icon-free. */
     private fun buildBottomRow(): LinearLayout {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
         val comma = if (includeJapaneseLongVowelKey) "、" else ","
@@ -126,7 +129,7 @@ class QwertyPadView(
         row.addView(
             KeyFactory.key(
                 context,
-                if (includeJapaneseLongVowelKey) context.getString(R.string.key_space) else "",
+                "",
                 Kind.FUNCTION,
                 13f
             ) {

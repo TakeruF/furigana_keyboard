@@ -16,6 +16,7 @@
     <color name="kbd_accent_pressed">#FF3E7FD5</color>
     <color name="kbd_on_accent">#FFFFFFFF</color>
     <color name="kbd_hint">#FFC4C4C4</color>
+    <color name="kbd_candidate_divider">#409A9A9A</color>
 
     <!-- Launcher icon background (not theme-dependent). -->
     <color name="ic_launcher_background">#FFFFFFFF</color>

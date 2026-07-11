@@ -14,6 +14,7 @@
     <color name="kbd_accent_pressed">#FF4B88DE</color>
     <color name="kbd_on_accent">#FFFFFFFF</color>
     <color name="kbd_hint">#FF565656</color>
+    <color name="kbd_candidate_divider">#528A8A8A</color>
 
     <color name="ic_launcher_background">#FFFFFFFF</color>
 
