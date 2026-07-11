@@ -55,9 +55,9 @@ export default async function LocalePage({ params }: PageProps) {
             src="/keyboard-preview.jpg"
             alt={content.hero.keyboardImage}
             width={1080}
-            height={922}
+            height={2354}
             priority
-            sizes="(max-width: 820px) calc(100vw - 32px), 720px"
+            sizes="(max-width: 820px) min(88vw, 390px), 390px"
           />
         </figure>
       </section>

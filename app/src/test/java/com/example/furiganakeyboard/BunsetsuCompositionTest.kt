@@ -1,6 +1,7 @@
 package com.example.furiganakeyboard
 
 import com.example.furiganakeyboard.conversion.ConversionSegment
+import com.example.furiganakeyboard.conversion.ConversionResult
 import com.example.furiganakeyboard.conversion.PosClass
 import com.example.furiganakeyboard.ime.BunsetsuComposition
 import org.junit.Assert.assertEquals
@@ -62,6 +63,42 @@ class BunsetsuCompositionTest {
         assertEquals(listOf("わたしも", "そうしたい"), state.composingSegments.map { it.reading })
     }
 
+    @Test
+    fun competingBunsetsuBoundariesProduceCandidatesForBothReadings() {
+        val reading = "ここではきもの"
+        val longFirst = listOf(
+            segment(0, 2, "ここ", PosClass.PRONOUN),
+            segment(2, 4, "では", PosClass.PARTICLE),
+            segment(4, 7, "きもの", PosClass.NOUN, surface = "着物"),
+        )
+        val shortFirst = listOf(
+            segment(0, 3, "ここで", PosClass.PARTICLE),
+            segment(3, 7, "はきもの", PosClass.NOUN, surface = "履き物"),
+        )
+
+        val plan = BunsetsuComposition.plan(
+            reading,
+            listOf(
+                conversion(reading, "ここでは着物", longFirst),
+                conversion(reading, "ここで履き物", shortFirst),
+            ),
+        )!!
+
+        assertEquals(listOf("ここでは", "ここで"), plan.candidates.map { it.surface })
+        assertEquals(listOf("ここでは", "ここで"), plan.candidates.map { it.reading })
+    }
+
+    @Test
+    fun selectingCompetingBoundaryCommitsOnlyItsReadingPrefix() {
+        val state = BunsetsuComposition.create("ここではきもの", emptyList())
+
+        assertTrue(state.selectActiveReading("ここで"))
+        val committed = state.commitActive("ここで")
+
+        assertEquals("ここで", committed.committedText)
+        assertEquals("はきもの", committed.remainingText)
+    }
+
     private fun expectedSegments(): List<ConversionSegment> = listOf(
         segment(0, 3, "わたし", PosClass.PRONOUN),
         segment(3, 4, "も", PosClass.PARTICLE),
@@ -75,14 +112,21 @@ class BunsetsuCompositionTest {
         end: Int,
         reading: String,
         pos: PosClass,
+        surface: String = reading,
     ) = ConversionSegment(
         start = start,
         end = end,
         reading = reading,
-        surface = reading,
+        surface = surface,
         leftId = pos.id,
         rightId = pos.id,
         wordCost = 0,
         isCopy = false,
     )
+
+    private fun conversion(
+        reading: String,
+        surface: String,
+        segments: List<ConversionSegment>,
+    ) = ConversionResult(surface, reading, 0, segments)
 }

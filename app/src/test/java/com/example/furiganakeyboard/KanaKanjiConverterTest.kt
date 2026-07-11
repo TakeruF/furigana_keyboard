@@ -117,6 +117,29 @@ class KanaKanjiConverterTest {
     }
 
     @Test
+    fun segmentationAnalysisRetainsDuplicateSurfacesWithDifferentPaths() {
+        val input = "あいう"
+        val lexemes = listOf(
+            lexeme(input, "あい", "甲", PosClass.PARTICLE, 100),
+            lexeme(input, "う", "乙", PosClass.NOUN, 100),
+            lexeme(input, "あ", "甲", PosClass.PARTICLE, 100),
+            lexeme(input, "いう", "乙", PosClass.NOUN, 100),
+        )
+
+        val results = KanaKanjiConverter.convert(
+            input,
+            lexemes,
+            zeroConnections(),
+            limit = 8,
+            preserveSegmentations = true,
+        )
+
+        val alternatives = results.filter { it.surface == "甲乙" }
+        assertEquals(2, alternatives.size)
+        assertEquals(listOf(1, 2), alternatives.map { it.segments.first().end }.sorted())
+    }
+
+    @Test
     fun limitIsStrictAndCappedAtEight() {
         val input = "こう"
         val lexemes = (0 until 10).map { index ->

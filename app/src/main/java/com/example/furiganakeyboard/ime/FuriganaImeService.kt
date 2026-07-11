@@ -75,7 +75,6 @@ class FuriganaImeService : InputMethodService() {
     private val romajiRaw = StringBuilder()
     private val romajiBaseKana = StringBuilder()
     private var bunsetsuState: BunsetsuComposition? = null
-    private var pendingBunsetsuState: BunsetsuComposition? = null
     private var currentEnterLabel = ""
 
     override fun attachBaseContext(newBase: Context) {
@@ -160,7 +159,6 @@ class FuriganaImeService : InputMethodService() {
         romajiRaw.setLength(0)
         romajiBaseKana.setLength(0)
         bunsetsuState = null
-        pendingBunsetsuState = null
         clearAlternativeContext()
         candidatePipeline.invalidate()
         recognizer?.cancelPending()
@@ -355,10 +353,11 @@ class FuriganaImeService : InputMethodService() {
                 CandidateKind.WORD -> if (bunsetsuState == null) {
                     commitWordCandidate(candidate.text)
                 } else {
-                    commitBunsetsuCandidate(candidate.text)
+                    commitBunsetsuCandidate(candidate.text, candidate.bunsetsuReading)
                 }
+                CandidateKind.BUNSETSU ->
+                    commitBunsetsuCandidate(candidate.text, candidate.bunsetsuReading)
                 CandidateKind.STATUS -> Unit
-                CandidateKind.SEGMENT_START -> startBunsetsuConversion()
                 CandidateKind.SEGMENT_SHRINK -> changeBunsetsuRange(expand = false)
                 CandidateKind.SEGMENT_EXPAND -> changeBunsetsuRange(expand = true)
             }
@@ -547,7 +546,6 @@ class FuriganaImeService : InputMethodService() {
         val kana = romajiBaseKana.toString() + converted.kana
         composition.replace(display)
         bunsetsuState = null
-        pendingBunsetsuState = null
         clearAlternativeContext()
         currentInputConnection?.setComposingText(display, 1)
         updateEnterLabel(currentInputEditorInfo)
@@ -575,38 +573,81 @@ class FuriganaImeService : InputMethodService() {
         candidateBar.setCandidates(scriptCandidates)
         candidatePipeline.submitRomajiAnalysis(
             kana,
-            MAX_WORD_CANDIDATES - scriptCandidates.size
+            MAX_WORD_CANDIDATES
         ) { result ->
-            val dictionaryCandidates = result.candidates.map {
-                CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
-            }
-            val segmented = BunsetsuComposition.create(kana, result.segments)
-            pendingBunsetsuState = segmented.takeIf { it.composingSegments.size > 1 }
-            val fullCandidates =
-                (dictionaryCandidates + scriptCandidates)
-                    .distinctBy { it.text }
-                    .take(if (pendingBunsetsuState == null) MAX_WORD_CANDIDATES else MAX_WORD_CANDIDATES - 1)
-            candidateBar.setCandidates(
-                fullCandidates + listOfNotNull(
-                    pendingBunsetsuState?.let {
-                        CandidateUiModel(getString(R.string.key_segment), kind = CandidateKind.SEGMENT_START)
-                    }
+            val plan = BunsetsuComposition.plan(kana, result.conversions)
+            if (plan == null) {
+                val dictionaryCandidates = result.candidates.map {
+                    CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
+                }
+                candidateBar.setCandidates(
+                    (dictionaryCandidates + scriptCandidates)
+                        .distinctBy { it.text }
+                        .take(MAX_WORD_CANDIDATES)
                 )
-            )
+            } else {
+                enterBunsetsuConversion(kana, plan)
+            }
         }
     }
 
-    private fun startBunsetsuConversion() {
-        val state = pendingBunsetsuState ?: return
-        candidatePipeline.invalidate()
+    private fun enterBunsetsuConversion(
+        reading: String,
+        plan: BunsetsuConversionPlan,
+    ) {
+        val state = BunsetsuComposition.create(reading, plan.initialSegments)
         bunsetsuState = state
-        pendingBunsetsuState = null
         romajiBaseKana.setLength(0)
-        romajiBaseKana.append(state.composingText)
+        romajiBaseKana.append(reading)
         romajiRaw.setLength(0)
-        composition.replace(state.composingText)
+        composition.replace(reading)
         renderBunsetsuComposition(state)
-        showActiveBunsetsuCandidates(state)
+        showBunsetsuPlan(state, plan)
+    }
+
+    private fun showBunsetsuPlan(
+        state: BunsetsuComposition,
+        plan: BunsetsuConversionPlan,
+    ) {
+        val converted = roundRobinByReading(plan.candidates).map { option ->
+            CandidateUiModel(
+                text = option.surface,
+                readings = listOf(option.reading),
+                kind = CandidateKind.BUNSETSU,
+                bunsetsuReading = option.reading,
+            )
+        }
+        val scriptFallbacks = plan.candidates.map { it.reading }.distinct().flatMap { reading ->
+            listOf(
+                CandidateUiModel(
+                    reading,
+                    listOf(reading),
+                    CandidateKind.BUNSETSU,
+                    bunsetsuReading = reading,
+                ),
+                CandidateUiModel(
+                    RomajiKanaConverter.toKatakana(reading),
+                    listOf(reading),
+                    CandidateKind.BUNSETSU,
+                    bunsetsuReading = reading,
+                ),
+            )
+        }
+        val candidates = (converted + scriptFallbacks)
+            .distinctBy { it.text to it.bunsetsuReading }
+        state.setCandidates(candidates.map { it.text })
+        candidateBar.setCandidates(withBunsetsuControls(state, candidates))
+    }
+
+    private fun roundRobinByReading(
+        candidates: List<BunsetsuCandidateOption>,
+    ): List<BunsetsuCandidateOption> {
+        val groups = candidates.groupBy { it.reading }.values.map { it.toMutableList() }
+        return buildList {
+            while (groups.any { it.isNotEmpty() }) {
+                groups.forEach { group -> if (group.isNotEmpty()) add(group.removeAt(0)) }
+            }
+        }
     }
 
     private fun changeBunsetsuRange(expand: Boolean) {
@@ -627,20 +668,18 @@ class FuriganaImeService : InputMethodService() {
             candidateBar.clear()
             return
         }
-        val scriptCandidates = listOf(
-            CandidateUiModel(reading, listOf(reading), CandidateKind.WORD),
-            CandidateUiModel(
-                RomajiKanaConverter.toKatakana(reading),
-                listOf(reading),
-                CandidateKind.WORD,
-            ),
-        ).distinctBy { it.text }
+        val scriptCandidates = bunsetsuScriptCandidates(reading)
         state.setCandidates(scriptCandidates.map { it.text })
         candidateBar.setCandidates(withBunsetsuControls(state, scriptCandidates))
         candidatePipeline.submitRomajiAnalysis(reading, MAX_WORD_CANDIDATES) { result ->
             if (bunsetsuState !== state || state.activeReading != reading) return@submitRomajiAnalysis
             val dictionaryCandidates = result.candidates.map {
-                CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
+                CandidateUiModel(
+                    it.surface,
+                    it.readings,
+                    CandidateKind.BUNSETSU,
+                    bunsetsuReading = reading,
+                )
             }
             val candidates = (dictionaryCandidates + scriptCandidates).distinctBy { it.text }
             state.setCandidates(candidates.map { it.text })
@@ -675,9 +714,10 @@ class FuriganaImeService : InputMethodService() {
         return candidates.take((MAX_WORD_CANDIDATES - controls.size).coerceAtLeast(1)) + controls
     }
 
-    private fun commitBunsetsuCandidate(surface: String) {
+    private fun commitBunsetsuCandidate(surface: String, reading: String?) {
         val state = bunsetsuState ?: return
         val connection = currentInputConnection ?: return
+        if (reading != null && !state.selectActiveReading(reading)) return
         val result = state.commitActive(surface)
         connection.beginBatchEdit()
         try {
@@ -699,14 +739,56 @@ class FuriganaImeService : InputMethodService() {
 
         if (result.remainingText.isEmpty()) {
             bunsetsuState = null
-            pendingBunsetsuState = null
             candidatePipeline.invalidate()
             candidateBar.clear()
         } else {
-            showActiveBunsetsuCandidates(state)
+            analyzeNextBunsetsu(result.remainingText, state)
         }
         updateEnterLabel(currentInputEditorInfo)
     }
+
+    private fun analyzeNextBunsetsu(reading: String, currentState: BunsetsuComposition) {
+        candidatePipeline.invalidate()
+        val scriptCandidates = bunsetsuScriptCandidates(reading)
+        currentState.setCandidates(scriptCandidates.map { it.text })
+        candidateBar.setCandidates(withBunsetsuControls(currentState, scriptCandidates))
+        candidatePipeline.submitRomajiAnalysis(reading, MAX_WORD_CANDIDATES) { result ->
+            if (bunsetsuState !== currentState || currentState.composingText != reading) {
+                return@submitRomajiAnalysis
+            }
+            val plan = BunsetsuComposition.plan(reading, result.conversions)
+            if (plan != null) {
+                enterBunsetsuConversion(reading, plan)
+            } else {
+                val dictionaryCandidates = result.candidates.map {
+                    CandidateUiModel(
+                        it.surface,
+                        it.readings,
+                        CandidateKind.BUNSETSU,
+                        bunsetsuReading = reading,
+                    )
+                }
+                val candidates = (dictionaryCandidates + scriptCandidates).distinctBy { it.text }
+                currentState.setCandidates(candidates.map { it.text })
+                candidateBar.setCandidates(withBunsetsuControls(currentState, candidates))
+            }
+        }
+    }
+
+    private fun bunsetsuScriptCandidates(reading: String): List<CandidateUiModel> = listOf(
+        CandidateUiModel(
+            reading,
+            listOf(reading),
+            CandidateKind.BUNSETSU,
+            bunsetsuReading = reading,
+        ),
+        CandidateUiModel(
+            RomajiKanaConverter.toKatakana(reading),
+            listOf(reading),
+            CandidateKind.BUNSETSU,
+            bunsetsuReading = reading,
+        ),
+    ).distinctBy { it.text }
 
     private fun renderBunsetsuComposition(state: BunsetsuComposition) {
         currentInputConnection?.setComposingText(styledBunsetsuText(state), 1)
@@ -741,7 +823,6 @@ class FuriganaImeService : InputMethodService() {
         romajiRaw.setLength(0)
         composition.replace(state.composingText)
         bunsetsuState = null
-        pendingBunsetsuState = null
     }
 
     private fun clearRomajiComposition() {
@@ -750,7 +831,6 @@ class FuriganaImeService : InputMethodService() {
         romajiRaw.setLength(0)
         romajiBaseKana.setLength(0)
         bunsetsuState = null
-        pendingBunsetsuState = null
         currentInputConnection?.setComposingText("", 1)
         currentInputConnection?.finishComposingText()
         candidateBar.clear()
@@ -809,7 +889,6 @@ class FuriganaImeService : InputMethodService() {
         romajiRaw.setLength(0)
         romajiBaseKana.setLength(0)
         bunsetsuState = null
-        pendingBunsetsuState = null
         clearAlternativeContext()
         candidatePipeline.invalidate()
         recognizer?.cancelPending()

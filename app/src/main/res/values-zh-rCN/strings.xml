@@ -28,7 +28,7 @@
     <string name="onboarding_title">设置假名注音键盘</string>
     <string name="onboarding_description">请完成以下两项Android设置，即可开始使用键盘。</string>
     <string name="onboarding_step_enable">第一步　启用系统输入法</string>
-    <string name="onboarding_step_select">第二步　切换到此输入法</string>
+    <string name="onboarding_step_select">选择此输入法</string>
     <string name="onboarding_privacy_note">启用任何输入法时，Android都会显示标准安全提示。输入内容仅在设备上处理。</string>
     <string name="settings_check_update">检查更新</string>
     <string name="settings_check_update_desc">在 Google Play 中检查最新版本</string>

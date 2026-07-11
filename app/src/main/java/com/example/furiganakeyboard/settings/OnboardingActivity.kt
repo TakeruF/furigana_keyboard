@@ -78,16 +78,17 @@ class OnboardingActivity : AppCompatActivity() {
         }, LinearLayout.LayoutParams(dp(116), dp(116)))
         addView(TextView(context).apply {
             setText(R.string.onboarding_title)
+            applyLocalizedFont(Typeface.BOLD)
             gravity = Gravity.CENTER
             setTextColor(color(R.color.settings_text))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 29f)
-            setTypeface(typeface, Typeface.BOLD)
         }, LinearLayout.LayoutParams(
             LinearLayout.LayoutParams.MATCH_PARENT,
             LinearLayout.LayoutParams.WRAP_CONTENT
         ).apply { topMargin = dp(20) })
         addView(TextView(context).apply {
             setText(R.string.onboarding_description)
+            applyLocalizedFont()
             gravity = Gravity.CENTER
             setTextColor(color(R.color.settings_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 13f)
@@ -106,6 +107,7 @@ class OnboardingActivity : AppCompatActivity() {
         ))
         addView(TextView(context).apply {
             setText(R.string.onboarding_privacy_note)
+            applyLocalizedFont()
             gravity = Gravity.CENTER
             setTextColor(color(R.color.settings_secondary))
             setTextSize(TypedValue.COMPLEX_UNIT_SP, 11.5f)
@@ -157,12 +159,12 @@ class OnboardingActivity : AppCompatActivity() {
 
             addView(TextView(context).apply {
                 setText(labelRes)
+                applyLocalizedFont(Typeface.BOLD)
                 setTextColor(
                     if (active) ContextCompat.getColor(context, android.R.color.white)
                     else color(R.color.settings_secondary)
                 )
                 setTextSize(TypedValue.COMPLEX_UNIT_SP, 16f)
-                setTypeface(typeface, Typeface.BOLD)
                 alpha = if (active) 1f else 0.62f
             }, LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.WRAP_CONTENT, 1f))
             addView(TextView(context).apply {
@@ -202,6 +204,11 @@ class OnboardingActivity : AppCompatActivity() {
             Configuration.UI_MODE_NIGHT_YES
 
     private fun color(resId: Int): Int = ContextCompat.getColor(this, resId)
+
+    private fun TextView.applyLocalizedFont(style: Int = Typeface.NORMAL) {
+        textLocales = resources.configuration.locales
+        typeface = Typeface.create("sans-serif", style)
+    }
 
     private fun dp(value: Int): Int =
         TypedValue.applyDimension(

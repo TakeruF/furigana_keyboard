@@ -5,6 +5,7 @@ import android.os.Looper
 import android.util.Log
 import com.example.furiganakeyboard.conversion.KanaKanjiConverter
 import com.example.furiganakeyboard.conversion.ConversionSegment
+import com.example.furiganakeyboard.conversion.ConversionResult
 import com.example.furiganakeyboard.reading.KanjiUsagePriority
 import com.example.furiganakeyboard.reading.ReadingDataSource
 import com.example.furiganakeyboard.reading.WordReadingCandidate
@@ -29,8 +30,11 @@ data class HandwritingStageContext(
 
 data class RomajiConversionResult(
     val candidates: List<WordReadingCandidate>,
-    val segments: List<ConversionSegment>,
-)
+    val conversions: List<ConversionResult>,
+) {
+    val segments: List<ConversionSegment>
+        get() = conversions.firstOrNull()?.segments.orEmpty()
+}
 
 sealed interface HandwritingPipelineResult {
     data class Characters(val candidates: List<ResolvedCharacterCandidate>) :
@@ -241,6 +245,7 @@ class CandidatePipeline(
             lexemes = lexemes,
             connections = dataSource.conversionConnections(),
             limit = MAX_CONVERSION_RESULTS,
+            preserveSegmentations = true,
             isCancelled = isCancelled
         )
         val converted = conversionResults.map { result ->
@@ -257,7 +262,7 @@ class CandidatePipeline(
             candidates = (converted + prefixMatches)
                 .distinctBy { it.surface }
                 .take(MAX_CONVERSION_RESULTS),
-            segments = conversionResults.firstOrNull()?.segments.orEmpty(),
+            conversions = conversionResults,
         ).also { conversionCache[kana] = it }
     }
 

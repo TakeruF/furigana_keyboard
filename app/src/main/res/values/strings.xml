@@ -193,7 +193,7 @@
     <string name="onboarding_title">Set up Furigana Keyboard</string>
     <string name="onboarding_description">Complete these two Android settings to start using the keyboard.</string>
     <string name="onboarding_step_enable">Step 1  Enable the system keyboard</string>
-    <string name="onboarding_step_select">Step 2  Switch to this keyboard</string>
+    <string name="onboarding_step_select">Select this keyboard</string>
     <string name="onboarding_privacy_note">Android shows a standard keyboard-access warning when enabling any input method. Input is processed on this device.</string>
     <string name="settings_check_update">Check for updates</string>
     <string name="settings_check_update_desc">Check Google Play for the latest version</string>

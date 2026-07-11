@@ -1,6 +1,7 @@
 package com.example.furiganakeyboard.ime
 
 import com.example.furiganakeyboard.conversion.ConversionSegment
+import com.example.furiganakeyboard.conversion.ConversionResult
 import com.example.furiganakeyboard.conversion.PosClass
 
 data class BunsetsuSegment(
@@ -16,6 +17,16 @@ data class CommittedBunsetsu(
 data class BunsetsuCommitResult(
     val committedText: String,
     val remainingText: String,
+)
+
+data class BunsetsuCandidateOption(
+    val surface: String,
+    val reading: String,
+)
+
+data class BunsetsuConversionPlan(
+    val initialSegments: List<ConversionSegment>,
+    val candidates: List<BunsetsuCandidateOption>,
 )
 
 /**
@@ -60,6 +71,19 @@ class BunsetsuComposition private constructor(
 
     fun setCandidates(values: List<String>) {
         candidates = values.distinct()
+    }
+
+    /** Select a competing leading boundary before committing its candidate. */
+    fun selectActiveReading(reading: String): Boolean {
+        if (reading.isEmpty() || !composingText.startsWith(reading)) return false
+        val remaining = composingText.substring(reading.length)
+        composingSegments.clear()
+        composingSegments += BunsetsuSegment(reading)
+        if (remaining.isNotEmpty()) composingSegments += BunsetsuSegment(remaining)
+        activeSegmentIndex = 0
+        activeSegmentCount = 1
+        candidates = emptyList()
+        return true
     }
 
     /** Move the active right boundary left by one segment or Unicode code point. */
@@ -127,6 +151,36 @@ class BunsetsuComposition private constructor(
     }
 
     companion object {
+        /**
+         * Extract leading bunsetsu candidates from every conversion path.
+         * A surface shared by different readings is deliberately retained so
+         * competing boundaries remain visible to the user.
+         */
+        fun plan(
+            reading: String,
+            conversions: List<ConversionResult>,
+        ): BunsetsuConversionPlan? {
+            var initialSegments: List<ConversionSegment>? = null
+            val candidates = LinkedHashSet<BunsetsuCandidateOption>()
+            conversions.forEach { conversion ->
+                val state = create(reading, conversion.segments)
+                if (state.composingSegments.size <= 1) return@forEach
+                if (initialSegments == null) initialSegments = conversion.segments
+                val firstReading = state.activeReading
+                val boundary = firstReading.length
+                val firstSegments = conversion.segments.takeWhile { it.end <= boundary }
+                if (firstSegments.isNotEmpty() && firstSegments.last().end == boundary) {
+                    candidates += BunsetsuCandidateOption(
+                        surface = firstSegments.joinToString("") { it.surface },
+                        reading = firstReading,
+                    )
+                }
+            }
+            val segments = initialSegments ?: return null
+            if (candidates.isEmpty()) return null
+            return BunsetsuConversionPlan(segments, candidates.toList())
+        }
+
         fun create(reading: String, conversionSegments: List<ConversionSegment>): BunsetsuComposition {
             val segments = fromConversionSegments(reading, conversionSegments)
                 .ifEmpty { fallbackSegments(reading) }

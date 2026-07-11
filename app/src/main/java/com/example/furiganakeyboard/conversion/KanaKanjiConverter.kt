@@ -15,6 +15,7 @@ object KanaKanjiConverter {
         lexemes: List<ConversionLexeme>,
         connections: List<ConversionConnection>,
         limit: Int = MAX_OUTPUT,
+        preserveSegmentations: Boolean = false,
         isCancelled: () -> Boolean = { false },
     ): List<ConversionResult> {
         if (isCancelled() || reading.isEmpty() || limit <= 0) return emptyList()
@@ -63,7 +64,7 @@ object KanaKanjiConverter {
         for (boundaryIndex in 0 until boundaries.lastIndex) {
             if (isCancelled()) return emptyList()
             val start = boundaries[boundaryIndex]
-            val incoming = prune(statesAt[start].orEmpty())
+            val incoming = prune(statesAt[start].orEmpty(), preserveSegmentations)
             if (incoming.isEmpty()) continue
 
             val copyEnd = boundaries[boundaryIndex + 1]
@@ -124,16 +125,31 @@ object KanaKanjiConverter {
         }
 
         if (isCancelled()) return emptyList()
-        val completed = prune(statesAt[reading.length].orEmpty()).map { state ->
+        val completed = prune(statesAt[reading.length].orEmpty(), preserveSegmentations).map { state ->
             state.copy(
                 cost = state.cost + connectionCost(connectionCosts, state.rightId, PosClass.EOS.id),
             )
         }.filter { state -> state.segments.any { !it.isCopy } }
 
-        val uniqueSurfaces = LinkedHashMap<String, PathState>()
-        completed.sortedWith(PATH_ORDER).forEach { state -> uniqueSurfaces.putIfAbsent(state.surface, state) }
+        // Keep alternate paths when they produce the same surface with different
+        // bunsetsu boundaries. The UI uses those paths to offer competing
+        // interpretations; presentation code still deduplicates full surfaces.
+        val uniquePaths = LinkedHashMap<ResultKey, PathState>()
+        completed.sortedWith(PATH_ORDER).forEach { state ->
+            uniquePaths.putIfAbsent(
+                ResultKey(
+                    state.surface,
+                    if (preserveSegmentations) {
+                        bunsetsuBoundaries(state.segments)
+                    } else {
+                        emptyList()
+                    },
+                ),
+                state,
+            )
+        }
 
-        return uniqueSurfaces.values.take(limit.coerceAtMost(MAX_OUTPUT)).map { state ->
+        return uniquePaths.values.take(limit.coerceAtMost(MAX_OUTPUT)).map { state ->
             ConversionResult(
                 surface = state.surface,
                 reading = reading,
@@ -175,10 +191,18 @@ object KanaKanjiConverter {
     ): Int = costs[ConnectionKey(rightId, leftId)] ?: DEFAULT_CONNECTION_COST
 
     /** Keep the cheapest path for each (position, right ID, surface), then apply the beam. */
-    private fun prune(states: List<PathState>): List<PathState> {
+    private fun prune(
+        states: List<PathState>,
+        preserveSegmentations: Boolean,
+    ): List<PathState> {
         val best = HashMap<StateKey, PathState>()
         states.forEach { state ->
-            val key = StateKey(state.end, state.rightId, state.surface)
+            val key = StateKey(
+                state.end,
+                state.rightId,
+                state.surface,
+                if (preserveSegmentations) bunsetsuBoundaries(state.segments) else emptyList(),
+            )
             val current = best[key]
             if (current == null || PATH_ORDER.compare(state, current) < 0) best[key] = state
         }
@@ -187,7 +211,13 @@ object KanaKanjiConverter {
 
     private data class ConnectionKey(val rightId: Int, val leftId: Int)
     private data class VocabularyKey(val start: Int, val end: Int, val reading: String)
-    private data class StateKey(val end: Int, val rightId: Int, val surface: String)
+    private data class StateKey(
+        val end: Int,
+        val rightId: Int,
+        val surface: String,
+        val bunsetsuBoundaries: List<Int>,
+    )
+    private data class ResultKey(val surface: String, val bunsetsuBoundaries: List<Int>)
 
     private data class Edge(
         val start: Int,
@@ -208,6 +238,32 @@ object KanaKanjiConverter {
         val copyCodePoints: Int,
         val segments: List<ConversionSegment>,
     )
+
+    private fun bunsetsuBoundaries(segments: List<ConversionSegment>): List<Int> = buildList {
+        segments.zipWithNext().forEach { (left, right) ->
+            if (closesBunsetsu(left.rightId) && startsContent(right.leftId)) add(left.end)
+        }
+        segments.lastOrNull()?.let { add(it.end) }
+    }
+
+    private fun closesBunsetsu(posId: Int): Boolean = when (PosClass.fromId(posId)) {
+        PosClass.PARTICLE, PosClass.AUXILIARY, PosClass.SUFFIX -> true
+        else -> false
+    }
+
+    private fun startsContent(posId: Int): Boolean = when (PosClass.fromId(posId)) {
+        PosClass.PRONOUN,
+        PosClass.NOUN,
+        PosClass.PROPER_NOUN,
+        PosClass.VERB,
+        PosClass.ADJECTIVE,
+        PosClass.ADVERB,
+        PosClass.EXPRESSION,
+        PosClass.PREFIX,
+        PosClass.OTHER,
+        PosClass.COPY -> true
+        else -> false
+    }
 
     private val LEXEME_ORDER = compareBy<ConversionLexeme>(
         ConversionLexeme::start,
