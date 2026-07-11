@@ -1,6 +1,7 @@
 /** Cloudflare Worker entry point for the vinext-starter template. */
 import { handleImageOptimization, DEFAULT_DEVICE_SIZES, DEFAULT_IMAGE_SIZES } from "vinext/server/image-optimization";
 import handler from "vinext/server/app-router-entry";
+import { preferredLocale } from "../lib/preferred-locale";
 
 interface Env {
   ASSETS: Fetcher;
@@ -30,7 +31,7 @@ const worker = {
     const url = new URL(request.url);
 
     if (url.pathname === "/") {
-      url.pathname = "/ja";
+      url.pathname = `/${preferredLocale(request.headers.get("accept-language"))}`;
       return Response.redirect(url, 307);
     }
 
