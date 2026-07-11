@@ -1,9 +1,10 @@
 import type { Metadata } from "next";
-import Image from "next/image";
 import { readFile } from "node:fs/promises";
 import path from "node:path";
 import { notFound } from "next/navigation";
 import { copy, isLocale, locales, type Locale } from "../../i18n";
+import SiteFooter from "../../components/SiteFooter";
+import SiteHeader from "../../components/SiteHeader";
 
 const documents = ["terms", "privacy"] as const;
 type LegalDocument = (typeof documents)[number];
@@ -44,19 +45,11 @@ async function legalText(locale: Locale, document: LegalDocument): Promise<strin
 export default async function LegalPage({ params }: PageProps) {
   const { locale, document } = await params;
   if (!isLocale(locale) || !isDocument(document)) notFound();
-  const content = copy[locale];
   const lines = (await legalText(locale, document)).split(/\r?\n/).filter(Boolean);
 
   return (
     <>
-      <nav className="nav shell" aria-label={content.nav.label}>
-        <a className="brand" href={`/${locale}`} aria-label={content.nav.top}>
-          <span className="brand-mark" aria-hidden="true">
-            <Image className="brand-icon" src="/app-icon.png" alt="" width={512} height={512} />
-          </span>
-          <span>Furigana Keyboard</span>
-        </a>
-      </nav>
+      <SiteHeader locale={locale} />
       <main className="legal-page shell">
         <a className="legal-back" href={`/${locale}`}>← Furigana Keyboard</a>
         <article className="legal-copy">
@@ -71,20 +64,7 @@ export default async function LegalPage({ params }: PageProps) {
           })}
         </article>
       </main>
-      <footer className="shell">
-        <div className="brand footer-brand">
-          <span className="brand-mark" aria-hidden="true">
-            <Image className="brand-icon" src="/app-icon.png" alt="" width={512} height={512} />
-          </span>
-          <span>Furigana Keyboard</span>
-        </div>
-        <nav className="footer-links" aria-label={content.nav.about}>
-          <a href={`/${locale}/terms`}>{content.legal.terms}</a>
-          <a href={`/${locale}/privacy`}>{content.legal.privacy}</a>
-          <a href="mailto:support@hanlu.app">{content.support}: support@hanlu.app</a>
-        </nav>
-        <p>© 2026 Furigana Keyboard</p>
-      </footer>
+      <SiteFooter locale={locale} />
     </>
   );
 }
