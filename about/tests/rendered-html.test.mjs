@@ -71,9 +71,29 @@ for (const expectation of [
     assert.match(html, /href="\/en"/);
     assert.match(html, /href="\/ko"/);
     assert.match(html, /mailto:support@hanlu\.app/);
+    assert.match(html, new RegExp(`href="${expectation.path}/terms"`));
+    assert.match(html, new RegExp(`href="${expectation.path}/privacy"`));
+    assert.match(html, /keyboard-preview\.jpg/);
+    assert.match(html, /app-icon\.png/);
+    assert.match(html, /google-play-glyph/);
+    assert.match(html, /apple-glyph/);
+    assert.match(html, /https:\/\/downloads\.hanlu\.app\/furigana-keyboard\/v1\.0\.0-beta\.2\.apk/);
+    assert.doesNotMatch(html, /Zinnia|Tegaki|KANJIDIC2|JMdict/);
     assert.doesNotMatch(html, /github\.com\/TakeruF|furigana_keyboard/);
     assert.doesNotMatch(html, /codex-preview|react-loading-skeleton/);
   });
+}
+
+for (const locale of ["ja", "zh", "en", "ko"]) {
+  for (const document of ["terms", "privacy"]) {
+    test(`serves ${locale} ${document} as a subpage`, async () => {
+      const response = await fetch(`${baseUrl}/${locale}/${document}`);
+      assert.equal(response.status, 200);
+      const html = await response.text();
+      assert.match(html, /support@hanlu\.app/);
+      assert.match(html, new RegExp(`href="/${locale}"`));
+    });
+  }
 }
 
 test("keeps future release URLs configurable without source rewrites", async () => {
@@ -81,7 +101,10 @@ test("keeps future release URLs configurable without source rewrites", async () 
   assert.match(page, /NEXT_PUBLIC_ANDROID_APK_URL/);
   assert.match(page, /NEXT_PUBLIC_APP_STORE_URL/);
   assert.doesNotMatch(page, /NEXT_PUBLIC_SOURCE_URL|github\.com\/TakeruF/);
+  assert.doesNotMatch(page, /content\.download\.note|release-note/);
   await access(new URL("../public/og.png", import.meta.url));
+  await access(new URL("../public/keyboard-preview.jpg", import.meta.url));
+  await access(new URL("../public/app-icon.png", import.meta.url));
 });
 
 test("assigns dedicated Noto fonts to Chinese and Korean", async () => {

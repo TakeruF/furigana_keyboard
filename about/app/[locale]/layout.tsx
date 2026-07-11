@@ -1,6 +1,5 @@
 import type { Metadata } from "next";
 import { Noto_Sans_KR, Noto_Sans_SC } from "next/font/google";
-import { headers } from "next/headers";
 import { copy, isLocale, locales, type Locale } from "../i18n";
 import "../globals.css";
 
@@ -37,15 +36,16 @@ export async function generateMetadata({ params }: Pick<LayoutProps, "params">):
   const { locale: value } = await params;
   const locale = getLocale(value);
   const content = copy[locale];
-  const requestHeaders = await headers();
-  const host = requestHeaders.get("x-forwarded-host") ?? requestHeaders.get("host") ?? "localhost:3000";
-  const protocol = requestHeaders.get("x-forwarded-proto") ?? (host.startsWith("localhost") ? "http" : "https");
-  const base = new URL(`${protocol}://${host}`);
+  const base = new URL(process.env.NEXT_PUBLIC_SITE_URL ?? "https://keyboard.hanlu.app");
 
   return {
     metadataBase: base,
     title: content.meta.title,
     description: content.meta.description,
+    icons: {
+      icon: [{ url: "/app-icon.png", type: "image/png" }],
+      apple: "/app-icon.png",
+    },
     alternates: {
       canonical: `/${locale}`,
       languages: Object.fromEntries(locales.map((item) => [copy[item].htmlLang, `/${item}`])),
