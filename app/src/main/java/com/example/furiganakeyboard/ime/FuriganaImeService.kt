@@ -9,9 +9,12 @@ import android.view.inputmethod.EditorInfo
 import android.view.inputmethod.InputMethodManager
 import android.content.res.Configuration
 import android.annotation.SuppressLint
+import android.os.Build
 import java.util.Locale
 import android.widget.Button
 import android.widget.FrameLayout
+import androidx.core.content.ContextCompat
+import androidx.core.view.WindowInsetsControllerCompat
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.recognizer.InkRecognizer
@@ -19,6 +22,7 @@ import com.example.furiganakeyboard.recognizer.PlusInkRecognizer
 import com.example.furiganakeyboard.recognizer.SideBySideInkRecognizer
 import com.example.furiganakeyboard.recognizer.ZinniaInkRecognizer
 import com.example.furiganakeyboard.settings.KeyboardPrefs
+import com.example.furiganakeyboard.settings.JapaneseInputMode
 import com.example.furiganakeyboard.settings.AppLocale
 import com.example.furiganakeyboard.settings.ReadingMode
 import com.example.furiganakeyboard.view.CandidateBarView
@@ -77,10 +81,12 @@ class FuriganaImeService : InputMethodService() {
         Haptics.strength = prefs.hapticStrength
         KeySounds.enabled = prefs.keySound
         KeySounds.volumeStep = prefs.keySoundVolume
+        applyNavigationBarStyle()
     }
 
     @SuppressLint("InflateParams")
     override fun onCreateInputView(): View {
+        applyNavigationBarStyle()
         // A locale change creates a new root; lazily rebuild panels against that root.
         symbolPad = null
         englishPad = null
@@ -107,6 +113,7 @@ class FuriganaImeService : InputMethodService() {
 
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        applyNavigationBarStyle()
         if (applyChangedLocale()) {
             setInputView(onCreateInputView())
         }
@@ -123,7 +130,7 @@ class FuriganaImeService : InputMethodService() {
         applyLayoutPreferences()
         applyReadingMode(prefs.readingMode)
         updateEnterLabel(info)
-        showPanel(Panel.HANDWRITING)
+        showPanel(prefs.lastJapaneseInputMode.toPanel())
         handwritingView.clear()
         candidateBar.clear()
         ensureRecognizer()
@@ -182,7 +189,17 @@ class FuriganaImeService : InputMethodService() {
 
     private fun switchPanel(panel: Panel) {
         if (panel != currentPanel) finishComposition()
+        when (panel) {
+            Panel.HANDWRITING -> prefs.lastJapaneseInputMode = JapaneseInputMode.HANDWRITING
+            Panel.ROMAJI -> prefs.lastJapaneseInputMode = JapaneseInputMode.ROMAJI
+            Panel.SYMBOLS, Panel.ENGLISH -> Unit
+        }
         showPanel(panel)
+    }
+
+    private fun JapaneseInputMode.toPanel(): Panel = when (this) {
+        JapaneseInputMode.HANDWRITING -> Panel.HANDWRITING
+        JapaneseInputMode.ROMAJI -> Panel.ROMAJI
     }
 
     private fun showPanel(panel: Panel) {
@@ -485,13 +502,24 @@ class FuriganaImeService : InputMethodService() {
             listOf(converted.kana),
             CandidateKind.WORD
         )
-        candidateBar.setCandidates(listOf(kanaCandidate))
-        candidatePipeline.submitRomaji(converted.kana, MAX_WORD_CANDIDATES - 1) { values ->
+        val katakanaCandidate = CandidateUiModel(
+            RomajiKanaConverter.toKatakana(converted.kana),
+            listOf(converted.kana),
+            CandidateKind.WORD
+        )
+        val scriptCandidates = listOf(katakanaCandidate, kanaCandidate).distinctBy { it.text }
+        candidateBar.setCandidates(scriptCandidates)
+        candidatePipeline.submitRomaji(
+            converted.kana,
+            MAX_WORD_CANDIDATES - scriptCandidates.size
+        ) { values ->
             val dictionaryCandidates = values.map {
                 CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
             }
             candidateBar.setCandidates(
-                (dictionaryCandidates + kanaCandidate).distinctBy { it.text }.take(MAX_WORD_CANDIDATES)
+                (dictionaryCandidates + scriptCandidates)
+                    .distinctBy { it.text }
+                    .take(MAX_WORD_CANDIDATES)
             )
         }
     }
@@ -584,6 +612,19 @@ class FuriganaImeService : InputMethodService() {
         latestCharacterAlternatives = emptyList()
         wordRootBeforeLastCharacter = ""
         lastCharacterAlternatives = emptyList()
+    }
+
+    /** Keep the gesture/navigation area visually continuous with the keyboard surface. */
+    private fun applyNavigationBarStyle() {
+        val imeWindow = window?.window ?: return
+        val darkMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
+            Configuration.UI_MODE_NIGHT_YES
+        imeWindow.navigationBarColor = ContextCompat.getColor(this, R.color.kbd_background)
+        WindowInsetsControllerCompat(imeWindow, imeWindow.decorView)
+            .isAppearanceLightNavigationBars = !darkMode
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
+            imeWindow.isNavigationBarContrastEnforced = false
+        }
     }
 
     override fun onDestroy() {

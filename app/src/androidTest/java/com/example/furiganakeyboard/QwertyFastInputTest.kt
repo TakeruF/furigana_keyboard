@@ -139,6 +139,21 @@ class QwertyFastInputTest {
     }
 
     @Test
+    fun englishPadUsesAsciiPunctuationWhileJapaneseRomajiKeepsJapaneseMarks() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            var englishText = ""
+            val english = QwertyPadView(context).apply { onText = { englishText += it } }
+            val romaji = QwertyPadView(context, includeJapaneseLongVowelKey = true)
+
+            english.findButton(",").performClick()
+            english.findButton(".").performClick()
+            assertEquals(",.", englishText)
+            assertTrue(romaji.buttons().map { it.text.toString() }.containsAll(listOf("、", "。")))
+        }
+    }
+
+    @Test
     fun symbolPadUsesJapanesePunctuation() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()

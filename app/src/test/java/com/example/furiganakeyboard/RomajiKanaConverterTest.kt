@@ -102,4 +102,11 @@ class RomajiKanaConverterTest {
         assertEquals("こーひー", RomajiKanaConverter.convert("koーhiー").displayText)
         assertEquals("ko", RomajiKanaConverter.deleteLastUnit("koー"))
     }
+
+    @Test
+    fun convertsCompletedHiraganaToFullWidthKatakanaCandidate() {
+        assertEquals("カタカナ", RomajiKanaConverter.toKatakana("かたかな"))
+        assertEquals("ファッション", RomajiKanaConverter.toKatakana("ふぁっしょん"))
+        assertEquals("コーヒー？", RomajiKanaConverter.toKatakana("こーひー？"))
+    }
 }

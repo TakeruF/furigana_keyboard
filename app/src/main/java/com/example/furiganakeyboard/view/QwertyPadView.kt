@@ -108,9 +108,11 @@ class QwertyPadView(
         return row
     }
 
-    /** [手書き] [、] [space] [。] [改行] */
+    /** English: [手書き] [,] [space] [.] [改行]; Japanese keeps [、] / [。]. */
     private fun buildBottomRow(): LinearLayout {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
+        val comma = if (includeJapaneseLongVowelKey) "、" else ","
+        val period = if (includeJapaneseLongVowelKey) "。" else "."
         row.addView(
             KeyFactory.key(context, context.getString(R.string.key_back_hw), Kind.FUNCTION, 13f) {
                 onBack?.invoke()
@@ -118,7 +120,7 @@ class QwertyPadView(
             KeyFactory.rowParams(context, 1.5f)
         )
         row.addView(
-            KeyFactory.key(context, "、", Kind.PLAIN) { onText?.invoke("、") },
+            KeyFactory.key(context, comma, Kind.PLAIN) { onText?.invoke(comma) },
             KeyFactory.rowParams(context, 1f)
         )
         row.addView(
@@ -128,7 +130,7 @@ class QwertyPadView(
             KeyFactory.rowParams(context, 3.5f)
         )
         row.addView(
-            KeyFactory.key(context, "。", Kind.PLAIN) { onText?.invoke("。") },
+            KeyFactory.key(context, period, Kind.PLAIN) { onText?.invoke(period) },
             KeyFactory.rowParams(context, 1f)
         )
         enterKey = KeyFactory.key(context, context.getString(R.string.key_enter), Kind.ACCENT, 13f) {

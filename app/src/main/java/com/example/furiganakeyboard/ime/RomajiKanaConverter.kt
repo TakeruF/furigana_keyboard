@@ -159,6 +159,16 @@ object RomajiKanaConverter {
     private fun Char.isVowel(): Boolean = this == 'a' || this == 'i' || this == 'u' ||
         this == 'e' || this == 'o'
 
+    /** Full-width katakana fallback for a completed hiragana composition. */
+    fun toKatakana(hiragana: String): String = buildString(hiragana.length) {
+        hiragana.forEach { character ->
+            append(
+                if (character in '\u3041'..'\u3096') character + HIRAGANA_KATAKANA_OFFSET
+                else character
+            )
+        }
+    }
+
     /**
      * Removes one visible input unit. Completed kana are removed as a whole
      * syllable ("sa" -> ""), while an incomplete romaji suffix still steps
@@ -231,4 +241,5 @@ object RomajiKanaConverter {
     }
 
     private const val JAPANESE_LONG_VOWEL_MARK = 'ー'
+    private const val HIRAGANA_KATAKANA_OFFSET = 0x60
 }

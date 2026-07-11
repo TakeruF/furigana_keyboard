@@ -34,6 +34,16 @@ enum class CandidateTextSize(val primarySp: Float, val readingSp: Float) {
     }
 }
 
+/** Japanese entry surface restored whenever the IME is shown again. */
+enum class JapaneseInputMode {
+    HANDWRITING, ROMAJI;
+
+    companion object {
+        fun fromStored(value: String?): JapaneseInputMode =
+            entries.firstOrNull { it.name == value } ?: HANDWRITING
+    }
+}
+
 enum class HapticStrength(val amplitude: Int?) {
     NONE(0), SYSTEM(null), WEAK(45), MEDIUM_WEAK(75), MEDIUM(110), MEDIUM_STRONG(155), STRONG(210);
 
@@ -105,6 +115,11 @@ class KeyboardPrefs(context: Context) {
         get() = CandidateTextSize.fromStored(prefs.getString(KEY_CANDIDATE_TEXT_SIZE, null))
         set(value) = prefs.edit().putString(KEY_CANDIDATE_TEXT_SIZE, value.name).apply()
 
+    /** Last explicitly used Japanese panel; ABC and 123 never overwrite it. */
+    var lastJapaneseInputMode: JapaneseInputMode
+        get() = JapaneseInputMode.fromStored(prefs.getString(KEY_LAST_JAPANESE_INPUT_MODE, null))
+        set(value) = prefs.edit().putString(KEY_LAST_JAPANESE_INPUT_MODE, value.name).apply()
+
     companion object {
         private const val FILE = "hanlu_keyboard_preferences"
         private const val KEY_READING_MODE = "reading_mode"
@@ -118,5 +133,6 @@ class KeyboardPrefs(context: Context) {
         private const val KEY_ACCENT_COLOR = "accent_color"
         private const val KEY_KEYBOARD_HEIGHT = "keyboard_height"
         private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
+        private const val KEY_LAST_JAPANESE_INPUT_MODE = "last_japanese_input_mode"
     }
 }
