@@ -12,7 +12,7 @@ class ReadingDatabaseTest {
     @Test
     fun databaseMeetsCoverageContract() {
         connect().use { db ->
-            assertEquals("7", metadata(db, "schema_version"))
+            assertEquals("8", metadata(db, "schema_version"))
             assertEquals("13108", metadata(db, "kanji_characters"))
             assertTrue(metadata(db, "kanji_priorities").toInt() >= 3_000)
             assertEquals("6356", metadata(db, "model_han_labels"))
@@ -20,6 +20,116 @@ class ReadingDatabaseTest {
             assertTrue(metadata(db, "word_pairs").toInt() >= 240_000)
             assertTrue(metadata(db, "inflected_pairs").toInt() >= 15_000)
             assertTrue(metadata(db, "geographic_name_pairs").toInt() >= 90_000)
+            assertTrue(metadata(db, "conversion_lexemes").toInt() >= 200_000)
+            assertEquals("256", metadata(db, "connection_costs"))
+            assertTrue(database.length() < 128L * 1024 * 1024)
+            assertEquals("ok", db.createStatement().use { statement ->
+                statement.executeQuery("PRAGMA integrity_check").use { result ->
+                    check(result.next())
+                    result.getString(1)
+                }
+            })
+        }
+    }
+
+    @Test
+    fun conversionSchemaUsesTheFixedPosIdsAndBounds() {
+        connect().use { db ->
+            val actualPos = db.createStatement().use { statement ->
+                statement.executeQuery("SELECT id, name FROM conversion_pos ORDER BY id").use { result ->
+                    buildList { while (result.next()) add(result.getInt(1) to result.getString(2)) }
+                }
+            }
+            assertEquals(
+                listOf(
+                    0 to "BOS", 1 to "EOS", 2 to "PRONOUN", 3 to "NOUN",
+                    4 to "PROPER_NOUN", 5 to "PARTICLE", 6 to "AUXILIARY",
+                    7 to "VERB", 8 to "ADJECTIVE", 9 to "ADVERB", 10 to "PREFIX",
+                    11 to "SUFFIX", 12 to "EXPRESSION", 13 to "SYMBOL", 14 to "OTHER",
+                    15 to "COPY"
+                ),
+                actualPos
+            )
+            assertEquals(256, db.createStatement().use { statement ->
+                statement.executeQuery("SELECT count(*) FROM connection_cost").use { result ->
+                    check(result.next())
+                    result.getInt(1)
+                }
+            })
+            db.createStatement().use { statement ->
+                statement.executeQuery(
+                    """SELECT max(candidate_count), max(length(reading)), max(length(surface))
+                       FROM (
+                         SELECT reading, surface, count(*) OVER (PARTITION BY reading) AS candidate_count
+                         FROM conversion_lexeme
+                       )"""
+                ).use { result ->
+                    assertTrue(result.next())
+                    assertTrue(result.getInt(1) <= 12)
+                    assertTrue(result.getInt(2) <= 16)
+                    assertTrue(result.getInt(3) <= 16)
+                }
+            }
+        }
+    }
+
+    @Test
+    fun conversionLexemesCoverRequiredPhraseParts() {
+        connect().use { db ->
+            listOf(
+                Triple("これ", "これ", 2),
+                Triple("も", "も", 5),
+                Triple("は", "は", 5),
+                Triple("ほん", "本", 3),
+                Triple("だ", "だ", 6),
+                Triple("きょう", "今日", 3),
+                Triple("はれ", "晴れ", 3),
+                Triple("わたし", "私", 2),
+                Triple("いく", "行く", 7),
+                Triple("を", "を", 5),
+                Triple("よむ", "読む", 7)
+            ).forEach { (reading, surface, posId) ->
+                db.prepareStatement(
+                    "SELECT 1 FROM conversion_lexeme WHERE reading=? AND surface=? AND left_id=?"
+                ).use { statement ->
+                    statement.setString(1, reading)
+                    statement.setString(2, surface)
+                    statement.setInt(3, posId)
+                    statement.executeQuery().use { result ->
+                        assertTrue("Missing conversion lexeme $surface/$reading/$posId", result.next())
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun usuallyKanaSpellingAndUsefulConnectionsHaveLowerCosts() {
+        connect().use { db ->
+            val kanaCost = conversionCost(db, "これ", "これ", 2)
+            listOf("此", "之", "是").forEach { oldSurface ->
+                db.prepareStatement(
+                    "SELECT word_cost FROM conversion_lexeme WHERE reading='これ' AND surface=?"
+                ).use { statement ->
+                    statement.setString(1, oldSurface)
+                    statement.executeQuery().use { result ->
+                        if (result.next()) assertTrue("$oldSurface outranks これ", kanaCost < result.getInt(1))
+                    }
+                }
+            }
+            listOf(2 to 5, 5 to 3, 3 to 6, 3 to 5, 5 to 7, 7 to 6, 8 to 6).forEach {
+                (previousId, nextId) ->
+                assertTrue(connectionCost(db, previousId, nextId) < connectionCost(db, 2, 3))
+            }
+            db.createStatement().use { statement ->
+                statement.executeQuery(
+                    "SELECT count(*), min(word_cost) FROM conversion_lexeme WHERE source='jmnedict_place'"
+                ).use { result ->
+                    assertTrue(result.next())
+                    assertTrue(result.getInt(1) >= 90_000)
+                    assertTrue(result.getInt(2) >= 9_000)
+                }
+            }
         }
     }
 
@@ -230,6 +340,31 @@ class ReadingDatabaseTest {
             result.getString(1)
         }
     }
+
+    private fun conversionCost(db: Connection, reading: String, surface: String, posId: Int): Int =
+        db.prepareStatement(
+            "SELECT word_cost FROM conversion_lexeme WHERE reading=? AND surface=? AND left_id=?"
+        ).use { statement ->
+            statement.setString(1, reading)
+            statement.setString(2, surface)
+            statement.setInt(3, posId)
+            statement.executeQuery().use { result ->
+                check(result.next())
+                result.getInt(1)
+            }
+        }
+
+    private fun connectionCost(db: Connection, previousId: Int, nextId: Int): Int =
+        db.prepareStatement(
+            "SELECT cost FROM connection_cost WHERE previous_right_id=? AND next_left_id=?"
+        ).use { statement ->
+            statement.setInt(1, previousId)
+            statement.setInt(2, nextId)
+            statement.executeQuery().use { result ->
+                check(result.next())
+                result.getInt(1)
+            }
+        }
 
     private fun readings(db: Connection, surface: String, table: String): List<String> {
         val query = if (table == "kanji_reading") {

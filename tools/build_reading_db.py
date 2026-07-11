@@ -18,7 +18,47 @@ import zipfile
 from pathlib import Path
 
 
-SCHEMA_VERSION = "7"
+SCHEMA_VERSION = "8"
+
+CONVERSION_POS = {
+    0: "BOS",
+    1: "EOS",
+    2: "PRONOUN",
+    3: "NOUN",
+    4: "PROPER_NOUN",
+    5: "PARTICLE",
+    6: "AUXILIARY",
+    7: "VERB",
+    8: "ADJECTIVE",
+    9: "ADVERB",
+    10: "PREFIX",
+    11: "SUFFIX",
+    12: "EXPRESSION",
+    13: "SYMBOL",
+    14: "OTHER",
+    15: "COPY",
+}
+
+MAX_CONVERSION_READING_LENGTH = 16
+MAX_CONVERSION_LEXEMES_PER_READING = 12
+USUALLY_KANA = "word usually written using kana alone"
+GEOGRAPHIC_CONVERSION_COST = 9_000
+
+POS_EXACT = {
+    "pronoun": 2,
+    "proper noun": 4,
+    "particle": 5,
+    "auxiliary": 6,
+    "auxiliary adjective": 6,
+    "auxiliary verb": 6,
+    "copula": 6,
+    "adverb (fukushi)": 9,
+    "adverb taking the 'to' particle": 9,
+    "prefix": 10,
+    "suffix": 11,
+    "expressions (phrases, clauses, etc.)": 12,
+    "symbol": 13,
+}
 
 # JMnedict contains many kinds of proper names. Keep this import focused on
 # geographic names so person and organization names do not crowd normal IME
@@ -246,6 +286,89 @@ def priority(tags: list[str]) -> int:
     return min(ranks, default=100)
 
 
+def conversion_pos_ids(pos_tags: set[str]) -> list[int]:
+    """Map JMdict sense POS descriptions to the fixed conversion POS IDs."""
+    ids: set[int] = set()
+    for tag in pos_tags:
+        if tag in POS_EXACT:
+            ids.add(POS_EXACT[tag])
+        elif tag.startswith("Godan verb") or tag.startswith("Ichidan verb"):
+            ids.add(7)
+        elif " verb" in tag or tag.endswith("verb"):
+            ids.add(7)
+        elif tag.startswith("adjective") or tag.startswith("adjectival"):
+            ids.add(8)
+        elif tag.startswith("pre-noun adjectival"):
+            ids.add(8)
+        elif tag.startswith("noun") or tag == "counter":
+            ids.add(3)
+        else:
+            ids.add(14)
+    return sorted(ids or {14})
+
+
+def inflected_conversion_pos(pos_tags: set[str]) -> int:
+    if pos_tags & I_ADJECTIVE_POS:
+        return 8
+    return 7
+
+
+def conversion_word_cost(
+    pair_priority: int,
+    reading_position: int,
+    *,
+    surface: str,
+    reading: str,
+    usually_kana: bool,
+    form_rank: int = 0,
+) -> int:
+    cost = 400 + min(pair_priority, 100) * 20 + reading_position * 4 + form_rank * 16
+    if usually_kana:
+        cost += -700 if surface == reading else 900
+    return max(100, cost)
+
+
+def insert_conversion_lexemes(
+    db: sqlite3.Connection,
+    rows: list[tuple[str, str, int, int, int, int, str]],
+) -> None:
+    if not rows:
+        return
+    db.executemany(
+        """INSERT INTO conversion_lexeme(
+               reading, surface, left_id, right_id, word_cost, form_rank, source
+           ) VALUES (?, ?, ?, ?, ?, ?, ?)
+           ON CONFLICT(reading, surface, left_id, right_id) DO UPDATE SET
+             word_cost=min(word_cost, excluded.word_cost),
+             form_rank=min(form_rank, excluded.form_rank),
+             source=min(source, excluded.source)""",
+        rows,
+    )
+    rows.clear()
+
+
+def create_connection_costs(db: sqlite3.Connection) -> None:
+    preferred = {
+        (2, 5): 0,    # PRONOUN -> PARTICLE
+        (5, 3): 100,  # PARTICLE -> NOUN
+        (3, 6): 0,    # NOUN -> AUXILIARY
+        (3, 5): 100,  # NOUN -> PARTICLE
+        (5, 7): 0,    # PARTICLE -> VERB
+        (7, 6): 0,    # VERB -> AUXILIARY
+        (8, 6): 0,    # ADJECTIVE -> AUXILIARY
+    }
+    rows = []
+    for previous_id in CONVERSION_POS:
+        for next_id in CONVERSION_POS:
+            cost = preferred.get((previous_id, next_id), 1_200)
+            if previous_id == 0 or next_id == 1:
+                cost = 400
+            if (previous_id, next_id) == (0, 1):
+                cost = 0
+            rows.append((previous_id, next_id, cost))
+    db.executemany("INSERT INTO connection_cost VALUES (?, ?, ?)", rows)
+
+
 def create_schema(db: sqlite3.Connection) -> None:
     db.executescript(
         """
@@ -291,8 +414,33 @@ def create_schema(db: sqlite3.Connection) -> None:
 
         CREATE INDEX word_reading_reading_rank
             ON word_reading(reading, form_rank, priority, surface);
+
+        CREATE TABLE conversion_pos (
+            id INTEGER PRIMARY KEY,
+            name TEXT NOT NULL UNIQUE
+        );
+
+        CREATE TABLE conversion_lexeme (
+            reading TEXT NOT NULL,
+            surface TEXT NOT NULL,
+            left_id INTEGER NOT NULL,
+            right_id INTEGER NOT NULL,
+            word_cost INTEGER NOT NULL,
+            form_rank INTEGER NOT NULL,
+            source TEXT NOT NULL,
+            PRIMARY KEY (reading, surface, left_id, right_id)
+        ) WITHOUT ROWID;
+
+        CREATE TABLE connection_cost (
+            previous_right_id INTEGER NOT NULL,
+            next_left_id INTEGER NOT NULL,
+            cost INTEGER NOT NULL,
+            PRIMARY KEY (previous_right_id, next_left_id)
+        ) WITHOUT ROWID;
         """
     )
+    db.executemany("INSERT INTO conversion_pos VALUES (?, ?)", CONVERSION_POS.items())
+    create_connection_costs(db)
 
 
 def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, int, str]:
@@ -444,10 +592,147 @@ def import_jmdict(db: sqlite3.Connection, source: Path) -> tuple[int, int, int]:
     return entries, base_pairs, inflected_pairs
 
 
+def import_jmdict_conversion(db: sqlite3.Connection, source: Path) -> None:
+    """Import sense-scoped JMdict lexemes for lattice conversion.
+
+    Unlike ``word_reading``, this path deliberately does not union POS tags
+    across an entry. POS inheritance and the stagk/stagr restrictions are
+    applied at each sense before a lexeme is emitted.
+    """
+    batch: list[tuple[str, str, int, int, int, int, str]] = []
+
+    def append(
+        reading: str,
+        surface: str,
+        pos_id: int,
+        cost: int,
+        form_rank: int,
+        source_name: str,
+    ) -> None:
+        if (
+            0 < len(reading) <= MAX_CONVERSION_READING_LENGTH
+            and 0 < len(surface) <= MAX_CONVERSION_READING_LENGTH
+        ):
+            batch.append(
+                (reading, surface, pos_id, pos_id, cost, form_rank, source_name)
+            )
+
+    with gzip.open(source, "rb") as stream:
+        for event, elem in ET.iterparse(stream, events=("end",)):
+            if elem.tag != "entry":
+                continue
+            surfaces = {
+                node.findtext("keb") or "":
+                    [value.text or "" for value in node.findall("ke_pri")]
+                for node in elem.findall("k_ele")
+                if node.findtext("keb")
+            }
+            has_surface_priority = any(tags for tags in surfaces.values())
+            readings = []
+            for reading_position, r_ele in enumerate(elem.findall("r_ele")):
+                reading = r_ele.findtext("reb")
+                reading_information = {
+                    node.text for node in r_ele.findall("re_inf") if node.text
+                }
+                if not reading or reading_information & EXCLUDED_READING_INFORMATION:
+                    continue
+                readings.append(
+                    {
+                        "reading": reading,
+                        "position": reading_position,
+                        "priority": [node.text or "" for node in r_ele.findall("re_pri")],
+                        "restrictions": {
+                            node.text for node in r_ele.findall("re_restr") if node.text
+                        },
+                        "no_kanji": r_ele.find("re_nokanji") is not None,
+                    }
+                )
+
+            inherited_pos: set[str] = set()
+            inherited_misc: set[str] = set()
+            for sense in elem.findall("sense"):
+                explicit_pos = {node.text for node in sense.findall("pos") if node.text}
+                if explicit_pos:
+                    inherited_pos = explicit_pos
+                explicit_misc = {node.text for node in sense.findall("misc") if node.text}
+                if explicit_misc:
+                    inherited_misc = explicit_misc
+                pos_tags = inherited_pos
+                pos_ids = conversion_pos_ids(pos_tags)
+                sense_surfaces = {
+                    node.text for node in sense.findall("stagk") if node.text
+                }
+                sense_readings = {
+                    node.text for node in sense.findall("stagr") if node.text
+                }
+                usually_kana = USUALLY_KANA in inherited_misc
+
+                for item in readings:
+                    reading = str(item["reading"])
+                    if sense_readings and reading not in sense_readings:
+                        continue
+                    reading_priority_tags = list(item["priority"])
+                    restrictions = set(item["restrictions"])
+                    no_kanji = bool(item["no_kanji"])
+                    applicable: dict[str, tuple[int, str]] = {}
+
+                    if not surfaces or no_kanji or usually_kana:
+                        applicable[reading] = (
+                            priority(reading_priority_tags), "jmdict_kana"
+                        )
+                    if not no_kanji:
+                        for surface, surface_priority_tags in surfaces.items():
+                            if restrictions and surface not in restrictions:
+                                continue
+                            if sense_surfaces and surface not in sense_surfaces:
+                                continue
+                            pair_priority = priority(
+                                surface_priority_tags
+                                if has_surface_priority else reading_priority_tags
+                            )
+                            applicable[surface] = (pair_priority, "jmdict")
+
+                    for surface, (pair_priority, source_name) in applicable.items():
+                        base_cost = conversion_word_cost(
+                            pair_priority,
+                            int(item["position"]),
+                            surface=surface,
+                            reading=reading,
+                            usually_kana=usually_kana,
+                        )
+                        for pos_id in pos_ids:
+                            append(reading, surface, pos_id, base_cost, 0, source_name)
+                        if pair_priority < 100:
+                            inflected_pos_id = inflected_conversion_pos(pos_tags)
+                            for inflected_surface, inflected_reading, form_rank in inflected_forms(
+                                surface, reading, pos_tags
+                            ):
+                                append(
+                                    inflected_reading,
+                                    inflected_surface,
+                                    inflected_pos_id,
+                                    conversion_word_cost(
+                                        pair_priority,
+                                        int(item["position"]),
+                                        surface=inflected_surface,
+                                        reading=inflected_reading,
+                                        usually_kana=usually_kana,
+                                        form_rank=form_rank,
+                                    ),
+                                    form_rank,
+                                    "jmdict_inflection",
+                                )
+            elem.clear()
+            if len(batch) >= 40_000:
+                insert_conversion_lexemes(db, batch)
+    insert_conversion_lexemes(db, batch)
+
+
 def import_jmnedict_places(db: sqlite3.Connection, source: Path) -> tuple[int, int]:
     """Import place and railway-station surface/reading pairs from JMnedict."""
     entries = 0
     batch: list[tuple[str, str, int, int, int, int]] = []
+    conversion_batch: list[tuple[str, str, int, int, int, int, str]] = []
 
     def flush() -> None:
         db.executemany(
@@ -463,6 +748,7 @@ def import_jmnedict_places(db: sqlite3.Connection, source: Path) -> tuple[int, i
             batch,
         )
         batch.clear()
+        insert_conversion_lexemes(db, conversion_batch)
 
     with gzip.open(source, "rb") as stream:
         for event, elem in ET.iterparse(stream, events=("end",)):
@@ -490,6 +776,21 @@ def import_jmnedict_places(db: sqlite3.Connection, source: Path) -> tuple[int, i
                         (surface, reading, GEOGRAPHIC_NAME_PRIORITY,
                          GEOGRAPHIC_NAME_PRIORITY, reading_position, 0)
                     )
+                    if (
+                        len(reading) <= MAX_CONVERSION_READING_LENGTH
+                        and len(surface) <= MAX_CONVERSION_READING_LENGTH
+                    ):
+                        conversion_batch.append(
+                            (
+                                reading,
+                                surface,
+                                4,
+                                4,
+                                GEOGRAPHIC_CONVERSION_COST + reading_position * 4,
+                                0,
+                                "jmnedict_place",
+                            )
+                        )
             elem.clear()
             if len(batch) >= 40_000:
                 flush()
@@ -501,6 +802,34 @@ def import_jmnedict_places(db: sqlite3.Connection, source: Path) -> tuple[int, i
         (GEOGRAPHIC_NAME_PRIORITY, GEOGRAPHIC_NAME_PRIORITY),
     ).fetchone()[0]
     return entries, place_pairs
+
+
+def limit_conversion_lexemes(db: sqlite3.Connection) -> int:
+    """Apply the deterministic per-reading vocabulary cap."""
+    db.executescript(
+        f"""
+        CREATE TEMP TABLE retained_conversion_lexeme AS
+        SELECT reading, surface, left_id, right_id, word_cost, form_rank, source
+        FROM (
+            SELECT conversion_lexeme.*,
+                   row_number() OVER (
+                       PARTITION BY reading
+                       ORDER BY word_cost, form_rank, surface,
+                                left_id, right_id, source
+                   ) AS position
+            FROM conversion_lexeme
+        )
+        WHERE position <= {MAX_CONVERSION_LEXEMES_PER_READING};
+
+        DELETE FROM conversion_lexeme;
+        INSERT INTO conversion_lexeme
+        SELECT reading, surface, left_id, right_id, word_cost, form_rank, source
+        FROM retained_conversion_lexeme
+        ORDER BY reading, surface, left_id, right_id;
+        DROP TABLE retained_conversion_lexeme;
+        """
+    )
+    return db.execute("SELECT count(*) FROM conversion_lexeme").fetchone()[0]
 
 
 def model_labels(model_archive: Path) -> set[str]:
@@ -545,7 +874,9 @@ def main() -> int:
             db, args.kanjidic
         )
         entries, word_pairs, inflected_pairs = import_jmdict(db, args.jmdict)
+        import_jmdict_conversion(db, args.jmdict)
         place_entries, place_pairs = import_jmnedict_places(db, args.jmnedict)
+        conversion_lexemes = limit_conversion_lexemes(db)
         labels = model_labels(args.model_archive)
         han_labels, missing = validate(db, labels)
         metadata = {
@@ -563,6 +894,8 @@ def main() -> int:
             "geographic_name_pairs": str(place_pairs),
             "word_pairs": str(word_pairs),
             "inflected_pairs": str(inflected_pairs),
+            "conversion_lexemes": str(conversion_lexemes),
+            "connection_costs": str(len(CONVERSION_POS) ** 2),
             "model_labels": str(len(labels)),
             "model_han_labels": str(han_labels),
             "model_missing_readings": str(len(missing)),

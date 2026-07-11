@@ -2,18 +2,18 @@ Reading data snapshot generated 2026-07-11
 
 KANJIDIC2
 URL: https://www.edrdg.org/kanjidic/kanjidic2.xml.gz
-SHA-256: 9786f2c2c7df568da5042e4c9bbb3f23667895ddb5c64d82d585d8a1616b85b0
+SHA-256: 88609a4e35f417c033841e228ec3d2f25935b94814a5074b3c013728ea604407
 
 JMdict (English subset; Japanese surfaces/readings are complete)
 URL: https://www.edrdg.org/pub/Nihongo/JMdict_e.gz
-SHA-256: 99ecf0435b523c99114dc9680bc940738eb8d131691b2f794e67b8a0d5ed32b3
+SHA-256: 70cb3c7a5f2c99f6db40e9eafd2eef54e7714a9fc797d9d50854e43f540ab3f4
 
 JMnedict (place and railway-station names only)
 URL: https://www.edrdg.org/pub/Nihongo/JMnedict.xml.gz
 SHA-256: c94534ed3f9523f818bf4b9389602769024184c6e0509b14f6ab55d505cf95ff
 
 Tegaki Zinnia Japanese 0.3 model archive
-URL: https://cdn.netbsd.org/pub/pkgsrc/distfiles/tegaki-zinnia-japanese-0.3.zip
+URL: https://github.com/tegaki/tegaki/releases/download/v0.3/tegaki-zinnia-japanese-0.3.zip
 SHA-256: 07861bbb5440d74e705864721f12a5ce1c7f21a869f9c95ff21433d8994aafda
 Bundled handwriting-ja.model SHA-256: d58618576d12c1ea38992606f30d19158a0a3beda3ac23bacccf1e48e651f2b2
 
