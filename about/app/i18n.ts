@@ -1,9 +1,10 @@
-export const locales = ["ja", "zh", "en", "ko"] as const;
+export const locales = ["ja", "zh-Hans", "zh-Hant", "en", "ko"] as const;
 export type Locale = (typeof locales)[number];
 
 export const localeLabels: Record<Locale, { short: string; full: string }> = {
   ja: { short: "日", full: "日本語" },
-  zh: { short: "中", full: "简体中文" },
+  "zh-Hans": { short: "简", full: "简体中文" },
+  "zh-Hant": { short: "繁", full: "繁體中文" },
   en: { short: "EN", full: "English" },
   ko: { short: "한", full: "한국어" },
 };
@@ -30,11 +31,11 @@ export const copy = {
     download: { heading: "あなたの端末へ。", intro: "各ストアでの公開後、このページから直接アクセスできます。", androidTitle: "Android版", androidBody: "オフライン手書き認識、ふりがな表示、連続入力に対応。", apk: "APKをダウンロード", iosTitle: "iOS版", iosBody: "現在プレビュー開発中。端末内の単文字認識と読み表示から対応。", appStore: "App Storeで見る", pending: "準備中", pendingLabel: "現在準備中です" },
     about: { heading: ["文字の形と、", "読みのあいだを結ぶ。"], lead: "Furigana Keyboardは、「書けるけれど読めない」「読みは分かるけれど変換しづらい」という小さな壁をなくすための、日本語キーボードです。", body: "入力内容や手書き履歴は保存しません。基本機能はオフラインでも利用でき、任意のPlus機能ではモデルの取得などに通信を使用します。", facts: ["JIS X 0208 漢字ラベル", "読みを収録した文字", "開発者による入力履歴の保存"] },
     legal: { terms: "利用規約", privacy: "プライバシーポリシー" },
-    support: "サポート",
+    support: "お問い合わせ",
     footer: "手書きとふりがなで、読みやすい日本語を。",
   },
-  zh: {
-    htmlLang: "zh-CN",
+  "zh-Hans": {
+    htmlLang: "zh-Hans",
     meta: {
       title: "Furigana Keyboard — 书写。读懂。连接。",
       description: "显示注音候选、重视隐私的日语键盘。计划支持 Android、iPhone 和 iPad。",
@@ -50,8 +51,28 @@ export const copy = {
     download: { heading: "安装到你的设备。", intro: "应用正式发布后，可从本页面直接前往下载。", androidTitle: "Android 版", androidBody: "支持离线手写识别、注音显示和连续输入。", apk: "下载 APK", iosTitle: "iOS 版", iosBody: "目前处于预览开发阶段，MVP 支持设备端单字识别和读音显示。", appStore: "前往 App Store", pending: "准备中", pendingLabel: "目前正在准备中" },
     about: { heading: ["连接字形与", "读音之间。"], lead: "Furigana Keyboard 是一款日语键盘，旨在消除“会写却不会读”或“知道读音却难以转换”的小障碍。", body: "应用不会保存输入内容或手写记录。基础功能可离线使用；可选的 Plus 功能会联网下载模型等数据。", facts: ["JIS X 0208 汉字标签", "收录读音的字符", "开发者保存的输入记录"] },
     legal: { terms: "使用条款", privacy: "隐私政策" },
-    support: "支持",
+    support: "联系我们",
     footer: "通过手写与注音，让日语更易读。",
+  },
+  "zh-Hant": {
+    htmlLang: "zh-Hant",
+    meta: {
+      title: "Furigana Keyboard — 書寫。讀懂。連結。",
+      description: "顯示注音候選、重視隱私的日語鍵盤。計畫支援 Android、iPhone 和 iPad。",
+      social: "書寫。讀懂。連結。顯示注音候選的日語鍵盤。",
+    },
+    nav: { label: "主導覽", top: "Furigana Keyboard 首頁", features: "特色", download: "下載", about: "關於", language: "顯示語言" },
+    hero: { title: ["書寫。讀懂。", "連結。"], lead: ["候選字附有假名讀音，讓日語輸入更直覺。", "基本功能也可離線使用。"], release: "查看發布資訊", keyboardImage: "手寫鍵盤示意圖", writingHint: "在這裡寫一個字", keys: ["假名", "空格", "⌫", "換行"], privateStatus: "基本功能支援離線使用" },
+    why: { heading: "輸入日語，不再猶豫。", features: [
+      { title: "手寫選擇", body: "用手指寫下假名或漢字，即時顯示辨識候選，無需來回切換鍵盤。" },
+      { title: "讀音可見", body: "候選字附有假名讀音。即使只記得字形，也能確認讀音後再選擇。" },
+      { title: "重視隱私", body: "輸入文字和手寫內容不會傳送到開發者的伺服器，基本功能也可離線使用。" },
+    ] },
+    download: { heading: "安裝到你的裝置。", intro: "應用程式正式發布後，可從本頁面直接前往下載。", androidTitle: "Android 版", androidBody: "支援離線手寫辨識、注音顯示和連續輸入。", apk: "下載 APK", iosTitle: "iOS 版", iosBody: "目前處於預覽開發階段，MVP 支援裝置端單字辨識和讀音顯示。", appStore: "前往 App Store", pending: "準備中", pendingLabel: "目前正在準備中" },
+    about: { heading: ["連結字形與", "讀音之間。"], lead: "Furigana Keyboard 是一款日語鍵盤，旨在消除「會寫卻不會讀」或「知道讀音卻難以轉換」的小障礙。", body: "應用程式不會儲存輸入內容或手寫紀錄。基本功能可離線使用；選用的 Plus 功能會連線下載模型等資料。", facts: ["JIS X 0208 漢字標籤", "收錄讀音的字元", "開發者儲存的輸入紀錄"] },
+    legal: { terms: "使用條款", privacy: "隱私權政策" },
+    support: "聯絡我們",
+    footer: "透過手寫與注音，讓日語更易讀。",
   },
   en: {
     htmlLang: "en",
@@ -70,7 +91,7 @@ export const copy = {
     download: { heading: "Bring it to your device.", intro: "Once each release is available, this page will link directly to it.", androidTitle: "Android", androidBody: "Offline handwriting recognition, furigana display, and continuous input.", apk: "Download APK", iosTitle: "iPhone & iPad", iosBody: "Now in preview development. The MVP supports on-device single-character recognition and readings.", appStore: "View on the App Store", pending: "Coming soon", pendingLabel: "This release is coming soon" },
     about: { heading: ["Connecting the shape", "of a character to its sound."], lead: "Furigana Keyboard is a Japanese keyboard designed to remove the small barriers between knowing how a character looks, knowing how it sounds, and getting it into a text field.", body: "The app does not retain typed text or handwriting history. Core features work offline; the optional Plus feature uses a connection for model downloads and related services.", facts: ["JIS X 0208 kanji labels", "characters with readings", "input history retained by the developer"] },
     legal: { terms: "Terms of Use", privacy: "Privacy Policy" },
-    support: "Support",
+    support: "Contact us",
     footer: "Handwriting and furigana for more readable Japanese.",
   },
   ko: {
@@ -90,7 +111,7 @@ export const copy = {
     download: { heading: "내 기기에서 시작하세요.", intro: "각 스토어에 공개되면 이 페이지에서 바로 이동할 수 있습니다.", androidTitle: "Android 버전", androidBody: "오프라인 필기 인식, 후리가나 표시, 연속 입력을 지원합니다.", apk: "APK 다운로드", iosTitle: "iOS 버전", iosBody: "현재 프리뷰 개발 중이며 MVP는 기기 내 한 글자 인식과 읽기 표시를 지원합니다.", appStore: "App Store에서 보기", pending: "준비 중", pendingLabel: "현재 준비 중입니다" },
     about: { heading: ["글자의 모양과", "읽는 법을 잇다."], lead: "Furigana Keyboard는 ‘쓸 수 있지만 읽기 어렵다’거나 ‘읽는 법은 알지만 변환하기 어렵다’는 작은 장벽을 없애기 위한 일본어 키보드입니다.", body: "입력 내용과 필기 기록은 저장하지 않습니다. 기본 기능은 오프라인에서도 사용할 수 있으며 선택형 Plus 기능은 모델 다운로드 등에 통신을 사용합니다.", facts: ["JIS X 0208 한자 라벨", "읽기가 수록된 문자", "개발자가 저장하는 입력 기록"] },
     legal: { terms: "이용약관", privacy: "개인정보 처리방침" },
-    support: "지원",
+    support: "문의하기",
     footer: "필기와 후리가나로 더 읽기 쉬운 일본어를.",
   },
 } as const;

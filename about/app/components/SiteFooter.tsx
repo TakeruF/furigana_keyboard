@@ -1,4 +1,4 @@
-import { copy, type Locale } from "../i18n";
+import { copy, localeLabels, locales, type Locale } from "../i18n";
 
 export default function SiteFooter({ locale }: { locale: Locale }) {
   const content = copy[locale];
@@ -11,7 +11,19 @@ export default function SiteFooter({ locale }: { locale: Locale }) {
           <a href={`/${locale}/terms`}>{content.legal.terms}</a>
           <a href="mailto:support@hanlu.app">{content.support}</a>
         </nav>
-        <a className="footer-support" href="mailto:support@hanlu.app">support@hanlu.app</a>
+        <nav className="footer-languages" aria-label={content.nav.language}>
+          {locales.map((item) => (
+            <a
+              key={item}
+              href={`/${item}`}
+              hrefLang={copy[item].htmlLang}
+              lang={copy[item].htmlLang}
+              aria-current={item === locale ? "page" : undefined}
+            >
+              {localeLabels[item].full}
+            </a>
+          ))}
+        </nav>
         <p>keyboard.hanlu.app</p>
       </div>
     </footer>

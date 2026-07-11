@@ -69,7 +69,7 @@ EdgeOne MakersはNext.js 13.5以降のApp Router、SSR、SSG、React Server Comp
 
 - `package.json`の既定ビルドを`next build`へ変更
 - Cloudflare/Vinext固有処理をEdgeOneの本番経路から分離
-- `/ja`、`/zh`、`/en`、`/ko`を標準Next.jsで配信
+- `/ja`、`/zh-Hans`、`/zh-Hant`、`/en`、`/ko`を標準Next.jsで配信
 - `/`から`/ja`への307リダイレクトをNext.jsページで実装
 - HTMLテストを実際の`next start`サーバーに対する検証へ変更
 - Turbopackのルートを`about/`へ固定
@@ -98,9 +98,9 @@ npm run build
 少なくとも次を確認してください。
 
 - `/`が`/ja`へ移動する
-- `/ja`、`/zh`、`/en`、`/ko`が表示できる
+- `/ja`、`/zh-Hans`、`/zh-Hant`、`/en`、`/ko`が表示できる
 - 各ページのcanonical URLが`keyboard.hanlu.app`を指す
-- 中国語にNoto Sans SC、韓国語にNoto Sans KRが適用される
+- 簡体中文にNoto Sans SC、繁体中文にNoto Sans TC、韓国語にNoto Sans KRが適用される
 - `support@hanlu.app`以外の不要な問い合わせ先が表示されない
 - GitHubリポジトリ名やローカルパスがHTMLへ含まれない
 - APK・App StoreのURLが未設定なら「準備中」になる
@@ -244,7 +244,8 @@ URLも確認します。
 ```bash
 curl -I https://keyboard.hanlu.app
 curl -I https://keyboard.hanlu.app/ja
-curl -I https://keyboard.hanlu.app/zh
+curl -I https://keyboard.hanlu.app/zh-Hans
+curl -I https://keyboard.hanlu.app/zh-Hant
 curl -I https://keyboard.hanlu.app/en
 curl -I https://keyboard.hanlu.app/ko
 ```
@@ -252,7 +253,7 @@ curl -I https://keyboard.hanlu.app/ko
 完了条件は次のとおりです。
 
 - `/`が意図どおり`/ja`へ移動する
-- 4言語すべてがHTTP 200で表示される
+- 5言語すべてがHTTP 200で表示される
 - TLS証明書エラーがない
 - ページソースにEdgeOne Preview URLやローカルURLが残っていない
 - AndroidとApp Storeのリンクが意図した配布先を指す

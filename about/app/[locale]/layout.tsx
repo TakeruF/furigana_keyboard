@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Noto_Sans_KR, Noto_Sans_SC } from "next/font/google";
+import { Noto_Sans_KR, Noto_Sans_SC, Noto_Sans_TC } from "next/font/google";
 import { copy, isLocale, locales, type Locale } from "../i18n";
 import "../globals.css";
 
@@ -17,6 +17,14 @@ const notoSansKR = Noto_Sans_KR({
   preload: false,
   variable: "--font-noto-sans-kr",
   fallback: ["Apple SD Gothic Neo", "Malgun Gothic", "sans-serif"],
+});
+
+const notoSansTC = Noto_Sans_TC({
+  weight: "variable",
+  display: "swap",
+  preload: false,
+  variable: "--font-noto-sans-tc",
+  fallback: ["PingFang TC", "Microsoft JhengHei", "sans-serif"],
 });
 
 type LayoutProps = Readonly<{
@@ -69,8 +77,10 @@ export async function generateMetadata({ params }: Pick<LayoutProps, "params">):
 export default async function LocaleLayout({ children, params }: LayoutProps) {
   const { locale: value } = await params;
   const locale = getLocale(value);
-  const localeFontClass = locale === "zh"
+  const localeFontClass = locale === "zh-Hans"
     ? notoSansSC.variable
+    : locale === "zh-Hant"
+      ? notoSansTC.variable
     : locale === "ko"
       ? notoSansKR.variable
       : undefined;

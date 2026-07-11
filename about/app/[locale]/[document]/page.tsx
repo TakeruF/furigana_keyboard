@@ -11,7 +11,8 @@ type LegalDocument = (typeof documents)[number];
 
 const localeFileTags: Record<Locale, string> = {
   ja: "ja",
-  zh: "zh-CN",
+  "zh-Hans": "zh-Hans",
+  "zh-Hant": "zh-Hant",
   en: "en",
   ko: "ko",
 };

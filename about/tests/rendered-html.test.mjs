@@ -47,7 +47,10 @@ after(() => {
 });
 
 for (const languagePreference of [
-  { header: "zh-CN,zh;q=0.9,en;q=0.8", locale: "zh" },
+  { header: "zh-CN,zh;q=0.9,en;q=0.8", locale: "zh-Hans" },
+  { header: "zh-Hans-CN,zh;q=0.9", locale: "zh-Hans" },
+  { header: "zh-TW,zh;q=0.9,en;q=0.8", locale: "zh-Hant" },
+  { header: "zh-Hant-HK,zh;q=0.9", locale: "zh-Hant" },
   { header: "ko-KR,ko;q=0.9", locale: "ko" },
   { header: "en-US,en;q=0.9", locale: "en" },
   { header: "ja-JP,ja;q=0.9", locale: "ja" },
@@ -65,7 +68,8 @@ for (const languagePreference of [
 
 for (const expectation of [
   { path: "/ja", lang: "ja", title: "書く。読める。", pending: "準備中" },
-  { path: "/zh", lang: "zh-CN", title: "书写。读懂。", pending: "准备中" },
+  { path: "/zh-Hans", lang: "zh-Hans", title: "书写。读懂。", pending: "准备中" },
+  { path: "/zh-Hant", lang: "zh-Hant", title: "書寫。讀懂。", pending: "準備中" },
   { path: "/en", lang: "en", title: "Write. Read.", pending: "Coming soon" },
   { path: "/ko", lang: "ko", title: "쓰고. 읽고.", pending: "준비 중" },
 ]) {
@@ -79,10 +83,12 @@ for (const expectation of [
     assert.match(html, new RegExp(expectation.pending));
     assert.match(html, /Furigana Keyboard Beta/);
     assert.match(html, /href="\/ja"/);
-    assert.match(html, /href="\/zh"/);
+    assert.match(html, /href="\/zh-Hans"/);
+    assert.match(html, /href="\/zh-Hant"/);
     assert.match(html, /href="\/en"/);
     assert.match(html, /href="\/ko"/);
     assert.match(html, /mailto:support@hanlu\.app/);
+    assert.doesNotMatch(html, />support@hanlu\.app</);
     assert.match(html, new RegExp(`href="${expectation.path}/terms"`));
     assert.match(html, new RegExp(`href="${expectation.path}/privacy"`));
     assert.match(html, /keyboard-preview\.jpg/);
@@ -90,6 +96,8 @@ for (const expectation of [
     assert.match(html, /class="site-header"/);
     assert.match(html, /class="hero-download primary"/);
     assert.match(html, /class="site-footer"/);
+    assert.match(html, /class="footer-languages"/);
+    assert.doesNotMatch(html, /class="header-languages"/);
     assert.match(html, /android-glyph/);
     assert.doesNotMatch(html, /google-play-glyph/);
     assert.match(html, /apple-glyph/);
@@ -104,7 +112,7 @@ for (const expectation of [
   });
 }
 
-for (const locale of ["ja", "zh", "en", "ko"]) {
+for (const locale of ["ja", "zh-Hans", "zh-Hant", "en", "ko"]) {
   for (const document of ["terms", "privacy"]) {
     test(`serves ${locale} ${document} as a subpage`, async () => {
       const response = await fetch(`${baseUrl}/${locale}/${document}`);
@@ -136,9 +144,12 @@ test("assigns dedicated Noto fonts to Chinese and Korean", async () => {
     readFile(new URL("../app/globals.css", import.meta.url), "utf8"),
   ]);
   assert.match(layout, /Noto_Sans_SC/);
+  assert.match(layout, /Noto_Sans_TC/);
   assert.match(layout, /Noto_Sans_KR/);
-  assert.match(layout, /locale === "zh"[\s\S]*notoSansSC\.variable/);
+  assert.match(layout, /locale === "zh-Hans"[\s\S]*notoSansSC\.variable/);
+  assert.match(layout, /locale === "zh-Hant"[\s\S]*notoSansTC\.variable/);
   assert.match(layout, /locale === "ko"[\s\S]*notoSansKR\.variable/);
-  assert.match(styles, /\[lang="zh-CN"\] body[\s\S]*var\(--font-noto-sans-sc\)/);
+  assert.match(styles, /\[lang="zh-Hans"\] body[\s\S]*var\(--font-noto-sans-sc\)/);
+  assert.match(styles, /\[lang="zh-Hant"\] body[\s\S]*var\(--font-noto-sans-tc\)/);
   assert.match(styles, /\[lang="ko"\] body[\s\S]*var\(--font-noto-sans-kr\)/);
 });

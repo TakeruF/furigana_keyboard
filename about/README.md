@@ -3,10 +3,11 @@
 Public product page for Furigana Keyboard. Until release URLs are configured,
 the Android and iOS cards display a non-clickable “準備中” state.
 
-The page is available in Japanese (`/ja`), Simplified Chinese (`/zh`), English
-(`/en`), and Korean (`/ko`). The root URL redirects to Japanese.
-Simplified Chinese uses the self-hosted Noto Sans SC web font, while Korean uses
-the self-hosted Noto Sans KR web font; each is applied only to its locale route.
+The page is available in Japanese (`/ja`), Simplified Chinese (`/zh-Hans`),
+Traditional Chinese (`/zh-Hant`), English (`/en`), and Korean (`/ko`). The root
+URL redirects to the closest supported browser language, falling back to Japanese.
+Simplified and Traditional Chinese use Noto Sans SC and TC respectively, while
+Korean uses Noto Sans KR; each is applied only to its locale route.
 
 ## Local development
 

@@ -19,8 +19,11 @@ body {
   font-family: -apple-system, BlinkMacSystemFont, "Hiragino Sans", "Yu Gothic UI", "Noto Sans JP", sans-serif;
   text-rendering: optimizeLegibility;
 }
-[lang="zh-CN"] body {
+[lang="zh-Hans"] body {
   font-family: var(--font-noto-sans-sc), "Noto Sans SC", "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+[lang="zh-Hant"] body {
+  font-family: var(--font-noto-sans-tc), "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", sans-serif;
 }
 [lang="ko"] body {
   font-family: var(--font-noto-sans-kr), "Noto Sans KR", "Apple SD Gothic Neo", "Malgun Gothic", sans-serif;
@@ -40,10 +43,6 @@ a { color: inherit; text-decoration: none; }
 .site-brand { display: inline-flex; align-items: center; gap: 8px; color: #3f3f46; font-size: 14px; font-weight: 650; }
 .site-brand img { width: 24px; height: 24px; border-radius: 6px; }
 .header-actions { display: flex; align-items: center; gap: 10px; }
-.header-languages { display: flex; align-items: center; gap: 2px; }
-.header-languages a { min-width: 27px; height: 27px; display: grid; place-items: center; border-radius: 999px; color: #a1a1aa; font-size: 10px; font-weight: 650; }
-.header-languages a:hover { color: #3f3f46; }
-.header-languages a[aria-current="page"] { background: #f4f4f5; color: #27272a; }
 .store-glyph { display: block; width: 17px; height: 17px; flex: 0 0 auto; }
 
 .hero {
@@ -167,9 +166,10 @@ h1 em { color: var(--green); font-style: normal; }
 .site-footer { border-top: 1px solid #f4f4f5; padding: 40px 24px; }
 .site-footer-inner { width: min(560px, 100%); margin-inline: auto; display: flex; flex-direction: column; align-items: center; gap: 16px; color: #a1a1aa; font-size: 12px; text-align: center; }
 .site-footer-links { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 20px; }
+.footer-languages { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 16px; }
+.footer-languages a[aria-current="page"] { color: #52525b; font-weight: 650; }
 .site-footer a { transition: color .2s ease; }
 .site-footer a:hover { color: #52525b; }
-.footer-support { color: #71717a; }
 .site-footer p { margin: 0; color: #d4d4d8; }
 
 .legal-page { min-height: calc(100vh - 160px); padding-block: 72px 110px; }
@@ -197,7 +197,6 @@ h1 em { color: var(--green); font-style: normal; }
 
 @media (max-width: 480px) {
   .site-brand span { display: none; }
-  .header-languages a { min-width: 23px; }
   h1 { font-size: 45px; }
   .hero-lead br { display: none; }
   .hero-downloads { width: 100%; flex-direction: column; }

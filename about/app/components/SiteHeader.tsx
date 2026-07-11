@@ -3,7 +3,7 @@
 import Image from "next/image";
 import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
-import { copy, localeLabels, locales, type Locale } from "../i18n";
+import { copy, type Locale } from "../i18n";
 import { releaseLinks } from "../release-links";
 import { AndroidIcon, AppleIcon } from "./PlatformIcons";
 
@@ -33,13 +33,6 @@ export default function SiteHeader({ locale }: { locale: Locale }) {
           <span>Furigana Keyboard Beta</span>
         </a>
         <div className="header-actions">
-          <div className="header-languages" aria-label={content.nav.language}>
-            {locales.map((item) => (
-              <a key={item} href={`/${item}`} hrefLang={copy[item].htmlLang} lang={copy[item].htmlLang} aria-current={item === locale ? "page" : undefined} title={localeLabels[item].full}>
-                {localeLabels[item].short}
-              </a>
-            ))}
-          </div>
           <div ref={menuRef} className="relative">
             <button
               type="button"

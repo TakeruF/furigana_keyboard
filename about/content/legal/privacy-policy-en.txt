@@ -1,5 +1,5 @@
 Furigana Keyboard Privacy Policy
-Effective: July 10, 2026
+Effective: July 11, 2026
 
 1. Provider and contact
 Furigana Keyboard is provided by the Furigana Keyboard Project. Privacy inquiries may be submitted to:
@@ -12,19 +12,19 @@ The app developer does not access, collect, or transmit typed text, handwriting 
 Handwriting strokes and composing text are processed temporarily on the device to recognize characters and show candidates. The app does not retain input history. Text that you confirm is delivered through Android's input connection to the app currently receiving keyboard input. That receiving app's privacy policy governs its subsequent handling of the text.
 
 4. Network communication
-The app requests Android's INTERNET permission for the optional Furigana Plus feature. ML Kit uses it to download and update the Japanese recognition model and may contact Google for bug fixes, hardware-compatibility information, and service metrics. Recognition and dictionary lookup run on the device. When Plus is disabled, the bundled Zinnia model remains available without a network connection.
+The app uses network access to check for and download signed reading-dictionary updates, and on Android for the optional Furigana Plus feature. The directly distributed Android edition contacts downloads.hanlu.app to check for app updates and download an APK. ML Kit may contact Google to download and update its Japanese recognition model and for bug fixes, hardware-compatibility information, and service metrics. These update requests do not contain typed text or handwriting. Recognition and dictionary lookup run on the device, and the bundled model and dictionary remain available offline.
 
 5. On-device storage
-The app stores preferences such as display language, reading style, continuous handwriting, haptic feedback, and the Furigana Plus switch on the device. The bundled recognition model, dictionaries, and an approximately 20 MB Plus model after download are stored locally. Input content and handwriting history are not stored. App backup is disabled.
+The app stores preferences such as display language, reading style, continuous handwriting, haptic feedback, and the Furigana Plus switch on the device. Bundled or downloaded recognition models and reading dictionaries are stored locally. The directly distributed Android edition temporarily stores an update APK for verification and installation. Input content and handwriting history are not stored. App backup is disabled.
 
 6. Permissions and access
-Android grants the app access to the input field in its role as an input method. The app does not request sensitive runtime permissions for the camera, microphone, location, contacts, photos, files, or advertising identifiers.
+Android grants the app access to the input field in its role as an input method. The directly distributed Android edition may ask for permission to pass a user-approved update APK to the standard Android installer. The app does not request sensitive runtime permissions for the camera, microphone, location, contacts, photos, files, or advertising identifiers.
 
 7. Retention and deletion
 Preferences remain until you change them, clear app data in Android settings, or uninstall the app. Because typed text and handwriting strokes are not retained by the app, there is no server-held input data to request for deletion.
 
 8. Third-party materials
-The app uses Google ML Kit for optional on-device digital-ink recognition. ML Kit's terms and privacy information are available at https://developers.google.com/ml-kit/terms. The bundled fallback uses Zinnia and the Tegaki Japanese model; reading data uses KANJIDIC2 and JMdict. Sources and open-source licenses are available under Settings > More > About & licenses.
+The app uses Google ML Kit for optional on-device digital-ink recognition. ML Kit's terms and privacy information are available at https://developers.google.com/ml-kit/terms. The bundled fallback uses Zinnia and the Tegaki Japanese model; reading data uses KANJIDIC2, JMdict, and JMnedict. Sources and open-source licenses are available under Settings > More > About & licenses.
 
 9. Changes
 If app functionality or data handling changes, this policy and the in-app disclosures will be updated. Material changes will be communicated by an appropriate method.
