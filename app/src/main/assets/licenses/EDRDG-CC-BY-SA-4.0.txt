@@ -1,4 +1,4 @@
-This application includes data derived from KANJIDIC2 and JMdict.
+This application includes data derived from KANJIDIC2, JMdict, and JMnedict.
 
 Copyright: Electronic Dictionary Research and Development Group (EDRDG)
 License: Creative Commons Attribution-ShareAlike 4.0 International
@@ -6,6 +6,7 @@ License: Creative Commons Attribution-ShareAlike 4.0 International
 Project pages:
 https://www.edrdg.org/wiki/index.php/KANJIDIC_Project
 https://www.edrdg.org/wiki/index.php/JMdict-EDICT_Dictionary_Project
+https://www.edrdg.org/enamdict/enamdict_doc.html
 
 License statement:
 https://www.edrdg.org/edrdg/licence.html

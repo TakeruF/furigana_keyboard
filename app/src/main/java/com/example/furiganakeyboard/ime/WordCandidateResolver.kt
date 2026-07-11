@@ -4,6 +4,42 @@ import com.example.furiganakeyboard.reading.WordReadingCandidate
 
 /** Ranks exact and prefix JMdict matches across handwriting alternative combinations. */
 object WordCandidateResolver {
+    /**
+     * Build readings for compounds whose complete surface is not in the dictionary.
+     *
+     * This lets a known word followed by a known character/word (for example
+     * 「国際」 + 「版」) remain a useful candidate even when JMdict does not
+     * contain the combined surface 「国際版」.
+     */
+    fun composedReadings(
+        root: String,
+        previousCharacters: List<String>,
+        currentCharacters: List<String>,
+        readings: Map<String, List<String>>
+    ): Map<String, List<String>> {
+        val previous = previousCharacters.ifEmpty { listOf("") }
+        val result = LinkedHashMap<String, List<String>>()
+        for (left in previous.take(MAX_CHARACTER_ALTERNATIVES)) {
+            val prefix = root + left
+            val prefixReadings = readings[prefix].orEmpty()
+            if (prefixReadings.isEmpty()) continue
+            for (right in currentCharacters.take(MAX_CHARACTER_ALTERNATIVES)) {
+                val suffixReadings = readings[right].orEmpty()
+                if (suffixReadings.isEmpty()) continue
+                result[prefix + right] = prefixReadings.asSequence()
+                    .flatMap { prefixReading ->
+                        suffixReadings.asSequence().map { suffixReading ->
+                            prefixReading.toHiragana() + suffixReading.toHiragana()
+                        }
+                    }
+                    .distinct()
+                    .take(MAX_COMPOSED_READINGS)
+                    .toList()
+            }
+        }
+        return result
+    }
+
     fun resolve(
         surfaces: List<String>,
         exactReadings: (String) -> List<String>,
@@ -72,4 +108,14 @@ object WordCandidateResolver {
 
     private const val MAX_CHARACTER_ALTERNATIVES = 5
     private const val MAX_SURFACES = 24
+    private const val MAX_COMPOSED_READINGS = 3
+
+    private fun String.toHiragana(): String = buildString(length) {
+        this@toHiragana.forEach { character ->
+            append(
+                if (character in '\u30a1'..'\u30f6') character - ('\u30a1' - '\u3041')
+                else character
+            )
+        }
+    }
 }

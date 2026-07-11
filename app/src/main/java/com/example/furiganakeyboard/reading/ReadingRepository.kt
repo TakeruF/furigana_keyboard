@@ -2,7 +2,7 @@ package com.example.furiganakeyboard.reading
 
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
-import com.example.furiganakeyboard.data.AssetInstaller
+import com.example.furiganakeyboard.data.ReadingDataStore
 import java.io.File
 
 data class WordReadingCandidate(val surface: String, val readings: List<String>)
@@ -29,7 +29,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
     private val database: SQLiteDatabase
 
     init {
-        val dbFile = AssetInstaller.ensure(
+        val dbFile = ReadingDataStore.activeOrBundled(
             context.applicationContext,
             DB_ASSET,
             DB_FILE,
@@ -283,15 +283,16 @@ class ReadingRepository(context: Context) : ReadingDataSource {
 
     companion object {
         private const val DB_ASSET = "reading.db"
-        private const val DB_FILE = "reading-v6.db"
+        private const val DB_FILE = "reading-v7.db"
         private const val DB_SHA256 =
-            "988291009fc548c57bb83f48843725418867063ca1b44bbc4bf485853b5f64cf"
+            "f9c414a3dbeb14199351af82f1b777b5c7751f471737f084cd922e5b18f67571"
         private val LEGACY_DB_FILES = listOf(
             "reading-v1.db", "reading-v1.db.sha256",
             "reading-v2.db", "reading-v2.db.sha256",
             "reading-v3.db", "reading-v3.db.sha256",
             "reading-v4.db", "reading-v4.db.sha256",
-            "reading-v5.db", "reading-v5.db.sha256"
+            "reading-v5.db", "reading-v5.db.sha256",
+            "reading-v6.db", "reading-v6.db.sha256"
         )
         private const val COMPOSED_PER_SPLIT_LIMIT = 4
         private val COMPOSABLE_KANA_SUFFIXES = setOf(

@@ -44,4 +44,38 @@ class ReadingRepositoryBatchTest {
             assertEquals(listOf("きょうは"), candidates.first().readings)
         }
     }
+
+    @Test
+    fun suruNounDesiderativeCanBeConverted() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val candidates = repository.suggestByReading("かくにんしたい", 8)
+
+            assertEquals("確認したい", candidates.first().surface)
+            assertEquals(listOf("かくにんしたい"), candidates.first().readings)
+        }
+    }
+
+    @Test
+    fun easeAuxiliaryOffersKanaAndKanjiSpellings() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val candidates = repository.suggestByReading("うちやすい", 8)
+
+            assertEquals("打ちやすい", candidates.first().surface)
+            assertTrue(candidates.any { it.surface == "打ち易い" })
+            assertTrue(candidates.take(2).all { it.readings == listOf("うちやすい") })
+        }
+    }
+
+    @Test
+    fun placeNameCanBeConvertedAsAWord() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            assertEquals(listOf("いけぶくろ"), repository.readingsFor("池袋"))
+            assertTrue(repository.suggestByReading("いけぶくろ", 8).any {
+                it.surface == "池袋"
+            })
+
+            val shinjuku = repository.suggestByReading("しんじゅく", 8)
+            assertEquals("新宿", shinjuku.first().surface)
+        }
+    }
 }

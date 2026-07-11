@@ -1,6 +1,7 @@
 package com.example.furiganakeyboard
 
 import com.example.furiganakeyboard.ime.CandidatePipeline
+import com.example.furiganakeyboard.ime.HandwritingStageContext
 import com.example.furiganakeyboard.ime.HandwritingPipelineResult
 import com.example.furiganakeyboard.reading.KanjiUsagePriority
 import com.example.furiganakeyboard.reading.ReadingDataSource
@@ -70,6 +71,36 @@ class CandidatePipelineTest {
 
         assertEquals(1, source.readingBatchCalls.get())
         assertEquals(1, source.priorityBatchCalls.get())
+        pipeline.close()
+    }
+
+    @Test
+    fun knownWordAndCharacterProduceACompoundCandidate() {
+        val source = FakeSource().apply {
+            readings = mapOf(
+                "国際" to listOf("こくさい"),
+                "版" to listOf("ハン")
+            )
+        }
+        val pipeline = pipeline(source)
+        val delivered = CountDownLatch(1)
+
+        pipeline.submitHandwriting(
+            candidates = listOf(RecognitionCandidate("版", 10f)),
+            stageContext = HandwritingStageContext(
+                baseBeforeCurrent = "国際",
+                wordRootBeforeLast = "国",
+                previousAlternatives = listOf("際")
+            ),
+            limit = 8
+        ) { result ->
+            val candidates = (result as HandwritingPipelineResult.Staged).candidates
+            assertEquals("国際版", candidates.first().surface)
+            assertEquals(listOf("こくさいはん"), candidates.first().readings)
+            delivered.countDown()
+        }
+
+        assertTrue(delivered.await(2, TimeUnit.SECONDS))
         pipeline.close()
     }
 

@@ -38,4 +38,19 @@ class WordCandidateResolverTest {
         )
         assertEquals(listOf("今日"), result.map { it.surface })
     }
+
+    @Test
+    fun combinesReadingsForAWordFollowedByACharacter() {
+        val readings = WordCandidateResolver.composedReadings(
+            root = "国",
+            previousCharacters = listOf("際"),
+            currentCharacters = listOf("版"),
+            readings = mapOf(
+                "国際" to listOf("こくさい"),
+                "版" to listOf("ハン", "バン")
+            )
+        )
+
+        assertEquals(listOf("こくさいはん", "こくさいばん"), readings["国際版"])
+    }
 }

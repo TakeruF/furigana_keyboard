@@ -93,16 +93,28 @@ class CandidatePipeline(
                 )
             } else {
                 val currentAlternatives = ranked.map { it.text }.distinct()
+                val root = if (stageContext.previousAlternatives.isEmpty()) {
+                    stageContext.baseBeforeCurrent
+                } else {
+                    stageContext.wordRootBeforeLast
+                }
                 val surfaces = WordCandidateResolver.combine(
-                    root = if (stageContext.previousAlternatives.isEmpty()) {
-                        stageContext.baseBeforeCurrent
-                    } else {
-                        stageContext.wordRootBeforeLast
-                    },
+                    root = root,
                     previousCharacters = stageContext.previousAlternatives,
                     currentCharacters = currentAlternatives
                 )
-                val exact = readings(surfaces)
+                val previous = stageContext.previousAlternatives.ifEmpty { listOf("") }
+                val componentSurfaces = previous.map { root + it } + currentAlternatives
+                val loadedReadings = readings(surfaces + componentSurfaces)
+                val composed = WordCandidateResolver.composedReadings(
+                    root,
+                    stageContext.previousAlternatives,
+                    currentAlternatives,
+                    loadedReadings
+                )
+                val exact = surfaces.associateWith { surface ->
+                    loadedReadings[surface].orEmpty().ifEmpty { composed[surface].orEmpty() }
+                }
                 val completions = surfaceSuggestions(surfaces, limit)
                 HandwritingPipelineResult.Staged(
                     topSurface = stageContext.baseBeforeCurrent + currentAlternatives.first(),

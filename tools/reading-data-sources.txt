@@ -1,4 +1,4 @@
-Reading data snapshot generated 2026-07-10
+Reading data snapshot generated 2026-07-11
 
 KANJIDIC2
 URL: https://www.edrdg.org/kanjidic/kanjidic2.xml.gz
@@ -7,6 +7,10 @@ SHA-256: 9786f2c2c7df568da5042e4c9bbb3f23667895ddb5c64d82d585d8a1616b85b0
 JMdict (English subset; Japanese surfaces/readings are complete)
 URL: https://www.edrdg.org/pub/Nihongo/JMdict_e.gz
 SHA-256: 99ecf0435b523c99114dc9680bc940738eb8d131691b2f794e67b8a0d5ed32b3
+
+JMnedict (place and railway-station names only)
+URL: https://www.edrdg.org/pub/Nihongo/JMnedict.xml.gz
+SHA-256: c94534ed3f9523f818bf4b9389602769024184c6e0509b14f6ab55d505cf95ff
 
 Tegaki Zinnia Japanese 0.3 model archive
 URL: https://cdn.netbsd.org/pub/pkgsrc/distfiles/tegaki-zinnia-japanese-0.3.zip
@@ -21,6 +25,7 @@ Run:
 python3 tools/build_reading_db.py \
   --kanjidic kanjidic2.xml.gz \
   --jmdict JMdict_e.gz \
+  --jmnedict JMnedict.xml.gz \
   --model-archive tegaki-zinnia-japanese-0.3.zip \
   --output app/src/main/assets/reading.db
 

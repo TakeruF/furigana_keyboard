@@ -12,13 +12,23 @@ class ReadingDatabaseTest {
     @Test
     fun databaseMeetsCoverageContract() {
         connect().use { db ->
-            assertEquals("6", metadata(db, "schema_version"))
+            assertEquals("7", metadata(db, "schema_version"))
             assertEquals("13108", metadata(db, "kanji_characters"))
             assertTrue(metadata(db, "kanji_priorities").toInt() >= 3_000)
             assertEquals("6356", metadata(db, "model_han_labels"))
             assertEquals("0", metadata(db, "model_missing_readings"))
             assertTrue(metadata(db, "word_pairs").toInt() >= 240_000)
             assertTrue(metadata(db, "inflected_pairs").toInt() >= 15_000)
+            assertTrue(metadata(db, "geographic_name_pairs").toInt() >= 90_000)
+        }
+    }
+
+    @Test
+    fun jmnedictProvidesPlaceNameReadings() {
+        connect().use { db ->
+            assertEquals(listOf("いけぶくろ"), readings(db, "池袋", "word_reading"))
+            assertTrue(readings(db, "池袋駅", "word_reading").contains("いけぶくろえき"))
+            assertTrue(readings(db, "新宿", "word_reading").contains("しんじゅく"))
         }
     }
 
@@ -120,7 +130,10 @@ class ReadingDatabaseTest {
                 "高くない" to "たかくない",
                 "来て" to "きて",
                 "使え" to "つかえ",
-                "使えて" to "つかえて"
+                "使えて" to "つかえて",
+                "確認したい" to "かくにんしたい",
+                "打ちやすい" to "うちやすい",
+                "打ち易い" to "うちやすい"
             )
             expected.forEach { (surface, reading) ->
                 db.prepareStatement(

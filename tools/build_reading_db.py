@@ -18,7 +18,13 @@ import zipfile
 from pathlib import Path
 
 
-SCHEMA_VERSION = "6"
+SCHEMA_VERSION = "7"
+
+# JMnedict contains many kinds of proper names. Keep this import focused on
+# geographic names so person and organization names do not crowd normal IME
+# conversion candidates.
+GEOGRAPHIC_NAME_TYPES = {"place name", "railway station"}
+GEOGRAPHIC_NAME_PRIORITY = 75
 
 # These JMdict reading annotations are useful for historical reference and
 # search, but should not be presented as normal modern input candidates.
@@ -55,6 +61,7 @@ GODAN_ENDINGS = {
 
 IKU_POS = "Godan verb - Iku/Yuku special class"
 SURU_POS = {"suru verb - included", "suru verb - special class"}
+SURU_NOUN_POS = "noun or participle which takes the aux. verb suru"
 KURU_POS = "Kuru verb - special class"
 I_ADJECTIVE_POS = {
     "adjective (keiyoushi)",
@@ -79,15 +86,33 @@ def inflected_forms(
             for suffix, rank in suffixes
         )
 
+    def append_ease_forms(
+        stem_surface: str,
+        stem_reading: str,
+        surface_connector: str,
+        reading_connector: str,
+        first_rank: int,
+    ) -> None:
+        reading_value = stem_reading + reading_connector + "やすい"
+        forms.extend(
+            [
+                (stem_surface + surface_connector + "やすい", reading_value, first_rank),
+                (stem_surface + surface_connector + "易い", reading_value, first_rank + 1),
+            ]
+        )
+
     if pos_tags & ICHIDAN_POS and surface.endswith("る") and reading.endswith("る"):
+        surface_stem = surface[:-1]
+        reading_stem = reading[:-1]
         append(
-            surface[:-1],
-            reading[:-1],
+            surface_stem,
+            reading_stem,
             [
                 ("て", 1), ("た", 2), ("ない", 3), ("なかった", 4),
                 ("ます", 5), ("ました", 6), ("れば", 7),
             ],
         )
+        append_ease_forms(surface_stem, reading_stem, "", "", 8)
 
     godan = next((value for key, value in GODAN_ENDINGS.items() if key in pos_tags), None)
     if IKU_POS in pos_tags:
@@ -122,18 +147,32 @@ def inflected_forms(
                 (surface_stem + suffix, reading_stem + suffix, rank)
                 for suffix, rank in suffixes
             )
+            append_ease_forms(
+                surface_stem,
+                reading_stem,
+                polite,
+                polite,
+                16,
+            )
 
-    if pos_tags & SURU_POS and surface.endswith("する") and reading.endswith("する"):
-        surface_stem = surface[:-2]
-        reading_stem = reading[:-2]
+    has_suru_stem = (
+        bool(pos_tags & SURU_POS)
+        and surface.endswith("する")
+        and reading.endswith("する")
+    )
+    if has_suru_stem or SURU_NOUN_POS in pos_tags:
+        surface_stem = surface[:-2] if has_suru_stem else surface
+        reading_stem = reading[:-2] if has_suru_stem else reading
         suffixes = [
             ("して", 1), ("した", 2), ("しない", 3), ("しなかった", 4),
             ("します", 5), ("しました", 6), ("すれば", 7),
+            ("したい", 8),
         ]
         forms.extend(
             (surface_stem + suffix, reading_stem + suffix, rank)
             for suffix, rank in suffixes
         )
+        append_ease_forms(surface_stem, reading_stem, "し", "し", 9)
 
     if KURU_POS in pos_tags and reading.endswith("くる"):
         if surface.endswith("くる"):
@@ -153,6 +192,10 @@ def inflected_forms(
                 zip(surface_suffixes, reading_suffixes), start=1
             )
         )
+        if surface.endswith("くる"):
+            append_ease_forms(surface_stem, reading_stem, "き", "き", 8)
+        elif surface.endswith("来る"):
+            append_ease_forms(surface_stem, reading_stem, "", "き", 8)
 
     if pos_tags & I_ADJECTIVE_POS and surface.endswith("い") and reading.endswith("い"):
         surface_stem = surface[:-1]
@@ -401,6 +444,65 @@ def import_jmdict(db: sqlite3.Connection, source: Path) -> tuple[int, int, int]:
     return entries, base_pairs, inflected_pairs
 
 
+def import_jmnedict_places(db: sqlite3.Connection, source: Path) -> tuple[int, int]:
+    """Import place and railway-station surface/reading pairs from JMnedict."""
+    entries = 0
+    batch: list[tuple[str, str, int, int, int, int]] = []
+
+    def flush() -> None:
+        db.executemany(
+            """INSERT INTO word_reading(
+                   surface, reading, priority, reading_priority,
+                   reading_position, form_rank
+               ) VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(surface, reading) DO UPDATE SET
+                 priority = min(priority, excluded.priority),
+                 reading_priority = min(reading_priority, excluded.reading_priority),
+                 reading_position = min(reading_position, excluded.reading_position),
+                 form_rank = min(form_rank, excluded.form_rank)""",
+            batch,
+        )
+        batch.clear()
+
+    with gzip.open(source, "rb") as stream:
+        for event, elem in ET.iterparse(stream, events=("end",)):
+            if elem.tag != "entry":
+                continue
+            name_types = {
+                node.text for node in elem.findall("./trans/name_type") if node.text
+            }
+            if not name_types & GEOGRAPHIC_NAME_TYPES:
+                elem.clear()
+                continue
+            entries += 1
+            surfaces = [node.text for node in elem.findall("./k_ele/keb") if node.text]
+            for reading_position, r_ele in enumerate(elem.findall("r_ele")):
+                reading = r_ele.findtext("reb")
+                if not reading:
+                    continue
+                restrictions = {
+                    node.text for node in r_ele.findall("re_restr") if node.text
+                }
+                for surface in surfaces:
+                    if restrictions and surface not in restrictions:
+                        continue
+                    batch.append(
+                        (surface, reading, GEOGRAPHIC_NAME_PRIORITY,
+                         GEOGRAPHIC_NAME_PRIORITY, reading_position, 0)
+                    )
+            elem.clear()
+            if len(batch) >= 40_000:
+                flush()
+    if batch:
+        flush()
+    place_pairs = db.execute(
+        """SELECT count(*) FROM word_reading
+           WHERE priority=? AND reading_priority=? AND form_rank=0""",
+        (GEOGRAPHIC_NAME_PRIORITY, GEOGRAPHIC_NAME_PRIORITY),
+    ).fetchone()[0]
+    return entries, place_pairs
+
+
 def model_labels(model_archive: Path) -> set[str]:
     with zipfile.ZipFile(model_archive) as archive:
         xml_name = next(name for name in archive.namelist() if name.endswith("handwriting-ja.xml"))
@@ -429,6 +531,7 @@ def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--kanjidic", required=True, type=Path)
     parser.add_argument("--jmdict", required=True, type=Path)
+    parser.add_argument("--jmnedict", required=True, type=Path)
     parser.add_argument("--model-archive", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     args = parser.parse_args()
@@ -442,6 +545,7 @@ def main() -> int:
             db, args.kanjidic
         )
         entries, word_pairs, inflected_pairs = import_jmdict(db, args.jmdict)
+        place_entries, place_pairs = import_jmnedict_places(db, args.jmnedict)
         labels = model_labels(args.model_archive)
         han_labels, missing = validate(db, labels)
         metadata = {
@@ -449,11 +553,14 @@ def main() -> int:
             "kanjidic_date": kanjidic_date,
             "kanjidic_sha256": sha256(args.kanjidic),
             "jmdict_sha256": sha256(args.jmdict),
+            "jmnedict_sha256": sha256(args.jmnedict),
             "model_archive_sha256": sha256(args.model_archive),
             "kanji_characters": str(chars),
             "kanji_readings": str(kanji_readings),
             "kanji_priorities": str(kanji_priorities),
             "jmdict_entries": str(entries),
+            "jmnedict_place_entries": str(place_entries),
+            "geographic_name_pairs": str(place_pairs),
             "word_pairs": str(word_pairs),
             "inflected_pairs": str(inflected_pairs),
             "model_labels": str(len(labels)),
