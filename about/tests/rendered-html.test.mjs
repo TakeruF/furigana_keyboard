@@ -64,10 +64,10 @@ for (const languagePreference of [
 }
 
 for (const expectation of [
-  { path: "/ja", lang: "ja", title: "書く。読める。", pending: "準備中", beta: "ベータ版" },
-  { path: "/zh", lang: "zh-CN", title: "书写。读懂。", pending: "准备中", beta: "测试版" },
-  { path: "/en", lang: "en", title: "Write. Read.", pending: "Coming soon", beta: "Beta" },
-  { path: "/ko", lang: "ko", title: "쓰고. 읽고.", pending: "준비 중", beta: "베타 버전" },
+  { path: "/ja", lang: "ja", title: "書く。読める。", pending: "準備中" },
+  { path: "/zh", lang: "zh-CN", title: "书写。读懂。", pending: "准备中" },
+  { path: "/en", lang: "en", title: "Write. Read.", pending: "Coming soon" },
+  { path: "/ko", lang: "ko", title: "쓰고. 읽고.", pending: "준비 중" },
 ]) {
   test(`server-renders localized content for ${expectation.path}`, async () => {
     const response = await fetch(`${baseUrl}${expectation.path}`);
@@ -77,8 +77,7 @@ for (const expectation of [
     assert.match(html, new RegExp(`<html lang="${expectation.lang}">`));
     assert.match(html, new RegExp(expectation.title.replaceAll(".", "\\.")));
     assert.match(html, new RegExp(expectation.pending));
-    assert.match(html, new RegExp(expectation.beta));
-    assert.match(html, /v1\.0\.0-beta\.2/);
+    assert.match(html, /Furigana Keyboard Beta/);
     assert.match(html, /href="\/ja"/);
     assert.match(html, /href="\/zh"/);
     assert.match(html, /href="\/en"/);
@@ -91,9 +90,10 @@ for (const expectation of [
     assert.match(html, /class="site-header"/);
     assert.match(html, /class="hero-download primary"/);
     assert.match(html, /class="site-footer"/);
-    assert.match(html, /google-play-glyph/);
+    assert.match(html, /android-glyph/);
+    assert.doesNotMatch(html, /google-play-glyph/);
     assert.match(html, /apple-glyph/);
-    assert.match(html, /https:\/\/downloads\.hanlu\.app\/furigana-keyboard\/v1\.0\.0-beta\.2\.apk/);
+    assert.match(html, /https:\/\/downloads\.hanlu\.app\/furigana-keyboard\/v1\.0\.0-beta\.3\.apk/);
     assert.doesNotMatch(html, /Zinnia|Tegaki|KANJIDIC2|JMdict/);
     if (expectation.path === "/ja") {
       assert.match(html, />ダウンロード</);
