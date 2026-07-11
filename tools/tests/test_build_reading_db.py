@@ -60,6 +60,7 @@ class BuildReadingDatabaseTest(unittest.TestCase):
 
     def build_conversion(self):
         db = sqlite3.connect(":memory:")
+        self.addCleanup(db.close)
         builder.create_schema(db)
         builder.import_jmdict_conversion(db, self.source)
         return db
@@ -122,6 +123,20 @@ class BuildReadingDatabaseTest(unittest.TestCase):
             )
             snapshots.append("\n".join(db.iterdump()))
         self.assertEqual(snapshots[0], snapshots[1])
+
+    def test_android_normalization_keeps_a_valid_database(self):
+        path = Path(self.temp_dir.name) / "normalized.db"
+        db = sqlite3.connect(path)
+        db.execute("CREATE TABLE sample(value TEXT PRIMARY KEY) WITHOUT ROWID")
+        db.execute("INSERT INTO sample VALUES ('ok')")
+        db.commit()
+        db.close()
+
+        builder.normalize_for_android(path)
+
+        with sqlite3.connect(path) as normalized:
+            self.assertEqual("ok", normalized.execute("PRAGMA integrity_check").fetchone()[0])
+            self.assertEqual("ok", normalized.execute("SELECT value FROM sample").fetchone()[0])
 
 
 if __name__ == "__main__":

@@ -461,7 +461,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         private const val DB_ASSET = "reading.db"
         private const val DB_FILE = "reading-v8.db"
         private const val DB_SHA256 =
-            "49c12cddd336ea4738771bed39f6249ed29aa85c0a581e48065ad1ded9882222"
+            "991a13b8552748ea2c35fb229446809869a0ceee14ba0107a65351c8527efbc2"
         private val LEGACY_DB_FILES = listOf(
             "reading-v1.db", "reading-v1.db.sha256",
             "reading-v2.db", "reading-v2.db.sha256",

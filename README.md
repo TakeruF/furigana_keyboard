@@ -26,6 +26,9 @@ Bundled recognition remains available on both platforms without a network.
   two characters can be written on the same pad; side-by-side ink is segmented,
   recognized from left to right, and matched against the on-device dictionaries
   automatically.
+- Offline kana-kanji sentence conversion for completed romaji input. The
+  converter ranks up to eight candidates locally and keeps hiragana and
+  katakana fallbacks available without sending the composition off device.
 - Kana, romaji, or hidden reading display.
 - Japanese, Simplified Chinese, Korean, and English UI.
 - Two-column card settings hub with focused pages for display, handwriting,
@@ -116,7 +119,8 @@ npm run dev
 ## Regenerating reading data
 
 Download the four pinned inputs listed in `tools/reading-data-sources.txt`,
-then run:
+install the SQLite 3.50 command-line tool used to finalize the Android-compatible
+file format, then run:
 
 ```bash
 python3 tools/build_reading_db.py \
@@ -129,6 +133,24 @@ python3 tools/build_reading_db.py \
 
 Generation fails if source coverage falls below the expected thresholds or if
 any Han label in the bundled recognition model lacks a Japanese reading.
+
+### Kana-kanji conversion design
+
+Schema 8 adds `conversion_lexeme`, the fixed 0–15 `conversion_pos` IDs, and a
+16×16 `connection_cost` matrix. Input code-point boundaries form lattice
+vertices; dictionary lexemes and one-code-point kana-copy alternatives form
+edges. A deterministic N-best dynamic program ranks paths by word and POS
+connection cost with beam width 12. Inputs are limited to 48 code points,
+dictionary edges to 16 code points, stored vocabulary to 12 entries per
+reading, and output to eight unique surfaces. Longer input bypasses dictionary
+conversion and retains the existing hiragana/katakana candidates.
+
+`conversion_lexeme` is a `WITHOUT ROWID` table whose composite primary key
+starts with `reading`, so SQLite uses the table's primary-key B-tree as the
+reading index without a second, size-heavy copy. The generated database must
+remain below 128 MiB. Conversion runs on the candidate worker, is cancelled by
+newer input generations, and caches only dictionary results in memory; input
+text is not logged, analyzed, or persisted.
 
 ## Publishing reading-data updates
 
@@ -171,6 +193,25 @@ Upload all three files from `reading-update-dist/`:
 The clients reject unsigned manifests, non-HTTPS database URLs, incompatible
 schemas, oversized files, hash mismatches, and corrupt SQLite databases. A
 failed update leaves the active or bundled database untouched.
+
+### Schema 8 rollout and rollback
+
+Release in this order:
+
+1. Publish Android and iOS app versions that bundle schema 8 and understand
+   schema 8 manifests. Both remain fully usable offline from the bundled DB.
+2. Confirm the compatible app versions have reached the required adoption
+   threshold while the public manifest still points to schema 7.
+3. Upload the schema 8 database and signature, then publish the schema 8
+   manifest last. Older apps reject it instead of opening an incompatible DB.
+
+Before step 3, retain the last signed schema 7 database, manifest, and detached
+signature. To roll back, republish those exact v7 artifacts atomically (database
+and signature first, manifest last), then verify the public manifest and a
+schema-7 client. Compatible apps safely ignore an active v7 download after the
+upgrade and fall back to their bundled v8 database; do not delete the bundled
+v8 asset. Actual upload requires the offline signing key and distribution
+permissions and is intentionally separate from completing this code change.
 
 Keep the private signing key outside the repository and never paste it into
 terminal output, manifests, issue reports, or commits. Review the generated

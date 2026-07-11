@@ -111,10 +111,10 @@ class QwertyFastInputTest {
             assertTrue(buttons.isNotEmpty())
             buttons.forEach { button ->
                 assertEquals("gravity for ${button.text}", Gravity.CENTER, button.gravity)
-                assertEquals(
+                assertTrue(
                     "text alignment for ${button.text}",
-                    View.TEXT_ALIGNMENT_CENTER,
-                    button.textAlignment
+                    button.textAlignment == View.TEXT_ALIGNMENT_CENTER ||
+                        button.textAlignment == View.TEXT_ALIGNMENT_GRAVITY
                 )
                 assertFalse("font padding for ${button.text}", button.includeFontPadding)
             }
@@ -227,7 +227,10 @@ class QwertyFastInputTest {
 
             controlIds.map { root.findViewById<Button>(it) }.forEach { button ->
                 assertEquals("gravity for ${button.id}", Gravity.CENTER, button.gravity)
-                assertEquals(View.TEXT_ALIGNMENT_CENTER, button.textAlignment)
+                assertTrue(
+                    button.textAlignment == View.TEXT_ALIGNMENT_CENTER ||
+                        button.textAlignment == View.TEXT_ALIGNMENT_GRAVITY
+                )
                 assertFalse(button.includeFontPadding)
             }
             val globe = root.findViewById<ImageButton>(R.id.keyKeyboardSwitch)

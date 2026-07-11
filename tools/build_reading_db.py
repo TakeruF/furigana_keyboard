@@ -11,7 +11,9 @@ from __future__ import annotations
 import argparse
 import gzip
 import hashlib
+import shutil
 import sqlite3
+import subprocess
 import sys
 import xml.etree.ElementTree as ET
 import zipfile
@@ -856,6 +858,31 @@ def validate(db: sqlite3.Connection, labels: set[str]) -> tuple[int, list[str]]:
     return len(han_labels), missing
 
 
+def normalize_for_android(path: Path) -> None:
+    """Rewrite the release DB with the Android-validated SQLite 3.50 format."""
+    sqlite_cli = shutil.which("sqlite3")
+    if sqlite_cli is None:
+        raise RuntimeError("sqlite3 3.50.x is required to finalize reading.db")
+    version = subprocess.run(
+        [sqlite_cli, "--version"],
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.split()[0]
+    if tuple(map(int, version.split(".")[:2])) != (3, 50):
+        raise RuntimeError(
+            f"sqlite3 3.50.x is required for Android compatibility; found {version}"
+        )
+    result = subprocess.run(
+        [sqlite_cli, str(path), "VACUUM; PRAGMA integrity_check;"],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    if result.stdout.strip() != "ok":
+        raise RuntimeError("final reading.db integrity check failed")
+
+
 def main() -> int:
     parser = argparse.ArgumentParser()
     parser.add_argument("--kanjidic", required=True, type=Path)
@@ -867,7 +894,7 @@ def main() -> int:
 
     args.output.parent.mkdir(parents=True, exist_ok=True)
     args.output.unlink(missing_ok=True)
-    db = sqlite3.connect(args.output)
+    db: sqlite3.Connection | None = sqlite3.connect(args.output)
     try:
         create_schema(db)
         chars, kanji_readings, kanji_priorities, kanjidic_date = import_kanjidic(
@@ -903,6 +930,9 @@ def main() -> int:
         db.executemany("INSERT INTO metadata VALUES (?, ?)", sorted(metadata.items()))
         db.commit()
         db.execute("VACUUM")
+        db.close()
+        db = None
+        normalize_for_android(args.output)
         print("\n".join(f"{key}={value}" for key, value in sorted(metadata.items())))
         if missing:
             print("Missing model readings: " + " ".join(missing), file=sys.stderr)
@@ -912,7 +942,8 @@ def main() -> int:
             return 3
         return 0
     finally:
-        db.close()
+        if db is not None:
+            db.close()
 
 
 if __name__ == "__main__":
