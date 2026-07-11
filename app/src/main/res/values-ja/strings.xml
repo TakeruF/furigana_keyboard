@@ -51,4 +51,7 @@
     <string name="update_is_current">現在のバージョンは最新です。</string>
     <string name="update_check_failed">アップデートを確認できませんでした。Google Playからインストールしたアプリでお試しください。</string>
     <string name="update_cancelled">アップデートをキャンセルしました</string>
+    <string name="key_segment">文節</string>
+    <string name="segment_shrink">短く</string>
+    <string name="segment_expand">長く</string>
 </resources>

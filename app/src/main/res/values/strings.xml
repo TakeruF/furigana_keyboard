@@ -204,4 +204,7 @@
     <string name="update_is_current">You already have the latest version.</string>
     <string name="update_check_failed">Could not check for updates. Make sure this app was installed from Google Play.</string>
     <string name="update_cancelled">Update cancelled</string>
+    <string name="key_segment">Segments</string>
+    <string name="segment_shrink">Shorter</string>
+    <string name="segment_expand">Longer</string>
 </resources>

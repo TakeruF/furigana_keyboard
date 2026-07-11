@@ -39,4 +39,7 @@
     <string name="update_is_current">当前已是最新版本。</string>
     <string name="update_check_failed">无法检查更新。请确认此应用是从 Google Play 安装的。</string>
     <string name="update_cancelled">已取消更新</string>
+    <string name="key_segment">分段</string>
+    <string name="segment_shrink">缩短</string>
+    <string name="segment_expand">扩展</string>
 </resources>

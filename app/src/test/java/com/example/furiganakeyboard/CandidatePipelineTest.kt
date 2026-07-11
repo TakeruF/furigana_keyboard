@@ -57,6 +57,25 @@ class CandidatePipelineTest {
     }
 
     @Test
+    fun romajiAnalysisPreservesTopConversionSegmentsForBunsetsuSelection() {
+        val source = FakeSource().apply {
+            conversionLexemeLoader = { requiredPhraseLexemes() }
+            connections = requiredPhraseConnections()
+        }
+        val pipeline = pipeline(source)
+        val delivered = CountDownLatch(1)
+
+        pipeline.submitRomajiAnalysis("これもほんだ", 6) { result ->
+            assertEquals("これも本だ", result.candidates.first().surface)
+            assertEquals(listOf("これ", "も", "ほん", "だ"), result.segments.map { it.reading })
+            delivered.countDown()
+        }
+
+        assertTrue(delivered.await(2, TimeUnit.SECONDS))
+        pipeline.close()
+    }
+
+    @Test
     fun invalidationAfterDeleteSuppressesInFlightRomajiResult() {
         val started = CountDownLatch(1)
         val release = CountDownLatch(1)

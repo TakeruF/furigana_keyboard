@@ -4,6 +4,7 @@ import android.os.Handler
 import android.os.Looper
 import android.util.Log
 import com.example.furiganakeyboard.conversion.KanaKanjiConverter
+import com.example.furiganakeyboard.conversion.ConversionSegment
 import com.example.furiganakeyboard.reading.KanjiUsagePriority
 import com.example.furiganakeyboard.reading.ReadingDataSource
 import com.example.furiganakeyboard.reading.WordReadingCandidate
@@ -24,6 +25,11 @@ data class HandwritingStageContext(
     val baseBeforeCurrent: String,
     val wordRootBeforeLast: String,
     val previousAlternatives: List<String>
+)
+
+data class RomajiConversionResult(
+    val candidates: List<WordReadingCandidate>,
+    val segments: List<ConversionSegment>,
 )
 
 sealed interface HandwritingPipelineResult {
@@ -62,7 +68,7 @@ class CandidatePipeline(
     private val suggestionCache =
         LruMap<SuggestionKey, List<WordReadingCandidate>>(SUGGESTION_CACHE_SIZE)
     private val conversionCache =
-        LruMap<String, List<WordReadingCandidate>>(CONVERSION_CACHE_SIZE)
+        LruMap<String, RomajiConversionResult>(CONVERSION_CACHE_SIZE)
     private val priorityCache =
         LruMap<String, KanjiUsagePriority?>(PRIORITY_CACHE_SIZE)
 
@@ -78,7 +84,19 @@ class CandidatePipeline(
 
     fun submitRomaji(kana: String, limit: Int, callback: (List<WordReadingCandidate>) -> Unit) {
         submit(callback, failureValue = { emptyList() }) { isCancelled ->
-            conversionSuggestions(kana, isCancelled).take(limit.coerceAtLeast(0))
+            conversionResult(kana, isCancelled).candidates.take(limit.coerceAtLeast(0))
+        }
+    }
+
+    fun submitRomajiAnalysis(
+        kana: String,
+        limit: Int,
+        callback: (RomajiConversionResult) -> Unit,
+    ) {
+        submit(callback, failureValue = { RomajiConversionResult(emptyList(), emptyList()) }) {
+            isCancelled ->
+            val result = conversionResult(kana, isCancelled)
+            result.copy(candidates = result.candidates.take(limit.coerceAtLeast(0)))
         }
     }
 
@@ -200,15 +218,15 @@ class CandidatePipeline(
         return loaded
     }
 
-    private fun conversionSuggestions(
+    private fun conversionResult(
         kana: String,
         isCancelled: () -> Boolean
-    ): List<WordReadingCandidate> {
+    ): RomajiConversionResult {
         if (!isCompletedKana(kana) ||
             kana.codePointCount(0, kana.length) > MAX_CONVERSION_INPUT_CODE_POINTS ||
             isCancelled()
         ) {
-            return emptyList()
+            return RomajiConversionResult(emptyList(), emptyList())
         }
         conversionCache[kana]?.let { return it }
         val dataSource = dataSource()
@@ -217,27 +235,30 @@ class CandidatePipeline(
             MAX_CONVERSION_TOKEN_CODE_POINTS,
             MAX_CONVERSION_VOCABULARY_PER_READING
         )
-        if (isCancelled()) return emptyList()
-        val converted = KanaKanjiConverter.convert(
+        if (isCancelled()) return RomajiConversionResult(emptyList(), emptyList())
+        val conversionResults = KanaKanjiConverter.convert(
             reading = kana,
             lexemes = lexemes,
             connections = dataSource.conversionConnections(),
             limit = MAX_CONVERSION_RESULTS,
             isCancelled = isCancelled
-        ).map { result ->
+        )
+        val converted = conversionResults.map { result ->
             WordReadingCandidate(result.surface, listOf(result.reading))
         }
-        if (isCancelled()) return emptyList()
+        if (isCancelled()) return RomajiConversionResult(emptyList(), emptyList())
         val prefixMatches = suggestions(
             SuggestionKind.READING,
             kana,
             MAX_CONVERSION_RESULTS
         )
-        if (isCancelled()) return emptyList()
-        return (converted + prefixMatches)
-            .distinctBy { it.surface }
-            .take(MAX_CONVERSION_RESULTS)
-            .also { conversionCache[kana] = it }
+        if (isCancelled()) return RomajiConversionResult(emptyList(), emptyList())
+        return RomajiConversionResult(
+            candidates = (converted + prefixMatches)
+                .distinctBy { it.surface }
+                .take(MAX_CONVERSION_RESULTS),
+            segments = conversionResults.firstOrNull()?.segments.orEmpty(),
+        ).also { conversionCache[kana] = it }
     }
 
     private fun isCompletedKana(value: String): Boolean {
