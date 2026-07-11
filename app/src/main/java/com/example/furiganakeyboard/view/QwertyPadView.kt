@@ -124,8 +124,15 @@ class QwertyPadView(
             KeyFactory.rowParams(context, 1f)
         )
         row.addView(
-            KeyFactory.key(context, context.getString(R.string.key_space), Kind.FUNCTION, 13f) {
+            KeyFactory.key(
+                context,
+                if (includeJapaneseLongVowelKey) context.getString(R.string.key_space) else "",
+                Kind.FUNCTION,
+                13f
+            ) {
                 onText?.invoke(" ")
+            }.apply {
+                contentDescription = context.getString(R.string.key_space)
             },
             KeyFactory.rowParams(context, 3.5f)
         )

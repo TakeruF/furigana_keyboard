@@ -205,6 +205,9 @@ class FuriganaImeService : InputMethodService() {
     private fun showPanel(panel: Panel) {
         ensurePanel(panel)
         currentPanel = panel
+        // English input commits characters directly, so it has no conversion
+        // candidates to show. Removing the bar also gives the ABC keys more room.
+        candidateBar.visibility = if (panel == Panel.ENGLISH) View.GONE else View.VISIBLE
         handwritingPanel.visibility = if (panel == Panel.HANDWRITING) View.VISIBLE else View.GONE
         symbolPad?.visibility = if (panel == Panel.SYMBOLS) View.VISIBLE else View.GONE
         englishPad?.visibility = if (panel == Panel.ENGLISH) View.VISIBLE else View.GONE
