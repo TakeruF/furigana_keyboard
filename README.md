@@ -1,10 +1,11 @@
 # Furigana Handwriting Keyboard
 
 A Japanese handwriting keyboard that recognizes characters and displays
-furigana. The production Android IME includes the full candidate pipeline and
-optional Furigana Plus recognition; an iOS MVP provides a container app and custom
-keyboard extension with offline single-character recognition and readings.
-Bundled recognition remains available on both platforms without a network.
+furigana. Android and iOS both provide the full offline input flow: continuous
+handwriting, side-by-side recognition, word candidates, Japanese and English
+QWERTY panels, symbols, and romaji kana-kanji conversion. Android additionally
+offers optional Furigana Plus recognition through Google ML Kit. Bundled
+recognition remains available on both platforms without a network.
 
 ## Features
 
@@ -31,7 +32,7 @@ Bundled recognition remains available on both platforms without a network.
   katakana fallbacks available without sending the composition off device.
 - Kana, romaji, or hidden reading display.
 - Japanese, Simplified Chinese, Korean, and English UI.
-- Two-column card settings hub with focused pages for display, handwriting,
+- Settings for display, handwriting, haptics, language, system keyboard setup,
   haptics, language, system keyboard setup, privacy, terms, help, and licenses.
 - Light/dark palettes, continuous handwriting, symbols, QWERTY, adaptive enter
   actions, haptics, and hold-to-delete.
@@ -83,7 +84,7 @@ the download site.
 The native library is built for `arm64-v8a`, `armeabi-v7a`, and `x86_64`, with
 16 KB ELF page alignment. The current universal debug APK is about 33 MB.
 
-### iOS MVP
+### iOS
 
 Requirements: Xcode 16 or newer and XcodeGen.
 
@@ -98,11 +99,11 @@ xcodebuild \
   CODE_SIGNING_ALLOWED=NO build
 ```
 
-The iOS MVP supports offline single-character handwriting recognition,
-KANJIDIC2 reading display, candidate insertion, delete, space, return, and
-keyboard switching. See `ios/README.md` for device signing and setup. Android's
-continuous composition and JMdict word candidates are intentionally outside
-the iOS MVP.
+The iOS keyboard supports offline one- and two-character handwriting,
+continuous composition, KANJIDIC2/JMdict/JMnedict candidates, QWERTY romaji
+kana-kanji conversion, English and symbol panels, shared display/input
+preferences, haptics, key clicks, and signed dictionary updates. Full Access
+remains disabled. See `ios/README.md` for device signing and setup.
 
 ### About site
 

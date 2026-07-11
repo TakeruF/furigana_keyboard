@@ -1,10 +1,27 @@
 # iOS setup
 
-The iOS project contains a small container app and a Japanese custom keyboard
-extension. The extension bundles the same Zinnia model and reading database as
-Android, performs recognition locally, and requests no open/network access.
-The container app can download signed dictionary updates into an App Group;
-the extension receives read-only access and keeps Full Access disabled.
+The iOS project contains a settings/onboarding app and a Japanese custom
+keyboard extension. The extension bundles the same Zinnia model and schema-8
+reading/conversion database as Android, performs recognition locally, and
+requests no open/network access. The container app verifies and downloads
+signed dictionary updates into the App Group; the keyboard always retains its
+bundled offline fallback and keeps Full Access disabled.
+
+## Feature parity
+
+- Continuous one-character handwriting and spatially segmented two-character
+  handwriting, with common-use kanji ranking.
+- KANJIDIC2 readings plus JMdict/JMnedict exact matches and word completions.
+- Offline romaji-to-kana input and lattice-based kana-kanji conversion using
+  the same conversion lexemes and part-of-speech connection costs as Android,
+  including sequential bunsetsu selection and shrink/expand controls.
+- Japanese QWERTY, English QWERTY, symbol, and handwriting panels.
+- Kana, romaji, or hidden readings; configurable candidate size, keyboard
+  height, accent color, number row, continuous input, haptics, and key clicks.
+- Light/dark appearance, press-and-hold delete, and iPhone/iPad layouts.
+
+Furigana Plus is Android-only because it uses Google ML Kit's Android model
+delivery. iOS uses the bundled Zinnia recognizer and remains fully offline.
 
 ## Generate and build
 
@@ -35,7 +52,6 @@ after changing `project.yml`.
 3. Choose Add New Keyboard and select Furigana Keyboard.
 4. Switch keyboards with the globe key while editing text.
 
-Full Access should remain disabled. This initial iOS setup supports offline
-single-character handwriting recognition and KANJIDIC2 readings. Android's
-continuous composition and JMdict word-candidate pipeline are the next parity
-milestone.
+Full Access should remain disabled. Open the container app's Settings tab to
+choose the initial panel, reading style, layout size, accent, feedback, and
+continuous-handwriting behavior; changes are shared with the extension.
