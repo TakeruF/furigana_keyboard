@@ -2,6 +2,7 @@ package com.example.furiganakeyboard
 
 import androidx.test.core.app.ApplicationProvider
 import androidx.test.ext.junit.runners.AndroidJUnit4
+import com.example.furiganakeyboard.conversion.KanaKanjiConverter
 import com.example.furiganakeyboard.reading.ReadingRepository
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue
@@ -10,6 +11,39 @@ import org.junit.runner.RunWith
 
 @RunWith(AndroidJUnit4::class)
 class ReadingRepositoryBatchTest {
+    @Test
+    fun latticeConversionReturnsEveryRequiredSentenceFirst() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val required = linkedMapOf(
+                "これもほんだ" to "これも本だ",
+                "これはほんだ" to "これは本だ",
+                "きょうははれだ" to "今日は晴れだ",
+                "わたしもいく" to "私も行く",
+                "ほんをよむ" to "本を読む"
+            )
+            val connections = repository.conversionConnections()
+            required.forEach { (reading, expected) ->
+                val results = KanaKanjiConverter.convert(
+                    reading,
+                    repository.conversionLexemes(reading, 16, 12),
+                    connections
+                )
+                assertEquals(reading, expected, results.first().surface)
+            }
+        }
+    }
+
+    @Test
+    fun conversionLexemesExpandEveryOccurrenceWithUtf16Offsets() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val lexemes = repository.conversionLexemes("ほんほん", 16, 12)
+                .filter { it.reading == "ほん" && it.surface == "本" }
+
+            assertTrue(lexemes.any { it.start == 0 && it.end == 2 })
+            assertTrue(lexemes.any { it.start == 2 && it.end == 4 })
+        }
+    }
+
     @Test
     fun mixedBatchMatchesIndividualReadingOrder() {
         ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->

@@ -3,6 +3,7 @@ package com.example.furiganakeyboard.ime
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
+import com.example.furiganakeyboard.conversion.KanaKanjiConverter
 import com.example.furiganakeyboard.reading.KanjiUsagePriority
 import com.example.furiganakeyboard.reading.ReadingDataSource
 import com.example.furiganakeyboard.reading.WordReadingCandidate
@@ -60,6 +61,8 @@ class CandidatePipeline(
     private val readingCache = LruMap<String, List<String>>(READING_CACHE_SIZE)
     private val suggestionCache =
         LruMap<SuggestionKey, List<WordReadingCandidate>>(SUGGESTION_CACHE_SIZE)
+    private val conversionCache =
+        LruMap<String, List<WordReadingCandidate>>(CONVERSION_CACHE_SIZE)
     private val priorityCache =
         LruMap<String, KanjiUsagePriority?>(PRIORITY_CACHE_SIZE)
 
@@ -74,7 +77,9 @@ class CandidatePipeline(
     }
 
     fun submitRomaji(kana: String, limit: Int, callback: (List<WordReadingCandidate>) -> Unit) {
-        submit(callback) { suggestions(SuggestionKind.READING, kana, limit) }
+        submit(callback, failureValue = { emptyList() }) { isCancelled ->
+            conversionSuggestions(kana, isCancelled).take(limit.coerceAtLeast(0))
+        }
     }
 
     fun submitHandwriting(
@@ -136,13 +141,20 @@ class CandidatePipeline(
         (worker as? ThreadPoolExecutor)?.queue?.clear()
     }
 
-    private fun <T> submit(callback: (T) -> Unit, operation: () -> T) {
+    private fun <T> submit(
+        callback: (T) -> Unit,
+        failureValue: (() -> T)? = null,
+        operation: (() -> Boolean) -> T
+    ) {
         if (closed.get()) return
         val request = generation.incrementAndGet()
         (worker as? ThreadPoolExecutor)?.queue?.clear()
         worker.execute {
             if (closed.get() || request != generation.get()) return@execute
-            val result = runCatching(operation).onFailure(::logFailure).getOrNull() ?: return@execute
+            val isCancelled = { closed.get() || request != generation.get() }
+            val result = runCatching { operation(isCancelled) }
+                .onFailure(::logFailure)
+                .getOrElse { failureValue?.invoke() ?: return@execute }
             postToMain {
                 if (!closed.get() && request == generation.get()) callback(result)
             }
@@ -188,6 +200,61 @@ class CandidatePipeline(
         return loaded
     }
 
+    private fun conversionSuggestions(
+        kana: String,
+        isCancelled: () -> Boolean
+    ): List<WordReadingCandidate> {
+        if (!isCompletedKana(kana) ||
+            kana.codePointCount(0, kana.length) > MAX_CONVERSION_INPUT_CODE_POINTS ||
+            isCancelled()
+        ) {
+            return emptyList()
+        }
+        conversionCache[kana]?.let { return it }
+        val dataSource = dataSource()
+        val lexemes = dataSource.conversionLexemes(
+            kana,
+            MAX_CONVERSION_TOKEN_CODE_POINTS,
+            MAX_CONVERSION_VOCABULARY_PER_READING
+        )
+        if (isCancelled()) return emptyList()
+        val converted = KanaKanjiConverter.convert(
+            reading = kana,
+            lexemes = lexemes,
+            connections = dataSource.conversionConnections(),
+            limit = MAX_CONVERSION_RESULTS,
+            isCancelled = isCancelled
+        ).map { result ->
+            WordReadingCandidate(result.surface, listOf(result.reading))
+        }
+        if (isCancelled()) return emptyList()
+        val prefixMatches = suggestions(
+            SuggestionKind.READING,
+            kana,
+            MAX_CONVERSION_RESULTS
+        )
+        if (isCancelled()) return emptyList()
+        return (converted + prefixMatches)
+            .distinctBy { it.surface }
+            .take(MAX_CONVERSION_RESULTS)
+            .also { conversionCache[kana] = it }
+    }
+
+    private fun isCompletedKana(value: String): Boolean {
+        if (value.isEmpty()) return false
+        var offset = 0
+        while (offset < value.length) {
+            val codePoint = value.codePointAt(offset)
+            if (Character.UnicodeScript.of(codePoint) != Character.UnicodeScript.HIRAGANA &&
+                codePoint != JAPANESE_LONG_VOWEL_MARK.codePointAt(0)
+            ) {
+                return false
+            }
+            offset += Character.charCount(codePoint)
+        }
+        return true
+    }
+
     private fun surfaceSuggestions(
         prefixes: List<String>,
         limit: Int
@@ -217,13 +284,15 @@ class CandidatePipeline(
             source = null
             readingCache.clear()
             suggestionCache.clear()
+            conversionCache.clear()
             priorityCache.clear()
         }
         worker.shutdown()
     }
 
     private fun logFailure(error: Throwable) {
-        Log.e(TAG, "Candidate pipeline operation failed", error)
+        // android.util.Log is unavailable in local JVM tests; logging must never suppress fallback.
+        runCatching { Log.e(TAG, "Candidate pipeline operation failed", error) }
     }
 
     private class LruMap<K, V>(private val maxSize: Int) :
@@ -236,7 +305,13 @@ class CandidatePipeline(
         private const val TAG = "CandidatePipeline"
         private const val READING_CACHE_SIZE = 512
         private const val SUGGESTION_CACHE_SIZE = 128
+        private const val CONVERSION_CACHE_SIZE = 64
         private const val PRIORITY_CACHE_SIZE = 1_024
+        private const val MAX_CONVERSION_INPUT_CODE_POINTS = 48
+        private const val MAX_CONVERSION_TOKEN_CODE_POINTS = 16
+        private const val MAX_CONVERSION_VOCABULARY_PER_READING = 12
+        private const val MAX_CONVERSION_RESULTS = 8
+        private const val JAPANESE_LONG_VOWEL_MARK = "ー"
 
         private fun defaultWorker(): ExecutorService = ThreadPoolExecutor(
             1,
