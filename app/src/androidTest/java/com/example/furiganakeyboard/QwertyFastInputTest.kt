@@ -86,6 +86,23 @@ class QwertyFastInputTest {
     }
 
     @Test
+    fun keyboardPanelDoesNotExceedTheImeWindowOnWideScreens() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val panel = KeyboardPanelContainer(context)
+            val tabletWidth = 1_280
+            val availableImeHeight = 600
+
+            panel.measure(
+                View.MeasureSpec.makeMeasureSpec(tabletWidth, View.MeasureSpec.EXACTLY),
+                View.MeasureSpec.makeMeasureSpec(availableImeHeight, View.MeasureSpec.AT_MOST)
+            )
+
+            assertEquals(availableImeHeight, panel.measuredHeight)
+        }
+    }
+
+    @Test
     fun generatedKeyboardKeysCenterTheirLabels() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync {
             val context = ApplicationProvider.getApplicationContext<android.content.Context>()
@@ -135,6 +152,19 @@ class QwertyFastInputTest {
 
             assertFalse(englishLabels.contains("ー"))
             assertTrue(romajiLabels.contains("ー"))
+        }
+    }
+
+    @Test
+    fun numberRowCanBeHiddenAndShownWithoutRebuildingThePad() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val context = ApplicationProvider.getApplicationContext<android.content.Context>()
+            val pad = QwertyPadView(context, showNumberRow = false)
+            val numberRow = pad.findButton("1").parent as View
+
+            assertEquals(View.GONE, numberRow.visibility)
+            pad.setNumberRowVisible(true)
+            assertEquals(View.VISIBLE, numberRow.visibility)
         }
     }
 

@@ -3,6 +3,7 @@ package com.example.furiganakeyboard.view
 import android.content.Context
 import android.annotation.SuppressLint
 import android.view.Gravity
+import android.view.View
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
@@ -13,12 +14,13 @@ import com.example.furiganakeyboard.settings.KeyboardPrefs
 import com.example.furiganakeyboard.view.KeyFactory.Kind
 
 /**
- * ABC input panel: a simple QWERTY keyboard (number row + three letter rows +
- * control row) with a one-shot shift, replacing the old placeholder toast.
+ * ABC input panel: a simple QWERTY keyboard (optional number row + three letter
+ * rows + control row) with a one-shot shift, replacing the old placeholder toast.
  */
 class QwertyPadView(
     context: Context,
-    private val includeJapaneseLongVowelKey: Boolean = false
+    private val includeJapaneseLongVowelKey: Boolean = false,
+    showNumberRow: Boolean = true
 ) : LinearLayout(context) {
 
     /** Input callbacks wired by the IME service. */
@@ -31,13 +33,15 @@ class QwertyPadView(
     private val letterKeys = mutableListOf<Button>()
     private var shiftKey: Button? = null
     private var enterKey: Button? = null
+    private val numberRow = buildCharRow("1234567890")
 
     init {
         orientation = VERTICAL
         if (!includeJapaneseLongVowelKey) {
             setPadding(0, KeyFactory.dp(context, 4), 0, 0)
         }
-        addRow(buildCharRow("1234567890"))
+        addRow(numberRow)
+        setNumberRowVisible(showNumberRow)
         addRow(buildCharRow("qwertyuiop"))
         addRow(
             if (includeJapaneseLongVowelKey) {
@@ -54,6 +58,11 @@ class QwertyPadView(
     /** Update the enter key label (改行 / 送信 / 検索). */
     fun setEnterLabel(label: String) {
         enterKey?.text = label
+    }
+
+    /** Show or hide the dedicated number row without rebuilding the panel. */
+    fun setNumberRowVisible(visible: Boolean) {
+        numberRow.visibility = if (visible) View.VISIBLE else View.GONE
     }
 
     /** Refresh accent controls when settings changed while the IME was hidden. */
@@ -75,7 +84,8 @@ class QwertyPadView(
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
         if (sidePad > 0) row.addView(Spacer(), KeyFactory.rowParams(context, sidePad))
         for (c in chars) {
-            val key = KeyFactory.key(context, c.toString(), Kind.PLAIN) {
+            val textSize = if (c.isDigit()) NUMBER_TEXT_SIZE_SP else LETTER_TEXT_SIZE_SP
+            val key = KeyFactory.key(context, c.toString(), Kind.PLAIN, textSize) {
                 commitLetter(c)
             }
             if (c.isLetter()) {
@@ -99,7 +109,7 @@ class QwertyPadView(
         shiftKey = shift
         row.addView(shift, KeyFactory.rowParams(context, 1.5f))
         for (c in chars) {
-            val key = KeyFactory.key(context, c.toString(), Kind.PLAIN) {
+            val key = KeyFactory.key(context, c.toString(), Kind.PLAIN, LETTER_TEXT_SIZE_SP) {
                 commitLetter(c)
             }
             letterKeys.add(key)
@@ -169,4 +179,9 @@ class QwertyPadView(
 
     /** Invisible flexible gap used to inset the middle letter row. */
     private inner class Spacer : android.view.View(context)
+
+    private companion object {
+        const val LETTER_TEXT_SIZE_SP = 24f
+        const val NUMBER_TEXT_SIZE_SP = 20f
+    }
 }

@@ -27,9 +27,13 @@ class KeyboardPanelContainer @JvmOverloads constructor(
         // The canvas has 2dp margins above and below in keyboard_view.xml.
         val desiredHeight = (availableWidth / 2f * canvasScale).toInt() +
             dp(MODE_ROW_HEIGHT_DP + CANVAS_VERTICAL_MARGINS_DP)
+        // A tablet in landscape (or a split-screen window) can be wider than
+        // the height available to the IME. Honor the parent's constraint so
+        // the input view is not measured outside the IME window.
+        val resolvedHeight = View.resolveSize(desiredHeight, heightMeasureSpec)
         super.onMeasure(
             widthMeasureSpec,
-            View.MeasureSpec.makeMeasureSpec(desiredHeight, View.MeasureSpec.EXACTLY)
+            View.MeasureSpec.makeMeasureSpec(resolvedHeight, View.MeasureSpec.EXACTLY)
         )
     }
 

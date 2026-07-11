@@ -115,6 +115,11 @@ class KeyboardPrefs(context: Context) {
         get() = CandidateTextSize.fromStored(prefs.getString(KEY_CANDIDATE_TEXT_SIZE, null))
         set(value) = prefs.edit().putString(KEY_CANDIDATE_TEXT_SIZE, value.name).apply()
 
+    /** Whether the dedicated 0-9 row is shown on English and romaji QWERTY panels. */
+    var showNumberRow: Boolean
+        get() = prefs.getBoolean(KEY_SHOW_NUMBER_ROW, true)
+        set(value) = prefs.edit().putBoolean(KEY_SHOW_NUMBER_ROW, value).apply()
+
     /** Last explicitly used Japanese panel; ABC and 123 never overwrite it. */
     var lastJapaneseInputMode: JapaneseInputMode
         get() = JapaneseInputMode.fromStored(prefs.getString(KEY_LAST_JAPANESE_INPUT_MODE, null))
@@ -133,6 +138,7 @@ class KeyboardPrefs(context: Context) {
         private const val KEY_ACCENT_COLOR = "accent_color"
         private const val KEY_KEYBOARD_HEIGHT = "keyboard_height"
         private const val KEY_CANDIDATE_TEXT_SIZE = "candidate_text_size"
+        private const val KEY_SHOW_NUMBER_ROW = "show_number_row"
         private const val KEY_LAST_JAPANESE_INPUT_MODE = "last_japanese_input_mode"
     }
 }

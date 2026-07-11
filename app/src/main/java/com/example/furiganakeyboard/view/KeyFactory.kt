@@ -1,6 +1,7 @@
 package com.example.furiganakeyboard.view
 
 import android.content.Context
+import android.graphics.Typeface
 import android.util.TypedValue
 import android.view.Gravity
 import android.view.MotionEvent
@@ -41,6 +42,10 @@ internal object KeyFactory {
         gravity = Gravity.CENTER
         textAlignment = View.TEXT_ALIGNMENT_CENTER
         includeFontPadding = false
+        // AppCompat buttons can inherit a medium-weight button face from the
+        // host theme. Keyboard legends should use the lighter, regular system
+        // face so dense rows remain as calm and readable as the system IME.
+        typeface = Typeface.create("sans-serif", Typeface.NORMAL)
         stateListAnimator = null // kill Material elevation animation
         setTextSize(TypedValue.COMPLEX_UNIT_SP, textSizeSp)
         maxLines = 1
@@ -65,11 +70,15 @@ internal object KeyFactory {
         onClick?.let(::setOnKeyPress)
     }
 
-    /** LayoutParams for a key in a horizontal row: weighted width, 2dp margin. */
+    /**
+     * LayoutParams for a key in a horizontal row. System keyboards leave more
+     * air between rows than between neighboring keys, so use asymmetric gaps.
+     */
     fun rowParams(context: Context, weight: Float): LinearLayout.LayoutParams =
         LinearLayout.LayoutParams(0, LinearLayout.LayoutParams.MATCH_PARENT, weight).apply {
-            val m = dp(context, 2)
-            setMargins(m, m, m, m)
+            val horizontal = dp(context, 2)
+            val vertical = dp(context, 4)
+            setMargins(horizontal, vertical, horizontal, vertical)
         }
 
     fun dp(context: Context, v: Int): Int = TypedValue.applyDimension(
