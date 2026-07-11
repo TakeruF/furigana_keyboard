@@ -4,13 +4,10 @@ export function AppleIcon({ className = "store-glyph" }: { className?: string })
   return <svg className={`${className} apple-glyph`} viewBox="0 0 814 1000" aria-hidden="true"><path d={APPLE_PATH} fill="currentColor" /></svg>;
 }
 
-export function GooglePlayIcon({ className = "store-glyph" }: { className?: string }) {
+export function AndroidIcon({ className = "store-glyph" }: { className?: string }) {
   return (
-    <svg className={`${className} google-play-glyph`} viewBox="0 0 28.99 31.99" aria-hidden="true">
-      <path d="M13.54 15.28.12 29.34a3.66 3.66 0 0 0 5.33 2.16l15.1-8.6Z" fill="#EA4335" />
-      <path d="m27.11 12.89-6.53-3.74-7.35 6.45 7.38 7.28 6.48-3.7a3.54 3.54 0 0 0 1.5-4.79 3.62 3.62 0 0 0-1.5-1.5z" fill="#FBBC04" />
-      <path d="M.12 2.66a3.57 3.57 0 0 0-.12.92v24.84a3.57 3.57 0 0 0 .12.92L14 15.64Z" fill="#4285F4" />
-      <path d="m13.64 16 6.94-6.85L5.5.51A3.73 3.73 0 0 0 3.63 0 3.64 3.64 0 0 0 .12 2.65Z" fill="#34A853" />
+    <svg className={`${className} android-glyph`} viewBox="0 0 24 24" aria-hidden="true">
+      <path fill="currentColor" d="M6 18c0 .55.45 1 1 1h1v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h2v3.5c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5V19h1c.55 0 1-.45 1-1V8H6v10ZM3.5 8C2.67 8 2 8.67 2 9.5v7c0 .83.67 1.5 1.5 1.5S5 17.33 5 16.5v-7C5 8.67 4.33 8 3.5 8Zm17 0c-.83 0-1.5.67-1.5 1.5v7c0 .83.67 1.5 1.5 1.5s1.5-.67 1.5-1.5v-7c0-.83-.67-1.5-1.5-1.5ZM15.53 2.16l1.3-1.3a.5.5 0 0 0-.71-.71l-1.48 1.48A6.02 6.02 0 0 0 12 1c-.96 0-1.86.23-2.66.63L7.85.15a.5.5 0 0 0-.71.71l1.31 1.31A5.98 5.98 0 0 0 6 7h12c0-2-1-3.74-2.47-4.84ZM10 5H9V4h1v1Zm5 0h-1V4h1v1Z" />
     </svg>
   );
 }

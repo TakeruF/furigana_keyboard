@@ -3,8 +3,8 @@ import Image from "next/image";
 import { copy, isLocale, locales } from "../i18n";
 import SiteFooter from "../components/SiteFooter";
 import SiteHeader from "../components/SiteHeader";
-import { AppleIcon, GooglePlayIcon } from "../components/PlatformIcons";
-import { releaseLinks, releaseVersion } from "../release-links";
+import { AndroidIcon, AppleIcon } from "../components/PlatformIcons";
+import { releaseLinks } from "../release-links";
 
 type PageProps = { params: Promise<{ locale: string }> };
 
@@ -31,12 +31,11 @@ export default async function LocalePage({ params }: PageProps) {
       <section className="hero" id="top">
         <div className="hero-copy">
           <Image className="hero-app-icon" src="/app-icon.png" alt="" width={96} height={96} priority />
-          <p className="beta-badge">{releaseVersion} · {content.download.beta}</p>
           <h1>{content.hero.title[0]}<br /><em>{content.hero.title[1]}</em></h1>
           <p className="hero-lead">{content.hero.lead[0]}<br />{content.hero.lead[1]}</p>
           <div className="hero-downloads" aria-label={content.nav.download}>
             <a className="hero-download primary" href={releaseLinks.androidApk}>
-              <GooglePlayIcon /> {content.download.apk}
+              <AndroidIcon /> {content.download.apk}
             </a>
             {releaseLinks.appStore ? (
               <a className="hero-download secondary" href={releaseLinks.appStore}>
@@ -78,8 +77,8 @@ export default async function LocalePage({ params }: PageProps) {
         <div className="section-heading compact"><p>DOWNLOAD</p><h2>{content.download.heading}</h2><span>{content.download.intro}</span></div>
         <div className="release-grid">
           <article className="release-card android">
-            <div className="platform-icon" aria-hidden="true"><GooglePlayIcon className="platform-glyph" /></div>
-            <div><p className="platform">ANDROID</p><h3>{content.download.androidTitle} <span className="card-beta">{content.download.beta}</span></h3><p>{content.download.androidBody}</p></div>
+            <div className="platform-icon" aria-hidden="true"><AndroidIcon className="platform-glyph" /></div>
+            <div><p className="platform">ANDROID</p><h3>{content.download.androidTitle}</h3><p>{content.download.androidBody}</p></div>
             <ReleaseAction href={releaseLinks.androidApk} availableLabel={content.download.apk} pending={content.download.pending} pendingLabel={content.download.pendingLabel} />
           </article>
           <article className="release-card ios">

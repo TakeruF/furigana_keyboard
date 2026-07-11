@@ -5,7 +5,7 @@ import { ChevronDown } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 import { copy, localeLabels, locales, type Locale } from "../i18n";
 import { releaseLinks } from "../release-links";
-import { AppleIcon, GooglePlayIcon } from "./PlatformIcons";
+import { AndroidIcon, AppleIcon } from "./PlatformIcons";
 
 export default function SiteHeader({ locale }: { locale: Locale }) {
   const [open, setOpen] = useState(false);
@@ -30,7 +30,7 @@ export default function SiteHeader({ locale }: { locale: Locale }) {
       <nav className="site-nav" aria-label={content.nav.label}>
         <a className="site-brand" href={`/${locale}`} aria-label={content.nav.top}>
           <Image src="/app-icon.png" alt="" width={24} height={24} />
-          <span>Furigana Keyboard</span>
+          <span>Furigana Keyboard Beta</span>
         </a>
         <div className="header-actions">
           <div className="header-languages" aria-label={content.nav.language}>
@@ -57,7 +57,7 @@ export default function SiteHeader({ locale }: { locale: Locale }) {
                   onClick={() => setOpen(false)}
                   className="flex items-center gap-2.5 whitespace-nowrap px-4 py-2.5 text-xs text-zinc-700 transition hover:bg-zinc-50"
                 >
-                  <GooglePlayIcon /> Android
+                  <AndroidIcon /> Android
                 </a>
                 {releaseLinks.appStore ? (
                   <a
