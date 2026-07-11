@@ -21,6 +21,16 @@ settings:
       STRIP_INSTALLED_PRODUCT: true
       STRIP_STYLE: all
 
+schemes:
+  FuriganaKeyboard:
+    build:
+      targets:
+        FuriganaKeyboard: all
+        FuriganaKeyboardTests: [test]
+    test:
+      targets:
+        - FuriganaKeyboardTests
+
 targets:
   FuriganaKeyboard:
     type: application
@@ -108,10 +118,14 @@ targets:
   FuriganaKeyboardTests:
     type: bundle.unit-test
     platform: iOS
+    hostApplication: FuriganaKeyboard
     sources:
       - Tests
     dependencies:
       - target: FuriganaKeyboard
+      - sdk: libsqlite3.tbd
     settings:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard.tests
+        TEST_HOST: "$(BUILT_PRODUCTS_DIR)/Furigana Keyboard.app/Furigana Keyboard"
+        BUNDLE_LOADER: "$(TEST_HOST)"

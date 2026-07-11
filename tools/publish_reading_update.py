@@ -18,7 +18,7 @@ import subprocess
 from pathlib import Path
 
 
-SUPPORTED_SCHEMA_VERSION = 7
+SUPPORTED_SCHEMA_VERSION = 8
 
 
 def database_metadata(path: Path) -> dict[str, str]:
@@ -64,6 +64,8 @@ def main() -> int:
         "databaseSha256": hashlib.sha256(payload).hexdigest(),
         "dictionaryDate": metadata.get("kanjidic_date", ""),
     }
+    if manifest["schemaVersion"] != int(metadata["schema_version"]):
+        raise ValueError("Manifest and database schema versions do not match")
     manifest_path = args.output / "manifest.json"
     manifest_path.write_text(
         json.dumps(manifest, ensure_ascii=False, sort_keys=True, separators=(",", ":"))

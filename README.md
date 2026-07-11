@@ -139,13 +139,20 @@ connected. On iOS, the container app checks at launch and when the user taps
 the update button; the keyboard extension remains offline and reads the
 verified database through its App Group.
 
+The current update schema is **8**. Both clients record the schema alongside
+the active data version and only reuse a downloaded database when its recorded
+schema, SQLite metadata, and integrity check all match schema 8. After an app
+upgrade, legacy `active` data without a schema, schema 7 data, and corrupt data
+are ignored automatically in favor of the bundled schema 8 database.
+
 The local ECDSA signing key is stored at
 `.secrets/reading-update-private.pem` and is intentionally ignored by Git.
 Back it up in a secure password manager or secret store: losing it requires an
 app release to rotate the embedded public key. Never upload or commit it.
 
 For each release, increase `--version` monotonically and use the final public
-database URL:
+database URL. The publishing command rejects every database except schema 8
+and verifies that the emitted manifest schema matches the database metadata:
 
 ```bash
 python3 tools/publish_reading_update.py \
@@ -164,6 +171,12 @@ Upload all three files from `reading-update-dist/`:
 The clients reject unsigned manifests, non-HTTPS database URLs, incompatible
 schemas, oversized files, hash mismatches, and corrupt SQLite databases. A
 failed update leaves the active or bundled database untouched.
+
+Keep the private signing key outside the repository and never paste it into
+terminal output, manifests, issue reports, or commits. Review the generated
+manifest and database filename, then upload the database and detached
+signature first and `manifest.json` last. Publishing the manifest last keeps
+clients from observing a release before all referenced files are available.
 
 ## Publishing direct Android updates
 

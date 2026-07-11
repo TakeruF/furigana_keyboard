@@ -51,6 +51,7 @@ object ReadingDataUpdater {
                     context,
                     target,
                     manifest.dataVersion,
+                    manifest.schemaVersion,
                     manifest.dictionaryDate
                 )
             ) { "Could not activate ${target.name}" }
@@ -202,7 +203,7 @@ object ReadingDataUpdater {
         "https://downloads.hanlu.app/furigana/manifest.json"
     private const val PUBLIC_KEY_DER_BASE64 =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9fXKWi9gKlKzeFvoERpCuEm0cpuo7LZ8bhqU0ZDU8BV1naCjNzdHDg6uW04s4P0x1Q4yFKv+w7kLN6j0HKGhGQ=="
-    private const val SUPPORTED_SCHEMA_VERSION = 7
+    internal const val SUPPORTED_SCHEMA_VERSION = 8
     private const val MAX_MANIFEST_BYTES = 32L * 1024
     private const val MAX_SIGNATURE_BYTES = 4L * 1024
     private const val MAX_DATABASE_BYTES = 128L * 1024 * 1024

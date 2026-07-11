@@ -8,7 +8,7 @@ enum ReadingUpdateConfiguration {
     static let manifestURL = URL(
         string: "https://downloads.hanlu.app/furigana/manifest.json"
     )!
-    static let supportedSchemaVersion = 7
+    static let supportedSchemaVersion = 8
     static let publicKeyDERBase64 =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9fXKWi9gKlKzeFvoERpCuEm0cpuo7LZ8bhqU0ZDU8BV1naCjNzdHDg6uW04s4P0x1Q4yFKv+w7kLN6j0HKGhGQ=="
 }
@@ -30,25 +30,51 @@ struct ReadingUpdateManifest: Decodable {
     }
 }
 
+extension ReadingUpdateManifest {
+    func validate(appVersion: Int) throws {
+        guard formatVersion == 1,
+              schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
+              minAppVersion <= appVersion,
+              databaseSize > 0,
+              databaseSize <= 128 * 1024 * 1024,
+              databaseUrl.scheme == "https",
+              databaseSha256.lowercased().range(
+                of: "^[0-9a-f]{64}$",
+                options: .regularExpression
+              ) != nil else {
+            throw ReadingUpdateValidationError.incompatible
+        }
+    }
+}
+
 struct ActiveReadingData: Codable {
     let fileName: String
     let dataVersion: Int
+    let schemaVersion: Int
     let dictionaryDate: String
 }
 
 enum ReadingDataLocation {
     private static let activeFileName = "active.json"
 
-    static func databaseURL(bundle: Bundle = .main) -> URL? {
-        if let directory = sharedDirectory(),
-           let active = try? activeData(in: directory),
-           safeFileName(active.fileName) {
-            let candidate = directory.appendingPathComponent(active.fileName)
-            if FileManager.default.fileExists(atPath: candidate.path) {
-                return candidate
-            }
-        }
-        return bundle.url(forResource: "reading", withExtension: "db")
+    static func databaseURL(
+        bundle: Bundle = .main,
+        activeDirectory: URL? = sharedDirectory()
+    ) -> URL? {
+        activeDirectory.flatMap { activeDatabaseURL(in: $0) }
+            ?? bundle.url(forResource: "reading", withExtension: "db")
+    }
+
+    static func activeDatabaseURL(in directory: URL) -> URL? {
+        guard let active = try? activeData(in: directory),
+              active.schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
+              safeFileName(active.fileName) else { return nil }
+        let candidate = directory.appendingPathComponent(active.fileName)
+        guard (try? ReadingDatabaseValidator.validate(
+            url: candidate,
+            expectedSchema: active.schemaVersion
+        )) != nil else { return nil }
+        return candidate
     }
 
     static func sharedDirectory() -> URL? {
@@ -128,6 +154,43 @@ enum ReadingDatabaseValidator {
     }
 }
 
+enum ReadingUpdateValidationError: Error {
+    case incompatible, sizeMismatch, hashMismatch, invalidSignature
+}
+
+enum ReadingManifestSignatureVerifier {
+    static func verify(
+        manifestData: Data,
+        signatureData: Data,
+        publicKeyDERBase64: String = ReadingUpdateConfiguration.publicKeyDERBase64
+    ) throws {
+        guard let keyData = Data(base64Encoded: publicKeyDERBase64),
+              let encodedSignature = String(data: signatureData, encoding: .utf8),
+              let signature = Data(
+                base64Encoded: encodedSignature.trimmingCharacters(in: .whitespacesAndNewlines)
+              ) else {
+            throw ReadingUpdateValidationError.invalidSignature
+        }
+        let publicKey = try P256.Signing.PublicKey(derRepresentation: keyData)
+        let ecdsaSignature = try P256.Signing.ECDSASignature(derRepresentation: signature)
+        guard publicKey.isValidSignature(ecdsaSignature, for: manifestData) else {
+            throw ReadingUpdateValidationError.invalidSignature
+        }
+    }
+}
+
+enum ReadingUpdatePackageValidator {
+    static func validate(data: Data, at url: URL, manifest: ReadingUpdateManifest) throws {
+        guard Int64(data.count) == manifest.databaseSize else {
+            throw ReadingUpdateValidationError.sizeMismatch
+        }
+        guard SHA256.hash(data: data).hex == manifest.databaseSha256.lowercased() else {
+            throw ReadingUpdateValidationError.hashMismatch
+        }
+        try ReadingDatabaseValidator.validate(url: url, expectedSchema: manifest.schemaVersion)
+    }
+}
+
 @MainActor
 final class ReadingDataUpdater: ObservableObject {
     @Published private(set) var status = "辞書更新を確認しています…"
@@ -153,20 +216,18 @@ final class ReadingDataUpdater: ObservableObject {
             ReadingUpdateConfiguration.manifestURL.appendingPathExtension("sig"),
             maximumSize: 4 * 1024
         )
-        try verify(manifestData: manifestData, signatureData: signatureData)
+        try ReadingManifestSignatureVerifier.verify(
+            manifestData: manifestData,
+            signatureData: signatureData
+        )
         let manifest = try JSONDecoder().decode(ReadingUpdateManifest.self, from: manifestData)
-        guard manifest.formatVersion == 1,
-              manifest.schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
-              manifest.minAppVersion <= appVersion,
-              manifest.databaseSize > 0,
-              manifest.databaseSize <= 128 * 1024 * 1024,
-              manifest.databaseUrl.scheme == "https" else {
-            throw UpdateError.incompatible
-        }
+        try manifest.validate(appVersion: appVersion)
         guard let directory = ReadingDataLocation.sharedDirectory() else {
             throw UpdateError.sharedContainerUnavailable
         }
         if let active = try? ReadingDataLocation.activeData(in: directory),
+           active.schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
+           ReadingDataLocation.activeDatabaseURL(in: directory) != nil,
            active.dataVersion >= manifest.dataVersion {
             return "辞書は最新です（\(active.dictionaryDate)）"
         }
@@ -175,22 +236,16 @@ final class ReadingDataUpdater: ObservableObject {
             from: manifest.databaseUrl
         )
         try requireOK(response)
-        let values = try temporaryDownload.resourceValues(forKeys: [.fileSizeKey])
-        guard Int64(values.fileSize ?? -1) == manifest.databaseSize else {
-            throw UpdateError.sizeMismatch
-        }
         let databaseData = try Data(contentsOf: temporaryDownload, options: .mappedIfSafe)
-        guard SHA256.hash(data: databaseData).hex == manifest.databaseSha256.lowercased() else {
-            throw UpdateError.hashMismatch
-        }
         let fileName = "reading-\(manifest.dataVersion).db"
         let staging = directory.appendingPathComponent("\(fileName).tmp")
         let target = directory.appendingPathComponent(fileName)
         try? FileManager.default.removeItem(at: staging)
         try FileManager.default.copyItem(at: temporaryDownload, to: staging)
-        try ReadingDatabaseValidator.validate(
-            url: staging,
-            expectedSchema: manifest.schemaVersion
+        try ReadingUpdatePackageValidator.validate(
+            data: databaseData,
+            at: staging,
+            manifest: manifest
         )
         try? FileManager.default.removeItem(at: target)
         try FileManager.default.moveItem(at: staging, to: target)
@@ -198,6 +253,7 @@ final class ReadingDataUpdater: ObservableObject {
             ActiveReadingData(
                 fileName: fileName,
                 dataVersion: manifest.dataVersion,
+                schemaVersion: manifest.schemaVersion,
                 dictionaryDate: manifest.dictionaryDate
             ),
             in: directory
@@ -218,26 +274,13 @@ final class ReadingDataUpdater: ObservableObject {
               response.statusCode == 200 else { throw UpdateError.httpFailure }
     }
 
-    private func verify(manifestData: Data, signatureData: Data) throws {
-        guard let keyData = Data(base64Encoded: ReadingUpdateConfiguration.publicKeyDERBase64),
-              let encodedSignature = String(data: signatureData, encoding: .utf8),
-              let signature = Data(base64Encoded: encodedSignature.trimmingCharacters(in: .whitespacesAndNewlines)) else {
-            throw UpdateError.invalidSignature
-        }
-        let publicKey = try P256.Signing.PublicKey(derRepresentation: keyData)
-        let ecdsaSignature = try P256.Signing.ECDSASignature(derRepresentation: signature)
-        guard publicKey.isValidSignature(ecdsaSignature, for: manifestData) else {
-            throw UpdateError.invalidSignature
-        }
-    }
-
     private var appVersion: Int {
         Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1") ?? 1
     }
 
     enum UpdateError: Error {
-        case incompatible, sharedContainerUnavailable, sizeMismatch, hashMismatch
-        case responseTooLarge, httpFailure, invalidSignature
+        case incompatible, sharedContainerUnavailable
+        case responseTooLarge, httpFailure
     }
 }
 
