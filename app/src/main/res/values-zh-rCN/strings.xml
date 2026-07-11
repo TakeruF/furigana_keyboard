@@ -28,4 +28,13 @@
     <string name="onboarding_step_enable">第一步　启用系统输入法</string>
     <string name="onboarding_step_select">第二步　切换到此输入法</string>
     <string name="onboarding_privacy_note">启用任何输入法时，Android都会显示标准安全提示。输入内容仅在设备上处理。</string>
+    <string name="settings_check_update">检查更新</string>
+    <string name="settings_check_update_desc">在 Google Play 中检查最新版本</string>
+    <string name="update_notification_channel">应用更新</string>
+    <string name="update_notification_channel_desc">有新版本可用时通知您</string>
+    <string name="update_notification_title">有可用更新</string>
+    <string name="update_notification_text">点按以更新注音键盘。</string>
+    <string name="update_is_current">当前已是最新版本。</string>
+    <string name="update_check_failed">无法检查更新。请确认此应用是从 Google Play 安装的。</string>
+    <string name="update_cancelled">已取消更新</string>
 </resources>

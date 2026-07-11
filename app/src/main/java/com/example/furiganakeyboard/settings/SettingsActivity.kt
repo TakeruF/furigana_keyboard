@@ -1,7 +1,10 @@
 package com.example.furiganakeyboard.settings
 
+import android.Manifest
+import android.app.Activity
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.content.res.ColorStateList
 import android.content.res.Configuration
 import android.graphics.drawable.ColorDrawable
@@ -9,6 +12,7 @@ import android.graphics.drawable.GradientDrawable
 import android.graphics.drawable.StateListDrawable
 import android.graphics.Typeface
 import android.net.Uri
+import android.os.Build
 import android.os.Bundle
 import android.provider.Settings
 import android.util.TypedValue
@@ -22,6 +26,8 @@ import android.widget.LinearLayout
 import android.widget.ScrollView
 import android.widget.SeekBar
 import android.widget.TextView
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
 import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.content.ContextCompat
@@ -32,7 +38,13 @@ import com.example.furiganakeyboard.reading.ReadingRepository
 import com.example.furiganakeyboard.view.HanluToggleView
 import com.example.furiganakeyboard.view.Haptics
 import com.example.furiganakeyboard.view.KeySounds
+import com.example.furiganakeyboard.update.AppUpdateNotifications
 import com.google.android.material.card.MaterialCardView
+import com.google.android.play.core.appupdate.AppUpdateManager
+import com.google.android.play.core.appupdate.AppUpdateManagerFactory
+import com.google.android.play.core.appupdate.AppUpdateOptions
+import com.google.android.play.core.install.model.AppUpdateType
+import com.google.android.play.core.install.model.UpdateAvailability
 
 /** Card-based settings hub with focused preference, privacy, legal, and help pages. */
 class SettingsActivity : AppCompatActivity() {
@@ -42,7 +54,22 @@ class SettingsActivity : AppCompatActivity() {
     private lateinit var headerTitle: TextView
     private lateinit var contentHost: LinearLayout
     private lateinit var screenRoot: LinearLayout
+    private lateinit var appUpdateManager: AppUpdateManager
     private var backAction: (() -> Unit)? = null
+
+    private val updateFlowLauncher = registerForActivityResult(
+        ActivityResultContracts.StartIntentSenderForResult()
+    ) { result ->
+        if (result.resultCode != Activity.RESULT_OK) {
+            Toast.makeText(this, R.string.update_cancelled, Toast.LENGTH_SHORT).show()
+        }
+    }
+
+    private val notificationPermissionLauncher = registerForActivityResult(
+        ActivityResultContracts.RequestPermission()
+    ) { granted ->
+        if (granted) checkForUpdates(manual = false)
+    }
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -65,6 +92,8 @@ class SettingsActivity : AppCompatActivity() {
         Haptics.strength = prefs.hapticStrength
         KeySounds.enabled = prefs.keySound
         KeySounds.volumeStep = prefs.keySoundVolume
+        appUpdateManager = AppUpdateManagerFactory.create(this)
+        AppUpdateNotifications.initialize(this)
         val darkMode = resources.configuration.uiMode and Configuration.UI_MODE_NIGHT_MASK ==
             Configuration.UI_MODE_NIGHT_YES
         val settingsBackground = prefs.accentColor.settingsBackground(darkMode)
@@ -76,11 +105,26 @@ class SettingsActivity : AppCompatActivity() {
         }
         setContentView(buildScreen())
         showHub()
+        requestUpdateNotificationPermissionOnce()
+        if (intent.getBooleanExtra(AppUpdateNotifications.EXTRA_CHECK_FOR_UPDATE, false)) {
+            intent.removeExtra(AppUpdateNotifications.EXTRA_CHECK_FOR_UPDATE)
+            checkForUpdates(manual = true)
+        }
     }
 
     override fun onResume() {
         super.onResume()
         if (!isFinishing && !KeyboardSetupState.isSelected(this)) showKeyboardSetup()
+        if (this::appUpdateManager.isInitialized) resumeUpdateIfNeeded()
+    }
+
+    override fun onNewIntent(intent: Intent) {
+        super.onNewIntent(intent)
+        setIntent(intent)
+        if (intent.getBooleanExtra(AppUpdateNotifications.EXTRA_CHECK_FOR_UPDATE, false)) {
+            intent.removeExtra(AppUpdateNotifications.EXTRA_CHECK_FOR_UPDATE)
+            checkForUpdates(manual = true)
+        }
     }
 
     private fun showKeyboardSetup() {
@@ -745,6 +789,11 @@ class SettingsActivity : AppCompatActivity() {
                 getString(R.string.settings_version_label),
                 getString(R.string.about_version, version)
             ),
+            actionRow(
+                R.string.settings_check_update,
+                R.string.settings_check_update_desc,
+                R.drawable.ic_settings_info
+            ) { checkForUpdates(manual = true) },
             infoRow(
                 getString(R.string.settings_private_title),
                 getString(R.string.about_offline),
@@ -850,6 +899,73 @@ class SettingsActivity : AppCompatActivity() {
             R.drawable.ic_settings_help,
             body
         )
+    }
+
+    private fun requestUpdateNotificationPermissionOnce() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.TIRAMISU ||
+            ContextCompat.checkSelfPermission(this, Manifest.permission.POST_NOTIFICATIONS) ==
+            PackageManager.PERMISSION_GRANTED
+        ) {
+            checkForUpdates(manual = false)
+            return
+        }
+        val preferences = getSharedPreferences(UPDATE_PREFERENCES, Context.MODE_PRIVATE)
+        if (!preferences.getBoolean(NOTIFICATION_PERMISSION_REQUESTED, false)) {
+            preferences.edit().putBoolean(NOTIFICATION_PERMISSION_REQUESTED, true).apply()
+            notificationPermissionLauncher.launch(Manifest.permission.POST_NOTIFICATIONS)
+        }
+    }
+
+    private fun checkForUpdates(manual: Boolean) {
+        appUpdateManager.appUpdateInfo
+            .addOnSuccessListener { info ->
+                if (info.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
+                    if (manual) {
+                        if (info.isUpdateTypeAllowed(AppUpdateType.IMMEDIATE)) {
+                            appUpdateManager.startUpdateFlowForResult(
+                                info,
+                                updateFlowLauncher,
+                                AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build()
+                            )
+                        } else {
+                            openPlayStore()
+                        }
+                    } else {
+                        AppUpdateNotifications.showIfNew(this, info.availableVersionCode())
+                    }
+                } else if (manual) {
+                    Toast.makeText(this, R.string.update_is_current, Toast.LENGTH_SHORT).show()
+                }
+            }
+            .addOnFailureListener {
+                if (manual) {
+                    Toast.makeText(this, R.string.update_check_failed, Toast.LENGTH_LONG).show()
+                }
+            }
+    }
+
+    private fun resumeUpdateIfNeeded() {
+        appUpdateManager.appUpdateInfo.addOnSuccessListener { info ->
+            if (info.updateAvailability() ==
+                UpdateAvailability.DEVELOPER_TRIGGERED_UPDATE_IN_PROGRESS
+            ) {
+                appUpdateManager.startUpdateFlowForResult(
+                    info,
+                    updateFlowLauncher,
+                    AppUpdateOptions.newBuilder(AppUpdateType.IMMEDIATE).build()
+                )
+            }
+        }
+    }
+
+    private fun openPlayStore() {
+        val marketIntent = Intent(Intent.ACTION_VIEW, Uri.parse("market://details?id=$packageName"))
+        val webIntent = Intent(
+            Intent.ACTION_VIEW,
+            Uri.parse("https://play.google.com/store/apps/details?id=$packageName")
+        )
+        runCatching { startActivity(marketIntent) }
+            .onFailure { startActivity(webIntent) }
     }
 
     private fun localizedLegalAsset(baseName: String): String {
@@ -1175,5 +1291,10 @@ class SettingsActivity : AppCompatActivity() {
         value.toFloat(),
         resources.displayMetrics
     ).toInt()
+
+    companion object {
+        private const val UPDATE_PREFERENCES = "update-preferences"
+        private const val NOTIFICATION_PERMISSION_REQUESTED = "notification-permission-requested"
+    }
 
 }

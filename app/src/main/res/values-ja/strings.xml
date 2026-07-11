@@ -41,4 +41,13 @@
     <string name="onboarding_step_enable">ステップ1　システム入力を有効にする</string>
     <string name="onboarding_step_select">ステップ2　このキーボードに切り替える</string>
     <string name="onboarding_privacy_note">入力方法を有効にすると、Android共通の注意事項が表示されます。入力内容は端末内で処理されます。</string>
+    <string name="settings_check_update">アップデートを確認</string>
+    <string name="settings_check_update_desc">Google Playで最新版を確認します</string>
+    <string name="update_notification_channel">アプリアップデート</string>
+    <string name="update_notification_channel_desc">新しいバージョンが利用可能になったときに通知します</string>
+    <string name="update_notification_title">アップデートがあります</string>
+    <string name="update_notification_text">タップして、ふりがなキーボードをアップデートしてください。</string>
+    <string name="update_is_current">現在のバージョンは最新です。</string>
+    <string name="update_check_failed">アップデートを確認できませんでした。Google Playからインストールしたアプリでお試しください。</string>
+    <string name="update_cancelled">アップデートをキャンセルしました</string>
 </resources>
