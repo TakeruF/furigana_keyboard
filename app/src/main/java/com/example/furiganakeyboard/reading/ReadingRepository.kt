@@ -64,8 +64,17 @@ class ReadingRepository(context: Context) : ReadingDataSource {
             if (words.isNotEmpty()) {
                 val placeholders = List(words.size) { "?" }.joinToString(",")
                 add(
-                    """SELECT surface, reading, priority AS rank1, 0 AS rank2
-                       FROM word_reading WHERE surface IN ($placeholders)""".trimIndent()
+                    """SELECT surface, reading, reading_priority AS rank1,
+                              reading_position * 10 + form_rank AS rank2
+                       FROM word_reading AS candidate
+                       WHERE surface IN ($placeholders)
+                         AND (
+                           reading_priority < 100 OR NOT EXISTS (
+                             SELECT 1 FROM word_reading AS preferred
+                             WHERE preferred.surface = candidate.surface
+                               AND preferred.reading_priority < 100
+                           )
+                         )""".trimIndent()
                 )
             }
         }
@@ -90,7 +99,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         val surfaces = database.rawQuery(
             """SELECT surface, min(priority) AS best_priority
                FROM word_reading
-               WHERE surface>=? AND surface<?
+               WHERE surface>=? AND surface<? AND form_rank=0
                GROUP BY surface
                ORDER BY CASE WHEN surface=? THEN 0 ELSE 1 END,
                         best_priority, length(surface), surface
@@ -115,11 +124,13 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         val upperBound = prefix + String(Character.toChars(Character.MAX_CODE_POINT))
         val surfaces = database.rawQuery(
             """SELECT surface, min(priority) AS best_priority,
-                      min(CASE WHEN reading=? THEN 0 ELSE 1 END) AS exact_match
+                      min(CASE WHEN reading=? THEN 0 ELSE 1 END) AS exact_match,
+                      min(form_rank) AS best_form_rank
                FROM word_reading
                WHERE reading>=? AND reading<?
                GROUP BY surface
-               ORDER BY exact_match, best_priority, length(surface), surface
+               ORDER BY exact_match, best_priority, best_form_rank,
+                        length(surface), surface
                LIMIT ?""",
             arrayOf(prefix, prefix, upperBound, limit.toString())
         ).use { cursor ->
@@ -156,12 +167,13 @@ class ReadingRepository(context: Context) : ReadingDataSource {
 
     private fun exactSurfacesByReading(reading: String, limit: Int): List<String> =
         database.rawQuery(
-            """SELECT surface, min(priority) AS best_priority
+            """SELECT surface, min(priority) AS best_priority,
+                      min(form_rank) AS best_form_rank
                FROM word_reading
                WHERE reading=?
-               GROUP BY surface
-               ORDER BY CASE WHEN surface=? THEN 1 ELSE 0 END,
-                        best_priority, length(surface) DESC, surface
+                GROUP BY surface
+                ORDER BY CASE WHEN surface=? THEN 1 ELSE 0 END,
+                        best_priority, best_form_rank, length(surface) DESC, surface
                LIMIT ?""",
             arrayOf(reading, reading, limit.toString())
         ).use { cursor ->
@@ -183,7 +195,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
             """SELECT * FROM (
                    SELECT $index AS prefix_rank, surface, min(priority) AS best_priority
                    FROM word_reading
-                   WHERE surface>=? AND surface<?
+                   WHERE surface>=? AND surface<? AND form_rank=0
                    GROUP BY surface
                    ORDER BY CASE WHEN surface=? THEN 0 ELSE 1 END,
                             best_priority, length(surface), surface
@@ -224,7 +236,8 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         return database.rawQuery(
             """SELECT surface, reading FROM word_reading
                WHERE surface IN ($placeholders) AND reading>=? AND reading<?
-               ORDER BY surface, CASE WHEN reading=? THEN 0 ELSE 1 END, priority, reading""",
+               ORDER BY surface, CASE WHEN reading=? THEN 0 ELSE 1 END,
+                        form_rank, reading_priority, reading_position, priority, reading""",
             args
         ).use { cursor ->
             val output = LinkedHashMap<String, MutableList<String>>()
@@ -270,12 +283,15 @@ class ReadingRepository(context: Context) : ReadingDataSource {
 
     companion object {
         private const val DB_ASSET = "reading.db"
-        private const val DB_FILE = "reading-v3.db"
+        private const val DB_FILE = "reading-v6.db"
         private const val DB_SHA256 =
-            "2d32ffc75a600ca090724ceeece4c70c1630ecd1bf16eca4383a67b2ba27a3ae"
+            "988291009fc548c57bb83f48843725418867063ca1b44bbc4bf485853b5f64cf"
         private val LEGACY_DB_FILES = listOf(
             "reading-v1.db", "reading-v1.db.sha256",
-            "reading-v2.db", "reading-v2.db.sha256"
+            "reading-v2.db", "reading-v2.db.sha256",
+            "reading-v3.db", "reading-v3.db.sha256",
+            "reading-v4.db", "reading-v4.db.sha256",
+            "reading-v5.db", "reading-v5.db.sha256"
         )
         private const val COMPOSED_PER_SPLIT_LIMIT = 4
         private val COMPOSABLE_KANA_SUFFIXES = setOf(

@@ -18,11 +18,157 @@ import zipfile
 from pathlib import Path
 
 
-SCHEMA_VERSION = "3"
+SCHEMA_VERSION = "6"
+
+# These JMdict reading annotations are useful for historical reference and
+# search, but should not be presented as normal modern input candidates.
+EXCLUDED_READING_INFORMATION = {
+    "out-dated or obsolete kana usage",
+    "rarely-used kana form",
+    "search-only kana form",
+}
 
 # The Tegaki JIS X 0208 label set contains the ditto mark 仝, which is not a
 # standalone KANJIDIC2 entry. It is the old-form equivalent of 同.
 MODEL_READING_OVERRIDES = {"仝": [("ドウ", 0), ("おな.じ", 1)]}
+
+ICHIDAN_POS = {
+    "Ichidan verb",
+    "Ichidan verb - kureru special class",
+}
+
+GODAN_ENDINGS = {
+    "Godan verb with 'u' ending": ("う", "って", "った", "わ", "い", "え"),
+    "Godan verb with 'u' ending (special class)":
+        ("う", "って", "った", "わ", "い", "え"),
+    "Godan verb with 'ku' ending": ("く", "いて", "いた", "か", "き", "け"),
+    "Godan verb with 'gu' ending": ("ぐ", "いで", "いだ", "が", "ぎ", "げ"),
+    "Godan verb with 'su' ending": ("す", "して", "した", "さ", "し", "せ"),
+    "Godan verb with 'tsu' ending": ("つ", "って", "った", "た", "ち", "て"),
+    "Godan verb with 'nu' ending": ("ぬ", "んで", "んだ", "な", "に", "ね"),
+    "Godan verb with 'bu' ending": ("ぶ", "んで", "んだ", "ば", "び", "べ"),
+    "Godan verb with 'mu' ending": ("む", "んで", "んだ", "ま", "み", "め"),
+    "Godan verb with 'ru' ending": ("る", "って", "った", "ら", "り", "れ"),
+    "Godan verb with 'ru' ending (irregular verb)":
+        ("る", "って", "った", "ら", "り", "れ"),
+}
+
+IKU_POS = "Godan verb - Iku/Yuku special class"
+SURU_POS = {"suru verb - included", "suru verb - special class"}
+KURU_POS = "Kuru verb - special class"
+I_ADJECTIVE_POS = {
+    "adjective (keiyoushi)",
+    "adjective (keiyoushi) - yoi/ii class",
+}
+
+
+def inflected_forms(
+    surface: str, reading: str, pos_tags: set[str]
+) -> list[tuple[str, str, int]]:
+    """Return common modern inflections for a JMdict surface/reading pair.
+
+    This deliberately covers only forms whose spelling follows directly from
+    the JMdict conjugation class. Archaic and ambiguous classes remain ordinary
+    dictionary entries rather than risking invented candidates.
+    """
+    forms: list[tuple[str, str, int]] = []
+
+    def append(stem_surface: str, stem_reading: str, suffixes: list[tuple[str, int]]) -> None:
+        forms.extend(
+            (stem_surface + suffix, stem_reading + suffix, rank)
+            for suffix, rank in suffixes
+        )
+
+    if pos_tags & ICHIDAN_POS and surface.endswith("る") and reading.endswith("る"):
+        append(
+            surface[:-1],
+            reading[:-1],
+            [
+                ("て", 1), ("た", 2), ("ない", 3), ("なかった", 4),
+                ("ます", 5), ("ました", 6), ("れば", 7),
+            ],
+        )
+
+    godan = next((value for key, value in GODAN_ENDINGS.items() if key in pos_tags), None)
+    if IKU_POS in pos_tags:
+        godan = ("く", "って", "った", "か", "き", "け")
+    if godan is not None:
+        ending, te, past, negative, polite, conditional = godan
+        if surface.endswith(ending) and reading.endswith(ending):
+            surface_stem = surface[:-1]
+            reading_stem = reading[:-1]
+            suffixes = [
+                (te, 1),
+                (past, 2),
+                (negative + "ない", 3),
+                (negative + "なかった", 4),
+                (polite + "ます", 5),
+                (polite + "ました", 6),
+                (conditional + "ば", 7),
+                # The e-row is both the modern imperative stem (使え) and
+                # the base of the godan potential (使える). Include the
+                # potential's common continuations so partial romaji input
+                # can convert naturally as well.
+                (conditional, 8),
+                (conditional + "る", 9),
+                (conditional + "て", 10),
+                (conditional + "た", 11),
+                (conditional + "ない", 12),
+                (conditional + "なかった", 13),
+                (conditional + "ます", 14),
+                (conditional + "ました", 15),
+            ]
+            forms.extend(
+                (surface_stem + suffix, reading_stem + suffix, rank)
+                for suffix, rank in suffixes
+            )
+
+    if pos_tags & SURU_POS and surface.endswith("する") and reading.endswith("する"):
+        surface_stem = surface[:-2]
+        reading_stem = reading[:-2]
+        suffixes = [
+            ("して", 1), ("した", 2), ("しない", 3), ("しなかった", 4),
+            ("します", 5), ("しました", 6), ("すれば", 7),
+        ]
+        forms.extend(
+            (surface_stem + suffix, reading_stem + suffix, rank)
+            for suffix, rank in suffixes
+        )
+
+    if KURU_POS in pos_tags and reading.endswith("くる"):
+        if surface.endswith("くる"):
+            surface_stem = surface[:-2]
+            surface_suffixes = ["きて", "きた", "こない", "こなかった", "きます", "きました", "くれば"]
+        elif surface.endswith("来る"):
+            surface_stem = surface[:-1]
+            surface_suffixes = ["て", "た", "ない", "なかった", "ます", "ました", "れば"]
+        else:
+            surface_suffixes = []
+            surface_stem = surface
+        reading_stem = reading[:-2]
+        reading_suffixes = ["きて", "きた", "こない", "こなかった", "きます", "きました", "くれば"]
+        forms.extend(
+            (surface_stem + surface_suffix, reading_stem + reading_suffix, rank)
+            for rank, (surface_suffix, reading_suffix) in enumerate(
+                zip(surface_suffixes, reading_suffixes), start=1
+            )
+        )
+
+    if pos_tags & I_ADJECTIVE_POS and surface.endswith("い") and reading.endswith("い"):
+        surface_stem = surface[:-1]
+        reading_stem = reading[:-1]
+        if reading == "いい":
+            reading_stem = "よ"
+        suffixes = [
+            ("くて", 1), ("かった", 2), ("くない", 3),
+            ("くなかった", 4), ("ければ", 7),
+        ]
+        forms.extend(
+            (surface_stem + suffix, reading_stem + suffix, rank)
+            for suffix, rank in suffixes
+        )
+
+    return forms
 
 
 def sha256(path: Path) -> str:
@@ -88,14 +234,20 @@ def create_schema(db: sqlite3.Connection) -> None:
             surface TEXT NOT NULL,
             reading TEXT NOT NULL,
             priority INTEGER NOT NULL,
+            reading_priority INTEGER NOT NULL,
+            reading_position INTEGER NOT NULL,
+            form_rank INTEGER NOT NULL,
             PRIMARY KEY (surface, reading)
         ) WITHOUT ROWID;
 
         CREATE INDEX word_reading_rank
-            ON word_reading(surface, priority, reading);
+            ON word_reading(
+                surface, reading_priority, reading_position, form_rank,
+                priority, reading
+            );
 
         CREATE INDEX word_reading_reading_rank
-            ON word_reading(reading, priority, surface);
+            ON word_reading(reading, form_rank, priority, surface);
         """
     )
 
@@ -105,7 +257,7 @@ def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, int
     readings = 0
     prioritized = 0
     creation_date = "unknown"
-    batch: list[tuple[str, str, int, int]] = []
+    batch: list[tuple[str, str, int, int, int]] = []
     priority_batch: list[tuple[str, int, int]] = []
     with gzip.open(source, "rb") as stream:
         for event, elem in ET.iterparse(stream, events=("end",)):
@@ -168,51 +320,85 @@ def import_kanjidic(db: sqlite3.Connection, source: Path) -> tuple[int, int, int
     return characters, readings, prioritized, creation_date
 
 
-def import_jmdict(db: sqlite3.Connection, source: Path) -> tuple[int, int]:
+def import_jmdict(db: sqlite3.Connection, source: Path) -> tuple[int, int, int]:
     entries = 0
-    pairs = 0
-    batch: list[tuple[str, str, int]] = []
+    batch: list[tuple[str, str, int, int, int, int]] = []
+
+    def flush() -> None:
+        db.executemany(
+            """INSERT INTO word_reading(
+                   surface, reading, priority, reading_priority,
+                   reading_position, form_rank
+               ) VALUES (?, ?, ?, ?, ?, ?)
+               ON CONFLICT(surface, reading) DO UPDATE SET
+                 priority = min(priority, excluded.priority),
+                 reading_priority = min(reading_priority, excluded.reading_priority),
+                 reading_position = min(reading_position, excluded.reading_position),
+                 form_rank = min(form_rank, excluded.form_rank)""",
+            batch,
+        )
+        batch.clear()
+
     with gzip.open(source, "rb") as stream:
         for event, elem in ET.iterparse(stream, events=("end",)):
             if elem.tag != "entry":
                 continue
             entries += 1
+            pos_tags = {node.text for node in elem.findall("./sense/pos") if node.text}
             surfaces: dict[str, list[str]] = {}
             for k_ele in elem.findall("k_ele"):
                 surface = k_ele.findtext("keb")
                 if surface:
                     surfaces[surface] = [p.text or "" for p in k_ele.findall("ke_pri")]
-            for r_ele in elem.findall("r_ele"):
+            has_surface_priority = any(tags for tags in surfaces.values())
+            for reading_position, r_ele in enumerate(elem.findall("r_ele")):
                 reading = r_ele.findtext("reb")
                 if not reading or r_ele.find("re_nokanji") is not None:
+                    continue
+                reading_information = {
+                    node.text for node in r_ele.findall("re_inf") if node.text
+                }
+                if reading_information & EXCLUDED_READING_INFORMATION:
                     continue
                 restrictions = {r.text for r in r_ele.findall("re_restr") if r.text}
                 reading_pri = [p.text or "" for p in r_ele.findall("re_pri")]
                 for surface, surface_pri in surfaces.items():
                     if restrictions and surface not in restrictions:
                         continue
-                    batch.append((surface, reading, priority(surface_pri + reading_pri)))
-                    pairs += 1
+                    # When JMdict marks only one spelling as common, keep that
+                    # surface ahead of historical/variant spellings even when
+                    # all of them share a common reading tag.
+                    pair_priority = priority(
+                        surface_pri if has_surface_priority else reading_pri
+                    )
+                    reading_priority = priority(reading_pri)
+                    batch.append(
+                        (surface, reading, pair_priority, reading_priority,
+                         reading_position, 0)
+                    )
+                    # Generating every obscure/historical variant would more
+                    # than double the bundled mobile database and crowd normal
+                    # IME candidates. JMdict-prioritized vocabulary covers the
+                    # useful conversion set while base-form lookup stays full.
+                    if pair_priority < 100:
+                        batch.extend(
+                            (inflected_surface, inflected_reading, pair_priority,
+                             reading_priority, reading_position, form_rank)
+                            for inflected_surface, inflected_reading, form_rank
+                            in inflected_forms(surface, reading, pos_tags)
+                        )
             elem.clear()
             if len(batch) >= 40_000:
-                db.executemany(
-                    """INSERT INTO word_reading(surface, reading, priority)
-                       VALUES (?, ?, ?)
-                       ON CONFLICT(surface, reading) DO UPDATE SET
-                         priority = min(priority, excluded.priority)""",
-                    batch,
-                )
-                batch.clear()
+                flush()
     if batch:
-        db.executemany(
-            """INSERT INTO word_reading(surface, reading, priority)
-               VALUES (?, ?, ?)
-               ON CONFLICT(surface, reading) DO UPDATE SET
-                 priority = min(priority, excluded.priority)""",
-            batch,
-        )
-    unique_pairs = db.execute("SELECT count(*) FROM word_reading").fetchone()[0]
-    return entries, unique_pairs
+        flush()
+    base_pairs = db.execute(
+        "SELECT count(*) FROM word_reading WHERE form_rank=0"
+    ).fetchone()[0]
+    inflected_pairs = db.execute(
+        "SELECT count(*) FROM word_reading WHERE form_rank>0"
+    ).fetchone()[0]
+    return entries, base_pairs, inflected_pairs
 
 
 def model_labels(model_archive: Path) -> set[str]:
@@ -255,7 +441,7 @@ def main() -> int:
         chars, kanji_readings, kanji_priorities, kanjidic_date = import_kanjidic(
             db, args.kanjidic
         )
-        entries, word_pairs = import_jmdict(db, args.jmdict)
+        entries, word_pairs, inflected_pairs = import_jmdict(db, args.jmdict)
         labels = model_labels(args.model_archive)
         han_labels, missing = validate(db, labels)
         metadata = {
@@ -269,6 +455,7 @@ def main() -> int:
             "kanji_priorities": str(kanji_priorities),
             "jmdict_entries": str(entries),
             "word_pairs": str(word_pairs),
+            "inflected_pairs": str(inflected_pairs),
             "model_labels": str(len(labels)),
             "model_han_labels": str(han_labels),
             "model_missing_readings": str(len(missing)),

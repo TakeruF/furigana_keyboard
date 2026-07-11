@@ -12,12 +12,13 @@ class ReadingDatabaseTest {
     @Test
     fun databaseMeetsCoverageContract() {
         connect().use { db ->
-            assertEquals("3", metadata(db, "schema_version"))
+            assertEquals("6", metadata(db, "schema_version"))
             assertEquals("13108", metadata(db, "kanji_characters"))
             assertTrue(metadata(db, "kanji_priorities").toInt() >= 3_000)
             assertEquals("6356", metadata(db, "model_han_labels"))
             assertEquals("0", metadata(db, "model_missing_readings"))
             assertTrue(metadata(db, "word_pairs").toInt() >= 240_000)
+            assertTrue(metadata(db, "inflected_pairs").toInt() >= 15_000)
         }
     }
 
@@ -54,6 +55,8 @@ class ReadingDatabaseTest {
             assertEquals("おとな", readings(db, "大人", "word_reading").first())
             val japan = readings(db, "日本", "word_reading").take(2).toSet()
             assertEquals(setOf("にっぽん", "にほん"), japan)
+            assertEquals(listOf("げんご"), readings(db, "言語", "word_reading"))
+            assertTrue(rawWordReadings(db, "言語").none { it == "げんきょ" })
         }
     }
 
@@ -103,6 +106,106 @@ class ReadingDatabaseTest {
         }
     }
 
+    @Test
+    fun commonInflectionsAreGeneratedFromDictionaryBaseForms() {
+        connect().use { db ->
+            val expected = mapOf(
+                "考えて" to "かんがえて",
+                "食べて" to "たべて",
+                "飲んで" to "のんで",
+                "書いた" to "かいた",
+                "話した" to "はなした",
+                "読んだ" to "よんだ",
+                "大きかった" to "おおきかった",
+                "高くない" to "たかくない",
+                "来て" to "きて",
+                "使え" to "つかえ",
+                "使えて" to "つかえて"
+            )
+            expected.forEach { (surface, reading) ->
+                db.prepareStatement(
+                    "SELECT form_rank FROM word_reading WHERE surface=? AND reading=?"
+                ).use { statement ->
+                    statement.setString(1, surface)
+                    statement.setString(2, reading)
+                    statement.executeQuery().use { result ->
+                        assertTrue("Missing generated pair $surface/$reading", result.next())
+                        assertTrue(result.getInt(1) > 0)
+                    }
+                }
+            }
+        }
+    }
+
+    @Test
+    fun exactInflectionPrecedesLongerPhraseAndVariantSpellings() {
+        connect().use { db ->
+            db.prepareStatement(
+                """SELECT surface, min(priority) AS best_priority,
+                          min(CASE WHEN reading=? THEN 0 ELSE 1 END) AS exact_match,
+                          min(form_rank) AS best_form_rank
+                   FROM word_reading
+                   WHERE reading>=? AND reading<?
+                   GROUP BY surface
+                   ORDER BY exact_match, best_priority, best_form_rank,
+                            length(surface), surface
+                   LIMIT 5"""
+            ).use { statement ->
+                val reading = "かんがえて"
+                statement.setString(1, reading)
+                statement.setString(2, reading)
+                statement.setString(
+                    3,
+                    reading + String(Character.toChars(Character.MAX_CODE_POINT))
+                )
+                statement.executeQuery().use { result ->
+                    assertTrue(result.next())
+                    assertEquals("考えて", result.getString(1))
+                }
+            }
+        }
+    }
+
+    @Test
+    fun commonGodanPotentialAndImperativeWinOverRareHomophones() {
+        connect().use { db ->
+            listOf(
+                Triple("つかえ", "使え", 1),
+                Triple("つかえる", "使える", 1),
+                Triple("つかえて", "使えて", 5)
+            ).forEach { (reading, expectedSurface, visibleLimit) ->
+                db.prepareStatement(
+                    """SELECT surface, min(priority) AS best_priority,
+                              min(CASE WHEN reading=? THEN 0 ELSE 1 END) AS exact_match,
+                              min(form_rank) AS best_form_rank
+                       FROM word_reading
+                       WHERE reading>=? AND reading<?
+                       GROUP BY surface
+                       ORDER BY exact_match, best_priority, best_form_rank,
+                                length(surface), surface
+                       LIMIT ?"""
+                ).use { statement ->
+                    statement.setString(1, reading)
+                    statement.setString(2, reading)
+                    statement.setString(
+                        3,
+                        reading + String(Character.toChars(Character.MAX_CODE_POINT))
+                    )
+                    statement.setInt(4, visibleLimit)
+                    statement.executeQuery().use { result ->
+                        val surfaces = buildList {
+                            while (result.next()) add(result.getString(1))
+                        }
+                        assertTrue(
+                            "$expectedSurface is not visible for $reading: $surfaces",
+                            expectedSurface in surfaces
+                        )
+                    }
+                }
+            }
+        }
+    }
+
     private fun connect(): Connection = DriverManager.getConnection("jdbc:sqlite:${database.absolutePath}")
 
     private fun metadata(db: Connection, key: String): String = db.prepareStatement(
@@ -116,15 +219,36 @@ class ReadingDatabaseTest {
     }
 
     private fun readings(db: Connection, surface: String, table: String): List<String> {
-        val key = if (table == "kanji_reading") "literal" else "surface"
-        val order = if (table == "kanji_reading") "kind, position" else "priority, reading"
-        return db.prepareStatement("SELECT reading FROM $table WHERE $key=? ORDER BY $order").use { statement ->
+        val query = if (table == "kanji_reading") {
+            "SELECT reading FROM kanji_reading WHERE literal=? ORDER BY kind, position"
+        } else {
+            """SELECT reading FROM word_reading AS candidate
+               WHERE surface=? AND (
+                 reading_priority < 100 OR NOT EXISTS (
+                   SELECT 1 FROM word_reading AS preferred
+                   WHERE preferred.surface = candidate.surface
+                     AND preferred.reading_priority < 100
+                 )
+               )
+               ORDER BY reading_priority, reading_position, form_rank, priority, reading"""
+        }
+        return db.prepareStatement(query).use { statement ->
             statement.setString(1, surface)
             statement.executeQuery().use { result ->
                 buildList { while (result.next()) add(result.getString(1)) }
             }
         }
     }
+
+    private fun rawWordReadings(db: Connection, surface: String): List<String> =
+        db.prepareStatement(
+            "SELECT reading FROM word_reading WHERE surface=? ORDER BY reading"
+        ).use { statement ->
+            statement.setString(1, surface)
+            statement.executeQuery().use { result ->
+                buildList { while (result.next()) add(result.getString(1)) }
+            }
+        }
 
     companion object {
         private lateinit var database: File
