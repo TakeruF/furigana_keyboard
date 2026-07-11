@@ -1,5 +1,6 @@
 package com.example.furiganakeyboard.update
 
+import java.io.ByteArrayInputStream
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertNull
 import org.junit.Test
@@ -82,5 +83,10 @@ class DirectUpdateManifestTest {
             }
             """.trimIndent()
         )
+    }
+
+    @Test(expected = IllegalArgumentException::class)
+    fun rejectsManifestBodyLargerThan64KiB() {
+        readDirectUpdateManifest(ByteArrayInputStream(ByteArray(64 * 1024 + 1)))
     }
 }

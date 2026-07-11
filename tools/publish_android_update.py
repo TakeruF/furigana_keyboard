@@ -14,6 +14,28 @@ from pathlib import Path
 SAFE_FILE_COMPONENT = re.compile(r"^[A-Za-z0-9._-]+$")
 
 
+def read_built_apk_version(apk: Path) -> tuple[int, str]:
+    """Read the version Gradle recorded for this exact APK output."""
+    metadata_path = apk.parent / "output-metadata.json"
+    if not metadata_path.is_file():
+        raise SystemExit(
+            f"Gradle output metadata not found: {metadata_path}. "
+            "Use the APK directly from app/build/outputs/apk/direct/release."
+        )
+    try:
+        metadata = json.loads(metadata_path.read_text(encoding="utf-8"))
+        element = next(
+            item
+            for item in metadata["elements"]
+            if item.get("outputFile") == apk.name
+        )
+        return int(element["versionCode"]), str(element["versionName"])
+    except (KeyError, TypeError, ValueError, StopIteration, json.JSONDecodeError) as error:
+        raise SystemExit(
+            f"Could not read version for {apk.name} from {metadata_path}: {error}"
+        ) from error
+
+
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser()
     parser.add_argument("--apk", required=True, type=Path)
@@ -39,6 +61,16 @@ def main() -> None:
         raise SystemExit("--version-name may contain only letters, digits, '.', '_' and '-'")
     if args.base_url.rstrip("/") != "https://downloads.hanlu.app":
         raise SystemExit("--base-url must be https://downloads.hanlu.app")
+    built_version_code, built_version_name = read_built_apk_version(args.apk)
+    if (built_version_code, built_version_name) != (
+        args.version_code,
+        args.version_name,
+    ):
+        raise SystemExit(
+            "Published version does not match the built APK: "
+            f"APK is {built_version_name} ({built_version_code}), arguments are "
+            f"{args.version_name} ({args.version_code})"
+        )
 
     args.output.mkdir(parents=True, exist_ok=True)
     apk_name = f"{args.version_name}.apk"

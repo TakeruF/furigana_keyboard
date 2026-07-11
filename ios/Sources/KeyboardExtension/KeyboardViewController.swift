@@ -127,7 +127,7 @@ final class KeyboardViewController: UIInputViewController {
     private func makeHandwritingPanel() -> UIView {
         handwritingControls.arrangedSubviews.forEach { handwritingControls.removeArrangedSubview($0); $0.removeFromSuperview() }
         handwritingControls.axis = .vertical; handwritingControls.spacing = 4; handwritingControls.distribution = .fillEqually
-        let globe = functionButton("🌐", accessibility: "Next keyboard") {}
+        let globe = functionButton("🌐", accessibility: AppStrings.text("next_keyboard")) {}
         globe.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
         let language = functionButton("かな", accessibility: AppStrings.text("japanese")) { [weak self] in self?.show(panel: .japanese) }
         handwritingControls.addArrangedSubview(controlRow(globe, language))

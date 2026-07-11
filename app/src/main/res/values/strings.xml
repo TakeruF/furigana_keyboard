@@ -61,16 +61,16 @@
     <string name="card_help_title">Help ›</string>
     <string name="card_help_desc">Setup, offline use and recognition coverage</string>
 
-    <string name="settings_reading_mode">Furigana display</string>
-    <string name="settings_behavior">Input behavior</string>
+
+
     <string name="settings_auto_commit">Continuous handwriting</string>
     <string name="settings_auto_commit_desc">Add recognized characters automatically and show word candidates after two characters</string>
     <string name="settings_section_plus" translatable="false">Furigana Plus</string>
     <string name="settings_plus_recognition">High-accuracy recognition</string>
     <string name="settings_plus_recognition_desc">Use Google’s on-device Japanese model with automatic bundled fallback</string>
     <string name="settings_plus_note">On by default for everyone. The first use downloads about 20 MB; turn this off if the download or recognition does not work reliably in your region.</string>
-    <string name="settings_haptics">Haptic feedback</string>
-    <string name="settings_haptics_desc">Vibrate gently for key presses and pen-down</string>
+
+
     <string name="settings_key_sound">Key sound</string>
     <string name="settings_key_sound_silent_note">Key sounds are muted while the system is in silent or vibrate mode.</string>
     <string name="sound_quiet">Quiet</string>
@@ -84,7 +84,7 @@
     <string name="haptic_medium_strong">Firm</string>
     <string name="haptic_strong">Strong</string>
     <string name="settings_section_accent_color">Accent color</string>
-    <string name="settings_accent_note">The settings background uses a subtle tint of the selected keyboard color.</string>
+
     <string name="settings_section_keyboard_height">Keyboard height</string>
     <string name="keyboard_height_compact">Compact</string>
     <string name="keyboard_height_standard">Standard</string>
@@ -94,12 +94,12 @@
     <string name="settings_show_number_row">Show number row</string>
     <string name="settings_show_number_row_desc">Show dedicated 0–9 keys above the English and romaji layouts</string>
     <!-- Retained only as resource fallbacks for older installed translations; no UI uses these. -->
-    <string name="settings_show_emoji_key">Show emoji key</string>
-    <string name="settings_show_emoji_key_desc">Add a key that opens the emoji panel</string>
-    <string name="settings_swipe_input">Swipe up for numbers and symbols</string>
-    <string name="settings_swipe_input_desc">Swipe upward on letter keys to enter their secondary character</string>
-    <string name="swipe_numbers_symbols">Numbers and symbols</string>
-    <string name="swipe_numbers_only">Numbers only</string>
+
+
+
+
+
+
     <string name="candidate_size_small">Small</string>
     <string name="candidate_size_standard">Standard</string>
     <string name="candidate_size_large">Large</string>
@@ -115,14 +115,13 @@
     <string name="settings_offline_model">Offline Japanese model</string>
     <string name="settings_offline_model_desc">Bundled in the app • 6,356 kanji labels + kana • no network required</string>
     <string name="settings_dictionary_version">Dictionary snapshot: %1$s</string>
-    <string name="settings_language_mode">App language</string>
+
     <string name="language_system">Use system language</string>
     <string name="language_japanese">日本語</string>
     <string name="language_chinese">简体中文</string>
     <string name="language_korean">한국어</string>
     <string name="language_english">English</string>
     <string name="about_version">Version %1$s</string>
-    <string name="about_offline">Recognition and reading lookup run entirely on this device.</string>
     <string name="about_edrdg">Dictionary data: KANJIDIC2 and JMdict by EDRDG, CC BY-SA 4.0.</string>
     <string name="about_zinnia">Recognition engine: Zinnia 0.07, New BSD License.</string>
     <string name="about_tegaki">Japanese handwriting model: Tegaki 0.3, LGPL 2.1.</string>
@@ -133,16 +132,18 @@
     <string name="license_zinnia">View Zinnia license</string>
     <string name="license_tegaki">View Tegaki model license</string>
     <string name="license_app_libraries">App library notices</string>
-    <string name="license_close">Close</string>
+
 
     <string name="settings_section_display">Display style</string>
     <string name="settings_section_input">Input behavior</string>
     <string name="settings_section_offline_data">Offline data</string>
-    <string name="settings_section_feedback">Feedback</string>
+
     <string name="settings_section_language">Display language</string>
     <string name="settings_section_keyboard_setup">Keyboard setup</string>
     <string name="settings_section_app">This app</string>
-    <string name="settings_section_open_source">Data sources &amp; licenses</string>
+    <string name="settings_section_dictionary_data">Dictionary data</string>
+    <string name="settings_section_handwriting_components">Handwriting recognition</string>
+    <string name="settings_section_app_libraries">App libraries</string>
     <string name="settings_kana_desc">Show dictionary readings in kana</string>
     <string name="settings_romaji_desc">Show readings in Latin letters</string>
     <string name="settings_off_desc">Hide readings below candidates</string>
@@ -154,7 +155,6 @@
     <string name="settings_enable_ime_desc">Open Android’s keyboard management screen</string>
     <string name="settings_choose_ime_desc">Switch the active input method</string>
     <string name="settings_version_label">App version</string>
-    <string name="settings_private_title">Private by design</string>
     <string name="settings_section_data_handling">Data handling</string>
     <string name="settings_section_permissions">Permissions &amp; access</string>
     <string name="settings_section_legal_documents">Legal documents</string>
@@ -188,6 +188,7 @@
     <string name="help_coverage_desc">Handwriting covers 6,356 JIS X 0208 kanji labels plus kana; arbitrary Unicode Han characters are outside the guaranteed range</string>
     <string name="help_support_title">Support and inquiries</string>
     <string name="help_support_desc">Email support@hanlu.app for help or to report a problem</string>
+    <string name="help_support_unavailable">No email app is available. Contact support@hanlu.app.</string>
     <string name="support_email" translatable="false">support@hanlu.app</string>
 
     <string name="onboarding_title">Set up Furigana Keyboard</string>
@@ -204,7 +205,7 @@
     <string name="update_is_current">You already have the latest version.</string>
     <string name="update_check_failed">Could not check for updates. Make sure this app was installed from Google Play.</string>
     <string name="update_cancelled">Update cancelled</string>
-    <string name="key_segment">Segments</string>
+
     <string name="segment_shrink">Shorter</string>
     <string name="segment_expand">Longer</string>
 </resources>

@@ -1,5 +1,7 @@
 import Foundation
 
+/// Shared app/extension localization. This table intentionally follows the
+/// in-app language preference instead of the process-wide iOS locale.
 enum AppStrings {
     static var language: AppLanguage {
         let selected = KeyboardPreferences().language
@@ -87,5 +89,12 @@ enum AppStrings {
         ,"small": [.japanese: "小", .english: "Small", .simplifiedChinese: "小", .korean: "작게"]
         ,"segment_shrink": [.japanese: "文節を縮める", .english: "Shorten segment", .simplifiedChinese: "缩短分段", .korean: "문절 줄이기"]
         ,"segment_expand": [.japanese: "文節を伸ばす", .english: "Extend segment", .simplifiedChinese: "扩展分段", .korean: "문절 늘리기"]
+        ,"next_keyboard": [.japanese: "次のキーボード", .english: "Next keyboard", .simplifiedChinese: "下一个键盘", .korean: "다음 키보드"]
+        ,"document_unavailable": [.japanese: "文書を読み込めませんでした。", .english: "The document could not be loaded.", .simplifiedChinese: "无法加载文档。", .korean: "문서를 불러올 수 없습니다."]
+        ,"accent_blue": [.japanese: "ブルー", .english: "Blue", .simplifiedChinese: "蓝色", .korean: "파란색"]
+        ,"accent_green": [.japanese: "グリーン", .english: "Green", .simplifiedChinese: "绿色", .korean: "초록색"]
+        ,"accent_orange": [.japanese: "オレンジ", .english: "Orange", .simplifiedChinese: "橙色", .korean: "주황색"]
+        ,"accent_pink": [.japanese: "ピンク", .english: "Pink", .simplifiedChinese: "粉色", .korean: "분홍색"]
+        ,"accent_purple": [.japanese: "パープル", .english: "Purple", .simplifiedChinese: "紫色", .korean: "보라색"]
     ]
 }

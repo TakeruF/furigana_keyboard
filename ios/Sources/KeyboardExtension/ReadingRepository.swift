@@ -37,7 +37,7 @@ final class ReadingRepository {
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(statement) }
         bind(text, at: 1, to: statement)
-        sqlite3_bind_int(statement, 2, Int32(limit))
+        _ = sqlite3_bind_int(statement, 2, Int32(limit))
         var output: [String] = []
         while sqlite3_step(statement) == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) {
             output.append(String(cString: value))
@@ -123,7 +123,7 @@ final class ReadingRepository {
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { return [] }
         defer { sqlite3_finalize(statement) }
         for (index, value) in values.enumerated() { bind(value, at: Int32(index + 1), to: statement) }
-        sqlite3_bind_int(statement, Int32(values.count + 1), Int32(limit * 3))
+        _ = sqlite3_bind_int(statement, Int32(values.count + 1), Int32(limit * 3))
         var order: [String] = []
         var grouped: [String: [String]] = [:]
         while sqlite3_step(statement) == SQLITE_ROW,

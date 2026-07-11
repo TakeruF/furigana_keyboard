@@ -1,0 +1,25 @@
+version: 2
+updates:
+  - package-ecosystem: gradle
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      android-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: npm
+    directory: "/about"
+    schedule:
+      interval: monthly
+    groups:
+      about-dependencies:
+        patterns: ["*"]
+
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]

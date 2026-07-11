@@ -41,7 +41,12 @@ object Haptics {
 
     /** The lightest feedback for toggles and single-choice changes. */
     fun selection(view: View) {
-        perform(view, HapticFeedbackConstants.TEXT_HANDLE_MOVE, 8)
+        val feedback = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O_MR1) {
+            HapticFeedbackConstants.TEXT_HANDLE_MOVE
+        } else {
+            HapticFeedbackConstants.VIRTUAL_KEY
+        }
+        perform(view, feedback, 8)
     }
 
     private fun perform(view: View, systemConstant: Int, durationMs: Long) {

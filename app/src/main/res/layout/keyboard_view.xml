@@ -3,12 +3,16 @@
      top    : horizontally scrolling candidates
      middle : wide writing surface with editing and punctuation shortcuts
      bottom : input-mode and system controls
-     The symbol / ABC panels are added to panelContainer at runtime. -->
+     The symbol / ABC panels are added to panelContainer at runtime.
+     This is an InputMethodService view, so activity-theme overdraw inference
+     does not describe the actual IME window. -->
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="vertical"
     android:background="@color/kbd_background"
+    tools:ignore="Overdraw"
     android:paddingLeft="4dp"
     android:paddingRight="4dp"
     android:paddingBottom="6dp">

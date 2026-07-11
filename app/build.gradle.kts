@@ -20,8 +20,8 @@ android {
         applicationId = "app.hanlu.furiganakeyboard"
         minSdk = 24
         targetSdk = 35
-        versionCode = 1
-        versionName = "1.0"
+        versionCode = 2
+        versionName = "1.0.0-rc.1"
         testInstrumentationRunner = "androidx.test.runner.AndroidJUnitRunner"
 
         ndk {
@@ -105,19 +105,30 @@ android {
 
 dependencies {
     implementation("androidx.core:core-ktx:1.13.1")
-    implementation("androidx.appcompat:appcompat:1.7.0")
+    implementation("androidx.appcompat:appcompat:1.7.1")
     implementation("com.google.android.material:material:1.12.0")
     implementation("androidx.work:work-runtime-ktx:2.9.1")
     // Keep Play's self-update code out of the directly distributed APK, and
     // keep the external APK updater out of the Play artifact.
     "playImplementation"("com.google.android.play:app-update:2.1.0")
-    // 18.1.0 is the latest line compatible with this project's Kotlin 1.9 toolchain.
-    implementation("com.google.mlkit:digital-ink-recognition:18.1.0")
+    implementation("com.google.mlkit:digital-ink-recognition:19.0.0")
 
     // Local unit tests for the pure Kotlin logic (romaji / dictionary).
     testImplementation("junit:junit:4.13.2")
-    testImplementation("org.json:json:20240303")
+    testImplementation("org.json:json:20250517")
     testImplementation("org.xerial:sqlite-jdbc:3.46.1.0")
-    androidTestImplementation("androidx.test:runner:1.6.2")
-    androidTestImplementation("androidx.test.ext:junit:1.2.1")
+    androidTestImplementation("androidx.test:runner:1.7.0")
+    androidTestImplementation("androidx.test.ext:junit:1.3.0")
+}
+
+// A release artifact without the configured upload/signing key must never be
+// mistaken for something that can be published.
+tasks.matching {
+    it.name == "prePlayReleaseBuild" || it.name == "preDirectReleaseBuild"
+}.configureEach {
+    doFirst {
+        check(keystorePropertiesFile.isFile) {
+            "Release builds require key.properties; see RELEASING.md"
+        }
+    }
 }

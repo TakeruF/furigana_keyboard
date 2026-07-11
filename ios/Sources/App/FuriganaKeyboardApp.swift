@@ -171,7 +171,7 @@ private struct SettingsView: View {
                 NavigationLink(AppStrings.text("licenses")) { LicensesView() }
             }
             Section(AppStrings.text("about")) {
-                LabeledContent(AppStrings.text("version"), value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0")
+                LabeledContent(AppStrings.text("version"), value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
                 Link(AppStrings.text("support"), destination: URL(string: "mailto:support@hanlu.app")!)
                 Link(AppStrings.text("website"), destination: URL(string: "https://hanlu.app")!)
             }
@@ -192,7 +192,7 @@ private struct LegalView: View {
     let title: String; let resource: String
     var body: some View { ScrollView { Text(content).frame(maxWidth: .infinity, alignment: .leading).padding() }.navigationTitle(title).navigationBarTitleDisplayMode(.inline) }
     private var content: String {
-        guard let url = Bundle.main.url(forResource: resource, withExtension: "txt"), let value = try? String(contentsOf: url, encoding: .utf8) else { return "文書を読み込めませんでした。" }
+        guard let url = Bundle.main.url(forResource: resource, withExtension: "txt"), let value = try? String(contentsOf: url, encoding: .utf8) else { return AppStrings.text("document_unavailable") }
         return value
     }
 }
@@ -213,5 +213,5 @@ private extension AccentChoice {
     var swiftUIColor: Color {
         switch self { case .blue: .blue; case .green: .green; case .orange: .orange; case .pink: .pink; case .purple: .purple }
     }
-    var label: String { rawValue.capitalized }
+    var label: String { AppStrings.text("accent_\(rawValue)") }
 }

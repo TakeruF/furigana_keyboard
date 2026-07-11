@@ -17,6 +17,7 @@ import com.example.furiganakeyboard.view.KeyFactory.Kind
  * ABC input panel: a simple QWERTY keyboard (optional number row + three letter
  * rows + control row) with a one-shot shift, replacing the old placeholder toast.
  */
+@SuppressLint("ViewConstructor")
 class QwertyPadView(
     context: Context,
     private val includeJapaneseLongVowelKey: Boolean = false,

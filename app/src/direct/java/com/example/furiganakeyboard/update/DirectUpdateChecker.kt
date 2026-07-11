@@ -1,5 +1,7 @@
 package com.example.furiganakeyboard.update
 
+import java.io.ByteArrayOutputStream
+import java.io.InputStream
 import java.net.URL
 import javax.net.ssl.HttpsURLConnection
 import org.json.JSONObject
@@ -55,16 +57,30 @@ object DirectUpdateChecker {
             require(connection.url.protocol == "https" &&
                 connection.url.host.equals(DOWNLOAD_HOST, ignoreCase = true)
             ) { "Update manifest redirected outside $DOWNLOAD_HOST" }
-            val json = connection.inputStream.bufferedReader(Charsets.UTF_8).use { it.readText() }
-            require(json.length <= MAX_MANIFEST_CHARS) { "Update manifest is too large" }
+            val json = connection.inputStream.use(::readDirectUpdateManifest)
             DirectUpdateManifest.parse(json)
         } finally {
             connection.disconnect()
         }
     }
+}
 
-    private const val MAX_MANIFEST_CHARS = 64 * 1024
+internal fun readDirectUpdateManifest(stream: InputStream): String {
+    val output = ByteArrayOutputStream()
+    stream.buffered().use { input ->
+        val buffer = ByteArray(DEFAULT_BUFFER_SIZE)
+        while (true) {
+            val count = input.read(buffer)
+            if (count < 0) break
+            require(output.size() + count <= MAX_MANIFEST_BYTES) {
+                "Update manifest is too large"
+            }
+            output.write(buffer, 0, count)
+        }
+    }
+    return output.toString(Charsets.UTF_8.name())
 }
 
 private const val DOWNLOAD_HOST = "downloads.hanlu.app"
 private const val MANIFEST_URL = "https://downloads.hanlu.app/latest.json"
+private const val MAX_MANIFEST_BYTES = 64 * 1024

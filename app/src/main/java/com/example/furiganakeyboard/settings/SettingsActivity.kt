@@ -1,6 +1,7 @@
 package com.example.furiganakeyboard.settings
 
 import android.Manifest
+import android.content.ActivityNotFoundException
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -807,18 +808,9 @@ class SettingsActivity : AppCompatActivity() {
                 R.string.settings_check_update_desc,
                 R.drawable.ic_settings_info
             ) { checkForUpdates(manual = true) },
-            infoRow(
-                getString(R.string.settings_private_title),
-                getString(R.string.about_offline),
-                getString(R.string.settings_status_on_device)
-            )
         )))
-        body.addView(sectionLabel(R.string.settings_section_open_source))
+        body.addView(sectionLabel(R.string.settings_section_dictionary_data))
         body.addView(groupCard(listOf(
-            infoRow(
-                getString(R.string.about_plus_title),
-                getString(R.string.about_plus_desc)
-            ),
             actionRow(R.string.license_edrdg, summary = getString(R.string.about_edrdg)) {
                 showAsset(
                     R.string.license_edrdg,
@@ -827,7 +819,14 @@ class SettingsActivity : AppCompatActivity() {
                     ::showAboutDetails,
                     "licenses/EDRDG-CC-BY-SA-4.0.txt"
                 )
-            },
+            }
+        )))
+        body.addView(sectionLabel(R.string.settings_section_handwriting_components))
+        body.addView(groupCard(listOf(
+            infoRow(
+                getString(R.string.about_plus_title),
+                getString(R.string.about_plus_desc)
+            ),
             actionRow(R.string.license_zinnia, summary = getString(R.string.about_zinnia)) {
                 showAsset(
                     R.string.license_zinnia,
@@ -845,7 +844,10 @@ class SettingsActivity : AppCompatActivity() {
                     ::showAboutDetails,
                     "licenses/TEGAKI-MODEL-LGPL-2.1.txt"
                 )
-            },
+            }
+        )))
+        body.addView(sectionLabel(R.string.settings_section_app_libraries))
+        body.addView(groupCard(listOf(
             actionRow(R.string.license_app_libraries, summary = getString(R.string.about_app_libraries)) {
                 showAssets(
                     R.string.license_app_libraries,
@@ -903,7 +905,11 @@ class SettingsActivity : AppCompatActivity() {
                 val intent = Intent(Intent.ACTION_SENDTO, Uri.parse("mailto:$email")).apply {
                     putExtra(Intent.EXTRA_SUBJECT, getString(R.string.app_name))
                 }
-                if (intent.resolveActivity(packageManager) != null) startActivity(intent)
+                try {
+                    startActivity(intent)
+                } catch (_: ActivityNotFoundException) {
+                    Toast.makeText(this, R.string.help_support_unavailable, Toast.LENGTH_LONG).show()
+                }
             }
         )))
         showDetail(

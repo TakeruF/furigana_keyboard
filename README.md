@@ -63,7 +63,7 @@ recorded in `tools/reading-data-sources.txt`.
 Requirements:
 
 - JDK 17
-- Android SDK 34
+- Android SDK 35 (Build Tools 35.0.0)
 - Android NDK `27.2.12479018`
 - CMake `3.22.1`
 
@@ -222,6 +222,9 @@ clients from observing a release before all referenced files are available.
 
 ## Publishing direct Android updates
 
+アプリ、iOS、読み辞書、サイトを含む公開前チェックとバージョン番号の規則は
+[`RELEASING.md`](./RELEASING.md)を先に確認してください。
+
 First increase `versionCode` and `versionName` in `app/build.gradle.kts`, then
 build the direct APK. Prepare the versioned APK and discovery manifest with:
 
@@ -243,6 +246,13 @@ Upload the APK first and `latest.json` last so clients are never directed to
 an APK that is not available yet. `versionCode` must increase for every
 release; the app uses it, rather than `versionName`, to decide whether an
 update is newer.
+
+Verify the public endpoint after uploading. Add `--download-apk` for the final
+release check, which downloads the referenced APK and compares its SHA-256:
+
+```bash
+python3 tools/check_android_update.py --current-version-code 11 --download-apk
+```
 
 ## Usage
 

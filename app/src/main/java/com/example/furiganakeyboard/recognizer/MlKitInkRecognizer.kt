@@ -5,14 +5,14 @@ import android.os.Looper
 import android.util.Log
 import com.google.mlkit.common.model.DownloadConditions
 import com.google.mlkit.common.model.RemoteModelManager
-import com.google.mlkit.vision.digitalink.DigitalInkRecognition
-import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModel
-import com.google.mlkit.vision.digitalink.DigitalInkRecognitionModelIdentifier
-import com.google.mlkit.vision.digitalink.DigitalInkRecognizer
-import com.google.mlkit.vision.digitalink.DigitalInkRecognizerOptions
-import com.google.mlkit.vision.digitalink.Ink
-import com.google.mlkit.vision.digitalink.RecognitionContext
-import com.google.mlkit.vision.digitalink.WritingArea
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognition
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModel
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognitionModelIdentifier
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognizer
+import com.google.mlkit.vision.digitalink.recognition.DigitalInkRecognizerOptions
+import com.google.mlkit.vision.digitalink.recognition.Ink
+import com.google.mlkit.vision.digitalink.recognition.RecognitionContext
+import com.google.mlkit.vision.digitalink.recognition.WritingArea
 import java.util.concurrent.atomic.AtomicLong
 
 /** Optional high-accuracy, on-device recognizer backed by Google ML Kit. */
@@ -159,4 +159,3 @@ class MlKitInkRecognizer : InkRecognizer {
         private const val RESULT_LIMIT = 10
     }
 }
-
