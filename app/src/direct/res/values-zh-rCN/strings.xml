@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_check_update_desc">通过 downloads.hanlu.app 检查最新版本</string>
+    <string name="update_check_failed">无法检查更新。请检查网络连接后重试。</string>
+    <string name="direct_update_available_version">版本 %1$s 已可用。</string>
+    <string name="direct_update_download">下载</string>
+    <string name="direct_update_downloading">正在下载并准备更新</string>
+    <string name="direct_update_download_started">已开始下载更新。</string>
+    <string name="direct_update_download_failed">无法下载更新。</string>
+    <string name="direct_update_verification_failed">无法验证下载的更新，已将其删除。</string>
+    <string name="direct_update_install_permission_title">允许安装更新</string>
+    <string name="direct_update_install_permission_message">要安装直接分发的更新，请允许注音键盘安装应用。Android仍会要求您确认每次更新。</string>
+    <string name="direct_update_install_permission_action">打开设置</string>
+    <string name="direct_update_install_failed">无法打开Android安装程序。</string>
+</resources>

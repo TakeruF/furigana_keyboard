@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Furigana Keyboard</string>
+    <string name="app_name" translatable="false">Furigana Keyboard</string>
     <string name="ime_name">Handwriting Furigana Keyboard</string>
     <string name="subtype_ja">Japanese handwriting</string>
     <string name="settings_title">Furigana Keyboard</string>
@@ -90,8 +90,10 @@
     <string name="keyboard_height_standard">Standard</string>
     <string name="keyboard_height_tall">Tall</string>
     <string name="settings_section_candidate_size">Candidate text size</string>
-    <!-- Retained only as resource fallbacks for older installed translations; no UI uses these. -->
     <string name="settings_section_keys">Keyboard keys</string>
+    <string name="settings_show_number_row">Show number row</string>
+    <string name="settings_show_number_row_desc">Show dedicated 0–9 keys above the English and romaji layouts</string>
+    <!-- Retained only as resource fallbacks for older installed translations; no UI uses these. -->
     <string name="settings_show_emoji_key">Show emoji key</string>
     <string name="settings_show_emoji_key_desc">Add a key that opens the emoji panel</string>
     <string name="settings_swipe_input">Swipe up for numbers and symbols</string>
@@ -163,7 +165,7 @@
     <string name="privacy_input_desc">Processed temporarily on this device; never collected by the app developer</string>
     <string name="privacy_not_collected">Not collected</string>
     <string name="privacy_network_title">Network communication</string>
-    <string name="privacy_network_desc">Furigana Plus uses the network for its optional model and ML Kit service data; handwriting and typed text are not sent</string>
+    <string name="privacy_network_desc">Used only for signed dictionary updates and Furigana Plus model data; handwriting and typed text are not sent</string>
     <string name="privacy_model_only">Model only</string>
     <string name="privacy_none">None</string>
     <string name="privacy_storage_title">Local storage</string>
@@ -179,7 +181,7 @@
     <string name="terms_desc">Conditions, recognition limitations and disclaimers</string>
     <string name="third_party_notices_title">Third-party notices</string>
     <string name="third_party_notices_desc">Dictionary, recognition engine and model licenses</string>
-    <string name="legal_effective_date">Policy version: July 10, 2026</string>
+    <string name="legal_effective_date">Policy version: July 11, 2026</string>
     <string name="help_offline_title">Using the keyboard offline</string>
     <string name="help_offline_desc">Recognition and reading lookup work without Google services or a network connection</string>
     <string name="help_coverage_title">Recognition coverage</string>

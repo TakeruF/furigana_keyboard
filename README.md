@@ -16,14 +16,16 @@ Bundled recognition remains available on both platforms without a network.
   recognition is unreliable in the user's region.
 - KANJIDIC2 snapshot with 13,108 characters and 40,510 Japanese on, kun,
   nanori, and radical-name readings.
-- JMdict snapshot with 217,819 entries and 247,673 surface/reading pairs.
+- JMdict snapshot with 217,819 entries and 247,673 surface/reading pairs,
+  plus 213,359 place and railway-station pairs from JMnedict.
 - KANJIDIC2 school/Jōyō grade and newspaper-frequency metadata gently
   re-ranks visually close kanji candidates toward commonly used characters.
 - Unicode-code-point-safe composition, including supplementary-plane kanji.
-- Word completion from the current handwritten composition. Exact JMdict
+- Word completion from the current handwritten composition. Exact dictionary
   readings are shown instead of guessed per-character concatenations. One or
   two characters can be written on the same pad; side-by-side ink is segmented,
-  recognized from left to right, and matched against JMdict automatically.
+  recognized from left to right, and matched against the on-device dictionaries
+  automatically.
 - Kana, romaji, or hidden reading display.
 - Japanese, Simplified Chinese, Korean, and English UI.
 - Two-column card settings hub with focused pages for display, handwriting,
@@ -34,14 +36,15 @@ Bundled recognition remains available on both platforms without a network.
 ## On-device recognition and licensing
 
 Recognition and dictionary lookup always run on device. Android requests the
-`INTERNET` permission only for optional Furigana Plus model delivery and ML Kit
-service data; handwriting and typed text are not sent. Turning Plus off keeps
-the bundled recognizer fully usable offline. The first Plus activation downloads
-an approximately 20 MB Japanese model.
+`INTERNET` permission for signed reading-dictionary updates and optional
+Furigana Plus model delivery; handwriting and typed text are not sent. The
+bundled recognizer and dictionary remain usable offline. The first Plus
+activation downloads an approximately 20 MB Japanese model.
 
 - Zinnia runtime: New BSD License.
 - Tegaki Japanese 0.3 model: LGPL 2.1.
-- KANJIDIC2/JMdict and the generated `reading.db`: CC BY-SA 4.0, EDRDG.
+- KANJIDIC2/JMdict/JMnedict and the generated `reading.db`: CC BY-SA 4.0,
+  EDRDG.
 - Google ML Kit Digital Ink Recognition: Google APIs/ML Kit terms.
 
 Notices are bundled under `app/src/main/assets/licenses`; localized privacy
@@ -61,10 +64,18 @@ Requirements:
 - CMake `3.22.1`
 
 ```bash
-./gradlew :app:assembleDebug
-./gradlew :app:testDebugUnitTest
-./gradlew :app:connectedDebugAndroidTest
+./gradlew :app:assemblePlayDebug :app:assembleDirectDebug
+./gradlew :app:testPlayDebugUnitTest :app:testDirectDebugUnitTest
+./gradlew :app:connectedPlayDebugAndroidTest
 ```
+
+Android has two distribution flavors. `play` uses Google Play In-App Updates
+and contains no external APK updater. `direct` checks
+`https://downloads.hanlu.app/latest.json`, downloads the listed APK inside the
+app, verifies its SHA-256 digest and signing certificate, and then opens the
+Android installer after the user confirms. Build release artifacts with
+`:app:bundlePlayRelease` for Google Play and `:app:assembleDirectRelease` for
+the download site.
 
 The native library is built for `arm64-v8a`, `armeabi-v7a`, and `x86_64`, with
 16 KB ELF page alignment. The current universal debug APK is about 33 MB.
@@ -104,19 +115,79 @@ npm run dev
 
 ## Regenerating reading data
 
-Download the three pinned inputs listed in `tools/reading-data-sources.txt`,
+Download the four pinned inputs listed in `tools/reading-data-sources.txt`,
 then run:
 
 ```bash
 python3 tools/build_reading_db.py \
   --kanjidic /path/to/kanjidic2.xml.gz \
   --jmdict /path/to/JMdict_e.gz \
+  --jmnedict /path/to/JMnedict.xml.gz \
   --model-archive /path/to/tegaki-zinnia-japanese-0.3.zip \
   --output app/src/main/assets/reading.db
 ```
 
 Generation fails if source coverage falls below the expected thresholds or if
 any Han label in the bundled recognition model lacks a Japanese reading.
+
+## Publishing reading-data updates
+
+Reading data is distributed as static files; Supabase or another online
+database is not required. Upload the generated files to HTTPS object storage
+served at `downloads.hanlu.app/furigana/`. Android checks once per day while
+connected. On iOS, the container app checks at launch and when the user taps
+the update button; the keyboard extension remains offline and reads the
+verified database through its App Group.
+
+The local ECDSA signing key is stored at
+`.secrets/reading-update-private.pem` and is intentionally ignored by Git.
+Back it up in a secure password manager or secret store: losing it requires an
+app release to rotate the embedded public key. Never upload or commit it.
+
+For each release, increase `--version` monotonically and use the final public
+database URL:
+
+```bash
+python3 tools/publish_reading_update.py \
+  --database app/src/main/assets/reading.db \
+  --version 20260711 \
+  --database-url https://downloads.hanlu.app/furigana/reading-20260711.db \
+  --private-key .secrets/reading-update-private.pem
+```
+
+Upload all three files from `reading-update-dist/`:
+
+- `manifest.json` → `/furigana/manifest.json`
+- `manifest.json.sig` → `/furigana/manifest.json.sig`
+- `reading-<version>.db` → the URL recorded in the manifest
+
+The clients reject unsigned manifests, non-HTTPS database URLs, incompatible
+schemas, oversized files, hash mismatches, and corrupt SQLite databases. A
+failed update leaves the active or bundled database untouched.
+
+## Publishing direct Android updates
+
+First increase `versionCode` and `versionName` in `app/build.gradle.kts`, then
+build the direct APK. Prepare the versioned APK and discovery manifest with:
+
+```bash
+./gradlew :app:assembleDirectRelease
+python3 tools/publish_android_update.py \
+  --apk app/build/outputs/apk/direct/release/app-direct-release.apk \
+  --version-code 12 \
+  --version-name 1.2.0 \
+  --release-notes "Recognition improvements"
+```
+
+Upload both files from `android-update-dist/` without changing their names:
+
+- `<versionName>.apk` → `https://downloads.hanlu.app/<versionName>.apk`
+- `latest.json` → `https://downloads.hanlu.app/latest.json`
+
+Upload the APK first and `latest.json` last so clients are never directed to
+an APK that is not available yet. `versionCode` must increase for every
+release; the app uses it, rather than `versionName`, to decide whether an
+update is newer.
 
 ## Usage
 
@@ -126,12 +197,14 @@ any Han label in the bundled recognition model lacks a Japanese reading.
 4. Write one character, or write two characters side by side across the left
    and right halves of the handwriting pad.
 5. Side-by-side characters are recognized from left to right and their combined
-   alternatives are matched against JMdict. Tap a word candidate to replace and
-   commit it, or press space/enter to finish the current composition.
+   alternatives are matched against JMdict and JMnedict. Tap a word candidate
+   to replace and commit it, or press space/enter to finish the current
+   composition.
 
 ## Coverage boundary
 
 Handwriting recognition covers the agreed JIS X 0208 set, not every Unicode
 Han code point. Reading lookup covers KANJIDIC2 characters that have Japanese
-reading information. JMdict word candidates exclude proper-name-only entries
-and arbitrary out-of-dictionary inflections.
+reading information. Word candidates cover JMdict vocabulary plus place and
+railway station names from JMnedict; other proper-name-only entries and
+arbitrary out-of-dictionary inflections remain outside the supported scope.

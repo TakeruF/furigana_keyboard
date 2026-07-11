@@ -3,6 +3,8 @@
 The iOS project contains a small container app and a Japanese custom keyboard
 extension. The extension bundles the same Zinnia model and reading database as
 Android, performs recognition locally, and requests no open/network access.
+The container app can download signed dictionary updates into an App Group;
+the extension receives read-only access and keeps Full Access disabled.
 
 ## Generate and build
 
@@ -21,7 +23,10 @@ xcodebuild \
 
 For a device/App Store build, set your Apple Developer team and replace the
 example bundle identifiers in `project.yml` with identifiers owned by that
-team. Regenerate the project after changing `project.yml`.
+team. Enable the App Groups capability for both targets and register
+`group.app.hanlu.furiganakeyboard` (or change the identifier consistently in
+both entitlements and `ReadingUpdateSupport.swift`). Regenerate the project
+after changing `project.yml`.
 
 ## Enable on a device
 

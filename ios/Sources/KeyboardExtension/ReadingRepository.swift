@@ -7,8 +7,8 @@ final class ReadingRepository {
     private var database: OpaquePointer?
 
     init?(bundle: Bundle = .main) {
-        guard let path = bundle.path(forResource: "reading", ofType: "db"),
-              sqlite3_open_v2(path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
+        guard let url = ReadingDataLocation.databaseURL(bundle: bundle),
+              sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
             if database != nil { sqlite3_close(database) }
             database = nil
             return nil

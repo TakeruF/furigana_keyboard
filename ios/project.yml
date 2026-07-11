@@ -38,6 +38,7 @@ targets:
     settings:
       base:
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        CODE_SIGN_ENTITLEMENTS: Sources/App/FuriganaKeyboard.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard
         PRODUCT_NAME: Furigana Keyboard
         PRODUCT_MODULE_NAME: FuriganaKeyboard
@@ -45,6 +46,7 @@ targets:
     dependencies:
       - target: FuriganaKeyboardExtension
         embed: true
+      - sdk: libsqlite3.tbd
 
   FuriganaKeyboardExtension:
     type: app-extension
@@ -74,6 +76,7 @@ targets:
           NSExtensionPrincipalClass: "$(PRODUCT_MODULE_NAME).KeyboardViewController"
     settings:
       base:
+        CODE_SIGN_ENTITLEMENTS: Sources/KeyboardExtension/FuriganaKeyboardExtension.entitlements
         PRODUCT_BUNDLE_IDENTIFIER: app.hanlu.furiganakeyboard.keyboard
         PRODUCT_NAME: FuriganaKeyboardExtension
         PRODUCT_MODULE_NAME: FuriganaKeyboardExtension

@@ -45,14 +45,18 @@ object AppUpdateNotifications {
         )
     }
 
-    fun showIfNew(context: Context, availableVersionCode: Int) {
+    fun showIfNew(context: Context, availableVersionCode: Long) {
         if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU &&
             ContextCompat.checkSelfPermission(context, Manifest.permission.POST_NOTIFICATIONS) !=
             PackageManager.PERMISSION_GRANTED
         ) return
 
         val preferences = context.getSharedPreferences(PREFS_NAME, Context.MODE_PRIVATE)
-        if (preferences.getInt(LAST_NOTIFIED_VERSION, -1) == availableVersionCode) return
+        // Older builds stored this value as an Int. Reading through all avoids
+        // a ClassCastException while migrating those existing installations.
+        val lastNotifiedVersion =
+            (preferences.all[LAST_NOTIFIED_VERSION] as? Number)?.toLong() ?: -1L
+        if (lastNotifiedVersion == availableVersionCode) return
 
         val intent = Intent(context, SettingsActivity::class.java).apply {
             putExtra(EXTRA_CHECK_FOR_UPDATE, true)
@@ -73,7 +77,7 @@ object AppUpdateNotifications {
             .setContentIntent(pendingIntent)
             .build()
         NotificationManagerCompat.from(context).notify(NOTIFICATION_ID, notification)
-        preferences.edit().putInt(LAST_NOTIFIED_VERSION, availableVersionCode).apply()
+        preferences.edit().putLong(LAST_NOTIFIED_VERSION, availableVersionCode).apply()
     }
 
     private fun createChannel(context: Context) {

@@ -10,6 +10,8 @@ struct FuriganaKeyboardApp: App {
 }
 
 private struct SetupView: View {
+    @StateObject private var readingUpdater = ReadingDataUpdater()
+
     private let steps = [
         ("1", "設定を開く", "一般 → キーボード → キーボードの順に進みます"),
         ("2", "キーボードを追加", "「新しいキーボードを追加」からFurigana Keyboardを選びます"),
@@ -26,6 +28,7 @@ private struct SetupView: View {
                             stepCard(number: step.0, title: step.1, detail: step.2)
                         }
                     }
+                    dictionaryUpdateCard
                     privacyCard
                     Text("iOS版は初期プレビューです。手書き認識は端末内で実行され、入力内容を外部へ送信しません。")
                         .font(.footnote)
@@ -40,7 +43,33 @@ private struct SetupView: View {
             .background(Color(uiColor: .systemGroupedBackground))
             .navigationTitle("Furigana Keyboard")
             .navigationBarTitleDisplayMode(.inline)
+            .task { await readingUpdater.update() }
         }
+    }
+
+    private var dictionaryUpdateCard: some View {
+        VStack(alignment: .leading, spacing: 10) {
+            HStack {
+                Image(systemName: "books.vertical.fill")
+                    .foregroundStyle(Color.accentColor)
+                Text("読み辞書").font(.headline)
+                Spacer()
+                if readingUpdater.isUpdating {
+                    ProgressView().controlSize(.small)
+                }
+            }
+            Text(readingUpdater.status)
+                .font(.subheadline)
+                .foregroundStyle(.secondary)
+            Button("辞書更新を確認") {
+                Task { await readingUpdater.update() }
+            }
+            .buttonStyle(.bordered)
+            .disabled(readingUpdater.isUpdating)
+        }
+        .frame(maxWidth: .infinity, alignment: .leading)
+        .padding(17)
+        .background(Color(uiColor: .secondarySystemGroupedBackground), in: RoundedRectangle(cornerRadius: 18))
     }
 
     private var hero: some View {
@@ -88,7 +117,7 @@ private struct SetupView: View {
                 .foregroundStyle(.green)
             VStack(alignment: .leading, spacing: 5) {
                 Text("フルアクセスは不要").font(.headline)
-                Text("認識モデルと読み辞書はキーボードに同梱されています。ネットワーク接続を許可せず利用できます。")
+                Text("キーボードは通信しません。親アプリが署名済み辞書を取得し、失敗時は同梱辞書を使用します。")
                     .font(.subheadline)
                     .foregroundStyle(.secondary)
             }

@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="settings_check_update_desc">downloads.hanlu.appで最新版を確認します</string>
+    <string name="update_check_failed">アップデートを確認できませんでした。通信状態を確認して、もう一度お試しください。</string>
+    <string name="direct_update_available_version">バージョン%1$sを利用できます。</string>
+    <string name="direct_update_download">ダウンロード</string>
+    <string name="direct_update_downloading">アップデートをダウンロードして準備しています</string>
+    <string name="direct_update_download_started">アップデートのダウンロードを開始しました。</string>
+    <string name="direct_update_download_failed">アップデートをダウンロードできませんでした。</string>
+    <string name="direct_update_verification_failed">ダウンロードしたアップデートを検証できなかったため削除しました。</string>
+    <string name="direct_update_install_permission_title">アップデートのインストールを許可</string>
+    <string name="direct_update_install_permission_message">直接配布版を更新するため、ふりがなキーボードからのアプリのインストールを許可してください。更新ごとにAndroidの確認画面が表示されます。</string>
+    <string name="direct_update_install_permission_action">設定を開く</string>
+    <string name="direct_update_install_failed">Androidのインストーラーを開けませんでした。</string>
+</resources>

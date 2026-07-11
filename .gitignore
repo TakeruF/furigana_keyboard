@@ -12,6 +12,12 @@
 .externalNativeBuild
 .cxx/
 *.apk
+__pycache__/
+*.pyc
+
+# Local signing material for downloadable dictionary releases.
+/.secrets/
+/reading-update-dist/
 
 # Generated iOS project and local Xcode state (regenerate with XcodeGen).
 /ios/FuriganaKeyboard.xcodeproj/

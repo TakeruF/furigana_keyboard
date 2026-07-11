@@ -39,6 +39,7 @@ import com.example.furiganakeyboard.view.SymbolPadView
 import com.example.furiganakeyboard.view.AccentStyle
 import com.example.furiganakeyboard.view.KeyboardPanelContainer
 import com.example.furiganakeyboard.view.KeySounds
+import com.example.furiganakeyboard.update.ReadingDataUpdates
 
 /** Japanese handwriting IME with optional Plus recognition and bundled fallback. */
 class FuriganaImeService : InputMethodService() {
@@ -76,6 +77,7 @@ class FuriganaImeService : InputMethodService() {
 
     override fun onCreate() {
         super.onCreate()
+        ReadingDataUpdates.initialize(this)
         prefs = KeyboardPrefs(this)
         appliedLocaleTag = prefs.localeTag
         candidatePipeline = CandidatePipeline({ ReadingRepository(this) })
@@ -264,7 +266,7 @@ class FuriganaImeService : InputMethodService() {
                 }
             }
             Panel.ENGLISH -> if (englishPad == null) {
-                englishPad = QwertyPadView(this).also { pad ->
+                englishPad = QwertyPadView(this, showNumberRow = prefs.showNumberRow).also { pad ->
                     addPanel(pad)
                     pad.onText = { commitDirect(it) }
                     pad.onDelete = { deleteBeforeCursor() }
@@ -274,7 +276,11 @@ class FuriganaImeService : InputMethodService() {
                 }
             }
             Panel.ROMAJI -> if (romajiPad == null) {
-                romajiPad = QwertyPadView(this, includeJapaneseLongVowelKey = true).also { pad ->
+                romajiPad = QwertyPadView(
+                    this,
+                    includeJapaneseLongVowelKey = true,
+                    showNumberRow = prefs.showNumberRow
+                ).also { pad ->
                     addPanel(pad)
                     pad.onText = { appendRomajiInput(it) }
                     pad.onDelete = { deleteRomajiInput() }
@@ -483,6 +489,8 @@ class FuriganaImeService : InputMethodService() {
         if (!this::panelContainer.isInitialized || !this::candidateBar.isInitialized) return
         panelContainer.canvasScale = prefs.keyboardHeight.canvasScale
         candidateBar.setCandidateTextSize(prefs.candidateTextSize)
+        englishPad?.setNumberRowVisible(prefs.showNumberRow)
+        romajiPad?.setNumberRowVisible(prefs.showNumberRow)
     }
 
     private fun updateEnterLabel(info: EditorInfo?) {
@@ -540,7 +548,9 @@ class FuriganaImeService : InputMethodService() {
             listOf(converted.kana),
             CandidateKind.WORD
         )
-        val scriptCandidates = listOf(katakanaCandidate, kanaCandidate).distinctBy { it.text }
+        // While the dictionary lookup is pending, and when it has no match,
+        // keep the plain-script fallback in the familiar hiragana | katakana order.
+        val scriptCandidates = listOf(kanaCandidate, katakanaCandidate).distinctBy { it.text }
         candidateBar.setCandidates(scriptCandidates)
         candidatePipeline.submitRomaji(
             converted.kana,

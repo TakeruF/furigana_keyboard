@@ -16,7 +16,10 @@ class AppUpdateWorker(
     override suspend fun doWork(): Result {
         val updateInfo = awaitUpdateInfo() ?: return Result.retry()
         if (updateInfo.updateAvailability() == UpdateAvailability.UPDATE_AVAILABLE) {
-            AppUpdateNotifications.showIfNew(applicationContext, updateInfo.availableVersionCode())
+            AppUpdateNotifications.showIfNew(
+                applicationContext,
+                updateInfo.availableVersionCode().toLong()
+            )
         }
         return Result.success()
     }
