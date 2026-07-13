@@ -3,6 +3,7 @@ package com.example.furiganakeyboard.ime
 import com.example.furiganakeyboard.conversion.ConversionSegment
 import com.example.furiganakeyboard.conversion.ConversionResult
 import com.example.furiganakeyboard.conversion.PosClass
+import com.example.furiganakeyboard.conversion.ConversionText
 
 data class BunsetsuSegment(
     val reading: String,
@@ -171,7 +172,7 @@ class BunsetsuComposition private constructor(
                 val state = create(reading, conversion.segments)
                 if (state.composingSegments.size <= 1) return@mapNotNull null
                 val firstReading = state.activeReading
-                val boundary = firstReading.length
+                val boundary = ConversionText.scalarCount(firstReading)
                 val firstSegments = conversion.segments.takeWhile { it.end <= boundary }
                 if (firstSegments.isEmpty() || firstSegments.last().end != boundary) {
                     return@mapNotNull null
@@ -214,8 +215,9 @@ class BunsetsuComposition private constructor(
             reading: String,
             segments: List<ConversionSegment>,
         ): List<BunsetsuSegment> {
+            val scalarCount = ConversionText.scalarCount(reading)
             if (segments.isEmpty() || segments.first().start != 0 ||
-                segments.last().end != reading.length ||
+                segments.last().end != scalarCount ||
                 segments.zipWithNext().any { (left, right) -> left.end != right.start }
             ) {
                 return emptyList()
@@ -230,8 +232,14 @@ class BunsetsuComposition private constructor(
                     groups.lastOrNull()?.add(segment) ?: groups.add(mutableListOf(segment))
                 }
             }
+            val utf16Boundaries = ConversionText.utf16Boundaries(reading)
             return groups.map { group ->
-                BunsetsuSegment(reading.substring(group.first().start, group.last().end))
+                BunsetsuSegment(
+                    reading.substring(
+                        utf16Boundaries[group.first().start],
+                        utf16Boundaries[group.last().end],
+                    )
+                )
             }
         }
 

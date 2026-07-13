@@ -21,8 +21,8 @@ object KanaKanjiConverter {
         if (isCancelled() || reading.isEmpty() || limit <= 0) return emptyList()
         if (reading.codePointCount(0, reading.length) > MAX_INPUT_CODE_POINTS) return emptyList()
 
-        val boundaries = codePointBoundaries(reading)
-        val boundarySet = boundaries.toHashSet()
+        val utf16Boundaries = ConversionText.utf16Boundaries(reading)
+        val scalarCount = utf16Boundaries.lastIndex
         val connectionCosts = HashMap<ConnectionKey, Int>()
         for (connection in connections) {
             if (isCancelled()) return emptyList()
@@ -33,7 +33,7 @@ object KanaKanjiConverter {
         val usableLexemes = ArrayList<ConversionLexeme>()
         for (lexeme in lexemes) {
             if (isCancelled()) return emptyList()
-            if (isUsable(lexeme, reading, boundarySet)) usableLexemes += lexeme
+            if (isUsable(lexeme, reading, utf16Boundaries)) usableLexemes += lexeme
         }
         usableLexemes.sortWith(LEXEME_ORDER)
 
@@ -61,14 +61,13 @@ object KanaKanjiConverter {
             ),
         )
 
-        for (boundaryIndex in 0 until boundaries.lastIndex) {
+        for (start in 0 until scalarCount) {
             if (isCancelled()) return emptyList()
-            val start = boundaries[boundaryIndex]
             val incoming = prune(statesAt[start].orEmpty(), preserveSegmentations)
             if (incoming.isEmpty()) continue
 
-            val copyEnd = boundaries[boundaryIndex + 1]
-            val copied = reading.substring(start, copyEnd)
+            val copyEnd = start + 1
+            val copied = reading.substring(utf16Boundaries[start], utf16Boundaries[copyEnd])
             val edges = ArrayList<Edge>((dictionaryEdges[start]?.size ?: 0) + 1)
             dictionaryEdges[start]?.forEach { lexeme ->
                 edges += Edge(
@@ -125,7 +124,7 @@ object KanaKanjiConverter {
         }
 
         if (isCancelled()) return emptyList()
-        val completed = prune(statesAt[reading.length].orEmpty(), preserveSegmentations).map { state ->
+        val completed = prune(statesAt[scalarCount].orEmpty(), preserveSegmentations).map { state ->
             state.copy(
                 cost = state.cost + connectionCost(connectionCosts, state.rightId, PosClass.EOS.id),
             )
@@ -153,7 +152,7 @@ object KanaKanjiConverter {
             ConversionResult(
                 surface = state.surface,
                 reading = reading,
-                cost = state.cost.coerceIn(Int.MIN_VALUE.toLong(), Int.MAX_VALUE.toLong()).toInt(),
+                cost = ConversionCost.clampInt32(state.cost),
                 segments = state.segments,
             )
         }
@@ -162,27 +161,16 @@ object KanaKanjiConverter {
     private fun isUsable(
         lexeme: ConversionLexeme,
         input: String,
-        boundaries: Set<Int>,
+        utf16Boundaries: IntArray,
     ): Boolean =
         lexeme.start >= 0 &&
             lexeme.end > lexeme.start &&
-            lexeme.end <= input.length &&
-            lexeme.start in boundaries &&
-            lexeme.end in boundaries &&
-            input.substring(lexeme.start, lexeme.end) == lexeme.reading &&
-            lexeme.reading.codePointCount(0, lexeme.reading.length) <= MAX_LEXEME_CODE_POINTS
-
-    private fun codePointBoundaries(value: String): IntArray {
-        val result = IntArray(value.codePointCount(0, value.length) + 1)
-        var offset = 0
-        var index = 0
-        while (offset < value.length) {
-            result[index++] = offset
-            offset += Character.charCount(value.codePointAt(offset))
-        }
-        result[index] = value.length
-        return result
-    }
+            lexeme.end < utf16Boundaries.size &&
+            input.substring(
+                utf16Boundaries[lexeme.start],
+                utf16Boundaries[lexeme.end],
+            ) == lexeme.reading &&
+            ConversionText.scalarCount(lexeme.reading) <= MAX_LEXEME_CODE_POINTS
 
     private fun connectionCost(
         costs: Map<ConnectionKey, Int>,
@@ -246,6 +234,14 @@ object KanaKanjiConverter {
         segments.lastOrNull()?.let { add(it.end) }
     }
 
+    private fun compareIntLists(left: List<Int>, right: List<Int>): Int {
+        for (index in 0 until minOf(left.size, right.size)) {
+            val comparison = compareValues(left[index], right[index])
+            if (comparison != 0) return comparison
+        }
+        return compareValues(left.size, right.size)
+    }
+
     private fun closesBunsetsu(posId: Int): Boolean = when (PosClass.fromId(posId)) {
         PosClass.PARTICLE, PosClass.AUXILIARY, PosClass.SUFFIX -> true
         else -> false
@@ -265,27 +261,31 @@ object KanaKanjiConverter {
         else -> false
     }
 
-    private val LEXEME_ORDER = compareBy<ConversionLexeme>(
-        ConversionLexeme::start,
-        ConversionLexeme::end,
-        ConversionLexeme::wordCost,
-        ConversionLexeme::surface,
-        ConversionLexeme::leftId,
-        ConversionLexeme::rightId,
-    )
-    private val EDGE_ORDER = compareBy<Edge>(
-        Edge::end,
-        Edge::wordCost,
-        Edge::surface,
-        Edge::leftId,
-        Edge::rightId,
-        Edge::isCopy,
-    )
-    private val PATH_ORDER = compareBy<PathState>(
-        PathState::cost,
-        PathState::copyCodePoints,
-        { it.segments.size },
-        PathState::surface,
-        PathState::rightId,
-    )
+    private val LEXEME_ORDER = Comparator<ConversionLexeme> { left, right ->
+        compareValues(left.start, right.start).takeUnless { it == 0 }
+            ?: compareValues(left.end, right.end).takeUnless { it == 0 }
+            ?: compareValues(left.wordCost, right.wordCost).takeUnless { it == 0 }
+            ?: ConversionText.compareScalars(left.surface, right.surface).takeUnless { it == 0 }
+            ?: compareValues(left.leftId, right.leftId).takeUnless { it == 0 }
+            ?: compareValues(left.rightId, right.rightId)
+    }
+    private val EDGE_ORDER = Comparator<Edge> { left, right ->
+        compareValues(left.end, right.end).takeUnless { it == 0 }
+            ?: compareValues(left.wordCost, right.wordCost).takeUnless { it == 0 }
+            ?: ConversionText.compareScalars(left.surface, right.surface).takeUnless { it == 0 }
+            ?: compareValues(left.leftId, right.leftId).takeUnless { it == 0 }
+            ?: compareValues(left.rightId, right.rightId).takeUnless { it == 0 }
+            ?: compareValues(left.isCopy, right.isCopy)
+    }
+    private val PATH_ORDER = Comparator<PathState> { left, right ->
+        compareValues(left.cost, right.cost).takeUnless { it == 0 }
+            ?: compareValues(left.copyCodePoints, right.copyCodePoints).takeUnless { it == 0 }
+            ?: compareValues(left.segments.size, right.segments.size).takeUnless { it == 0 }
+            ?: ConversionText.compareScalars(left.surface, right.surface).takeUnless { it == 0 }
+            ?: compareValues(left.rightId, right.rightId).takeUnless { it == 0 }
+            ?: compareIntLists(
+                bunsetsuBoundaries(left.segments),
+                bunsetsuBoundaries(right.segments),
+            )
+    }
 }

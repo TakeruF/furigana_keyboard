@@ -26,6 +26,26 @@ final class KanaKanjiConverterTests: XCTestCase {
         XCTAssertTrue(KanaKanjiConverter.convert(reading: "かな", lexemes: [malformed], connections: []).isEmpty)
     }
 
+    func testSupplementaryScalarUsesScalarOffsetsInsteadOfCharacterOrUTF16Offsets() {
+        let reading = "𠮟ほん"
+        let lexeme = ConversionLexeme(
+            start: 1, end: 3, reading: "ほん", surface: "本",
+            leftID: 3, rightID: 3, wordCost: 100
+        )
+
+        let result = KanaKanjiConverter.convert(
+            reading: reading,
+            lexemes: [lexeme],
+            connections: []
+        ).first
+
+        XCTAssertEqual(result?.surface, "𠮟本")
+        XCTAssertEqual(result?.segments.first?.start, 0)
+        XCTAssertEqual(result?.segments.first?.end, 1)
+        XCTAssertEqual(result?.segments.last?.start, 1)
+        XCTAssertEqual(result?.segments.last?.end, 3)
+    }
+
     func testLeadingBunsetsuIncludesParticleInsteadOfUsingFirstToken() {
         let segments = [
             ConversionSegment(start: 0, end: 3, reading: "わたし", surface: "私",

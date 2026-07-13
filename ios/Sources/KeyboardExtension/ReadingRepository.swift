@@ -48,11 +48,13 @@ final class ReadingRepository {
     func priorities(for literals: [String]) -> [String: (grade: Int, frequency: Int)] {
         guard let database else { return [:] }
         var output: [String: (Int, Int)] = [:]
+        var seen = Set<[UInt32]>()
+        let unique = literals.filter { seen.insert(ConversionText.scalarValues($0)).inserted }
         let sql = "SELECT grade, frequency FROM kanji_priority WHERE literal = ?"
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { return output }
         defer { sqlite3_finalize(statement) }
-        for literal in literals {
+        for literal in unique {
             sqlite3_reset(statement); sqlite3_clear_bindings(statement)
             bind(literal, at: 1, to: statement)
             if sqlite3_step(statement) == SQLITE_ROW {
@@ -78,26 +80,70 @@ final class ReadingRepository {
 
     func conversionData(for reading: String) -> (lexemes: [ConversionLexeme], connections: [ConversionConnection]) {
         guard let database else { return ([], []) }
-        let characters = Array(reading)
-        guard characters.count <= 48 else { return ([], connections) }
-        let sql = "SELECT surface, left_id, right_id, word_cost FROM conversion_lexeme WHERE reading = ? ORDER BY word_cost, form_rank, surface LIMIT 12"
+        let boundaries = ConversionText.scalarBoundaries(reading)
+        let scalarCount = boundaries.count - 1
+        guard scalarCount <= 48 else { return ([], connections) }
+        let sql = "SELECT surface, left_id, right_id, word_cost FROM conversion_lexeme WHERE reading = ? ORDER BY word_cost, form_rank, surface, left_id, right_id LIMIT 12"
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { return ([], connections) }
         defer { sqlite3_finalize(statement) }
-        var output: [ConversionLexeme] = []
-        for start in characters.indices {
-            for end in (start + 1)...min(characters.count, start + 16) {
-                let token = String(characters[start..<end])
-                sqlite3_reset(statement); sqlite3_clear_bindings(statement)
-                bind(token, at: 1, to: statement)
-                while sqlite3_step(statement) == SQLITE_ROW {
-                    guard let value = sqlite3_column_text(statement, 0) else { continue }
-                    output.append(ConversionLexeme(
-                        start: start, end: end, reading: token, surface: String(cString: value),
-                        leftID: Int(sqlite3_column_int(statement, 1)), rightID: Int(sqlite3_column_int(statement, 2)),
-                        wordCost: Int(sqlite3_column_int(statement, 3))
-                    ))
+        guard scalarCount > 0 else { return ([], connections) }
+
+        var tokenOrder: [[UInt32]] = []
+        var tokenByKey: [[UInt32]: String] = [:]
+        var occurrencesByKey: [[UInt32]: [(start: Int, end: Int)]] = [:]
+        for start in 0..<scalarCount {
+            for end in (start + 1)...min(scalarCount, start + 16) {
+                let token = String(reading[boundaries[start]..<boundaries[end]])
+                let key = ConversionText.scalarValues(token)
+                if tokenByKey[key] == nil {
+                    tokenOrder.append(key)
+                    tokenByKey[key] = token
                 }
+                occurrencesByKey[key, default: []].append((start, end))
+            }
+        }
+
+        var storedByKey: [[UInt32]: [StoredConversionLexeme]] = [:]
+        for key in tokenOrder {
+            guard let token = tokenByKey[key] else { continue }
+            sqlite3_reset(statement); sqlite3_clear_bindings(statement)
+            bind(token, at: 1, to: statement)
+            while sqlite3_step(statement) == SQLITE_ROW {
+                guard let value = sqlite3_column_text(statement, 0) else { continue }
+                storedByKey[key, default: []].append(StoredConversionLexeme(
+                    surface: String(cString: value),
+                    leftID: Int(sqlite3_column_int(statement, 1)),
+                    rightID: Int(sqlite3_column_int(statement, 2)),
+                    wordCost: ConversionCost.clampInt32(sqlite3_column_int64(statement, 3))
+                ))
+            }
+        }
+        let literals = storedByKey.values.flatMap { stored in
+            stored.flatMap { ConversionCost.hanLiterals(in: $0.surface) }
+        }
+        let frequencies = priorities(for: literals).mapValues { $0.frequency }
+        var output: [ConversionLexeme] = []
+        for key in tokenOrder {
+            guard let token = tokenByKey[key] else { continue }
+            for occurrence in occurrencesByKey[key] ?? [] {
+                output.append(contentsOf: (storedByKey[key] ?? []).map { lexeme in
+                    ConversionLexeme(
+                        start: occurrence.start,
+                        end: occurrence.end,
+                        reading: token,
+                        surface: lexeme.surface,
+                        leftID: lexeme.leftID,
+                        rightID: lexeme.rightID,
+                        wordCost: ConversionCost.adjustedWordCost(
+                            reading: token,
+                            surface: lexeme.surface,
+                            leftID: lexeme.leftID,
+                            rawWordCost: lexeme.wordCost,
+                            frequencyByHanLiteral: frequencies
+                        )
+                    )
+                })
             }
         }
         return (output, connections)
@@ -112,7 +158,7 @@ final class ReadingRepository {
         while sqlite3_step(statement) == SQLITE_ROW {
             output.append(ConversionConnection(rightID: Int(sqlite3_column_int(statement, 0)),
                                                leftID: Int(sqlite3_column_int(statement, 1)),
-                                               cost: Int(sqlite3_column_int(statement, 2))))
+                                               cost: ConversionCost.clampInt32(sqlite3_column_int64(statement, 2))))
         }
         return output
     }
@@ -138,5 +184,12 @@ final class ReadingRepository {
 
     private func bind(_ value: String, at index: Int32, to statement: OpaquePointer?) {
         _ = value.withCString { sqlite3_bind_text(statement, index, $0, -1, sqliteTransient) }
+    }
+
+    private struct StoredConversionLexeme {
+        let surface: String
+        let leftID: Int
+        let rightID: Int
+        let wordCost: Int
     }
 }

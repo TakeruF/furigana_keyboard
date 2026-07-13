@@ -34,13 +34,24 @@ class ReadingRepositoryBatchTest {
     }
 
     @Test
-    fun conversionLexemesExpandEveryOccurrenceWithUtf16Offsets() {
+    fun conversionLexemesExpandEveryOccurrenceWithScalarOffsets() {
         ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
             val lexemes = repository.conversionLexemes("ほんほん", 16, 12)
                 .filter { it.reading == "ほん" && it.surface == "本" }
 
             assertTrue(lexemes.any { it.start == 0 && it.end == 2 })
             assertTrue(lexemes.any { it.start == 2 && it.end == 4 })
+        }
+    }
+
+    @Test
+    fun conversionLexemeOffsetsDoNotSplitSupplementaryScalar() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val lexeme = repository.conversionLexemes("𠮟ほん", 16, 12)
+                .first { it.reading == "ほん" && it.surface == "本" }
+
+            assertEquals(1, lexeme.start)
+            assertEquals(3, lexeme.end)
         }
     }
 

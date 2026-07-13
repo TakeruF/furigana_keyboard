@@ -24,7 +24,7 @@ enum class PosClass(val id: Int) {
     }
 }
 
-/** A dictionary edge. [start] and [end] are UTF-16 offsets in [reading]. */
+/** A dictionary edge. [start] and [end] are Unicode-scalar offsets in [reading]. */
 data class ConversionLexeme(
     val start: Int,
     val end: Int,

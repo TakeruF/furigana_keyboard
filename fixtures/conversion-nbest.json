@@ -1,0 +1,132 @@
+[
+  {
+    "reading": "にほん",
+    "results": [
+      {"surface": "日本", "cost": 1218},
+      {"surface": "に本", "cost": 1738},
+      {"surface": "二本", "cost": 2838},
+      {"surface": "荷本", "cost": 2850},
+      {"surface": "２本", "cost": 3198},
+      {"surface": "に品", "cost": 3720},
+      {"surface": "に歩ん", "cost": 4142},
+      {"surface": "に穂ん", "cost": 4153}
+    ]
+  },
+  {
+    "reading": "きょう",
+    "results": [
+      {"surface": "今日", "cost": 1218},
+      {"surface": "京", "cost": 1219},
+      {"surface": "経", "cost": 1219},
+      {"surface": "境", "cost": 1226},
+      {"surface": "興", "cost": 1226},
+      {"surface": "卿", "cost": 1240},
+      {"surface": "凶", "cost": 1715},
+      {"surface": "兇", "cost": 3229}
+    ]
+  },
+  {
+    "reading": "ほんをよむ",
+    "results": [
+      {"surface": "本を読む", "cost": 2162},
+      {"surface": "本を詠む", "cost": 2176},
+      {"surface": "本をよ無", "cost": 3878},
+      {"surface": "本を世無", "cost": 3879},
+      {"surface": "本を世六", "cost": 3881},
+      {"surface": "本を夜無", "cost": 3886},
+      {"surface": "本を夜六", "cost": 3888},
+      {"surface": "品を読む", "cost": 4144}
+    ]
+  },
+  {
+    "reading": "これはほんだ",
+    "results": [
+      {"surface": "これは本だ", "cost": 2255},
+      {"surface": "維は本だ", "cost": 2582},
+      {"surface": "是れは本だ", "cost": 2585},
+      {"surface": "是は本だ", "cost": 2586},
+      {"surface": "之れは本だ", "cost": 2588},
+      {"surface": "之は本だ", "cost": 2589},
+      {"surface": "此れは本だ", "cost": 2595},
+      {"surface": "此は本だ", "cost": 2596}
+    ]
+  },
+  {
+    "reading": "きょうははれだ",
+    "results": [
+      {"surface": "今日は晴れだ", "cost": 2684},
+      {"surface": "京は晴れだ", "cost": 2685},
+      {"surface": "経は晴れだ", "cost": 2685},
+      {"surface": "境は晴れだ", "cost": 2692},
+      {"surface": "興は晴れだ", "cost": 2692},
+      {"surface": "今日は張れだ", "cost": 2706},
+      {"surface": "卿は晴れだ", "cost": 2706},
+      {"surface": "京は張れだ", "cost": 2707}
+    ]
+  },
+  {
+    "reading": "わたしもいく",
+    "results": [
+      {"surface": "私も行く", "cost": 2058},
+      {"surface": "渡しも行く", "cost": 2159},
+      {"surface": "私もいく", "cost": 2238},
+      {"surface": "渡しもいく", "cost": 2339},
+      {"surface": "わたし藻いく", "cost": 2555},
+      {"surface": "わ田し藻いく", "cost": 2895},
+      {"surface": "わ多し藻いく", "cost": 2896},
+      {"surface": "わ他し藻いく", "cost": 2900}
+    ]
+  },
+  {
+    "reading": "これもほんだ",
+    "results": [
+      {"surface": "これも本だ", "cost": 2255},
+      {"surface": "維も本だ", "cost": 2582},
+      {"surface": "是れも本だ", "cost": 2585},
+      {"surface": "是も本だ", "cost": 2586},
+      {"surface": "之れも本だ", "cost": 2588},
+      {"surface": "之も本だ", "cost": 2589},
+      {"surface": "此れも本だ", "cost": 2595},
+      {"surface": "此も本だ", "cost": 2596}
+    ]
+  },
+  {
+    "reading": "なぞほん",
+    "results": [
+      {"surface": "名ぞ本", "cost": 2258},
+      {"surface": "菜ぞ本", "cost": 2750},
+      {"surface": "謎本", "cost": 2858},
+      {"surface": "なぞ本", "cost": 3357},
+      {"surface": "己ぞ本", "cost": 4147},
+      {"surface": "汝ぞ本", "cost": 4167},
+      {"surface": "名ぞ品", "cost": 4240},
+      {"surface": "儺ぞ本", "cost": 4267}
+    ]
+  },
+  {
+    "reading": "しんじゅく",
+    "results": [
+      {"surface": "真珠区", "cost": 2847},
+      {"surface": "新塾", "cost": 2850},
+      {"surface": "真珠九", "cost": 2850},
+      {"surface": "心塾", "cost": 2851},
+      {"surface": "信塾", "cost": 2852},
+      {"surface": "真塾", "cost": 2852},
+      {"surface": "真珠句", "cost": 2858},
+      {"surface": "寝塾", "cost": 2864}
+    ]
+  },
+  {
+    "reading": "かくにんしたい",
+    "results": [
+      {"surface": "確認したい", "cost": 1344},
+      {"surface": "確認し対", "cost": 2257},
+      {"surface": "確認し帯", "cost": 2264},
+      {"surface": "確認し態", "cost": 2500},
+      {"surface": "確認し他意", "cost": 2738},
+      {"surface": "確認死体", "cost": 2838},
+      {"surface": "確認した位", "cost": 2870},
+      {"surface": "確認した医", "cost": 2872}
+    ]
+  }
+]

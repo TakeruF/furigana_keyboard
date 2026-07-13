@@ -146,6 +146,12 @@ dictionary edges to 16 code points, stored vocabulary to 12 entries per
 reading, and output to eight unique surfaces. Longer input bypasses dictionary
 conversion and retains the existing hiragana/katakana candidates.
 
+Android and iOS apply the same integer-only word-cost adjustment and Unicode
+scalar rules. The normative formula, overflow behavior, Han ranges, and
+deterministic tie breakers are documented in
+[`docs/conversion-scoring.md`](docs/conversion-scoring.md) and guarded by the
+shared fixtures under `fixtures/`.
+
 `conversion_lexeme` is a `WITHOUT ROWID` table whose composite primary key
 starts with `reading`, so SQLite uses the table's primary-key B-tree as the
 reading index without a second, size-heavy copy. The generated database must

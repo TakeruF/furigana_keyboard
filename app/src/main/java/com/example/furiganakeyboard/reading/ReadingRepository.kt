@@ -3,7 +3,9 @@ package com.example.furiganakeyboard.reading
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.example.furiganakeyboard.conversion.ConversionConnection
+import com.example.furiganakeyboard.conversion.ConversionCost
 import com.example.furiganakeyboard.conversion.ConversionLexeme
+import com.example.furiganakeyboard.conversion.ConversionText
 import com.example.furiganakeyboard.data.ReadingDataStore
 import java.io.File
 
@@ -322,7 +324,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
                             surface = cursor.getString(1),
                             leftId = cursor.getInt(2),
                             rightId = cursor.getInt(3),
-                            wordCost = cursor.getInt(4)
+                            wordCost = ConversionCost.clampInt32(cursor.getLong(4))
                         )
                     }
                 }
@@ -331,10 +333,11 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         val usagePriorities = kanjiPriorities(
             lexemesByReading.values.asSequence()
                 .flatten()
-                .flatMap { hanLiterals(it.surface) }
+                .flatMap { ConversionCost.hanLiterals(it.surface) }
                 .distinct()
                 .toList()
         )
+        val frequencyByHanLiteral = usagePriorities.mapValues { it.value.frequency }
         return buildList {
             occurrences.forEach { (tokenReading, positions) ->
                 val stored = lexemesByReading[tokenReading].orEmpty()
@@ -348,10 +351,12 @@ class ReadingRepository(context: Context) : ReadingDataSource {
                                 surface = lexeme.surface,
                                 leftId = lexeme.leftId,
                                 rightId = lexeme.rightId,
-                                wordCost = lexeme.wordCost + conversionAdjustment(
-                                    tokenReading,
-                                    lexeme,
-                                    usagePriorities
+                                wordCost = ConversionCost.adjustedWordCost(
+                                    reading = tokenReading,
+                                    surface = lexeme.surface,
+                                    leftId = lexeme.leftId,
+                                    rawWordCost = lexeme.wordCost,
+                                    frequencyByHanLiteral = frequencyByHanLiteral,
                                 )
                             )
                         )
@@ -382,7 +387,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         input: String,
         maxTokenCodePoints: Int
     ): LinkedHashMap<String, MutableList<TextRange>> {
-        val boundaries = codePointBoundaries(input)
+        val boundaries = ConversionText.utf16Boundaries(input)
         val result = LinkedHashMap<String, MutableList<TextRange>>()
         for (startIndex in 0 until boundaries.lastIndex) {
             val finalIndex = minOf(boundaries.lastIndex, startIndex + maxTokenCodePoints)
@@ -390,54 +395,10 @@ class ReadingRepository(context: Context) : ReadingDataSource {
                 val start = boundaries[startIndex]
                 val end = boundaries[endIndex]
                 val token = input.substring(start, end)
-                result.getOrPut(token) { mutableListOf() } += TextRange(start, end)
+                result.getOrPut(token) { mutableListOf() } += TextRange(startIndex, endIndex)
             }
         }
         return result
-    }
-
-    private fun codePointBoundaries(value: String): IntArray {
-        val result = IntArray(value.codePointCount(0, value.length) + 1)
-        var offset = 0
-        var index = 0
-        while (offset < value.length) {
-            result[index++] = offset
-            offset += Character.charCount(value.codePointAt(offset))
-        }
-        result[index] = value.length
-        return result
-    }
-
-    /** Prefer useful content-word conversion; frequency only breaks otherwise close homophones. */
-    private fun conversionAdjustment(
-        reading: String,
-        lexeme: StoredConversionLexeme,
-        priorities: Map<String, KanjiUsagePriority>
-    ): Int {
-        val kanaContentPenalty = if (
-            lexeme.surface == reading && lexeme.leftId in CONTENT_WORD_POS_IDS
-        ) KANA_CONTENT_WORD_PENALTY else 0
-        val literals = hanLiterals(lexeme.surface).toList()
-        val frequencyPenalty = if (literals.isEmpty()) 0 else {
-            literals.sumOf { literal ->
-                val frequency = priorities[literal]?.frequency?.takeIf { it > 0 }
-                    ?: UNKNOWN_KANJI_FREQUENCY
-                minOf(frequency, UNKNOWN_KANJI_FREQUENCY) / KANJI_FREQUENCY_SCALE
-            } / literals.size
-        }
-        return kanaContentPenalty + frequencyPenalty -
-            lexeme.surface.codePointCount(0, lexeme.surface.length)
-    }
-
-    private fun hanLiterals(value: String): Sequence<String> = sequence {
-        var offset = 0
-        while (offset < value.length) {
-            val codePoint = value.codePointAt(offset)
-            if (Character.UnicodeScript.of(codePoint) == Character.UnicodeScript.HAN) {
-                yield(String(Character.toChars(codePoint)))
-            }
-            offset += Character.charCount(codePoint)
-        }
     }
 
     private data class TextRange(val start: Int, val end: Int)
@@ -475,10 +436,6 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         private const val MAX_CONVERSION_INPUT_CODE_POINTS = 48
         private const val MAX_CONVERSION_TOKEN_CODE_POINTS = 16
         private const val MAX_CONVERSION_VOCABULARY_PER_READING = 12
-        private const val UNKNOWN_KANJI_FREQUENCY = 3_000
-        private const val KANJI_FREQUENCY_SCALE = 100
-        private const val KANA_CONTENT_WORD_PENALTY = 500
-        private val CONTENT_WORD_POS_IDS = setOf(3, 4, 7, 8, 9)
         private const val COMPOSED_PER_SPLIT_LIMIT = 4
         private val COMPOSABLE_KANA_SUFFIXES = setOf(
             "は", "が", "を", "に", "で", "と", "も", "の", "へ", "や", "か", "ね", "よ",

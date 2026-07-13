@@ -58,7 +58,12 @@ final class CandidateEngine {
         guard let repository else { completion(KanaAnalysis(candidates: [], conversions: [])); return }
         queue.async { [weak self] in
             let data = repository.conversionData(for: kana)
-            let conversions = KanaKanjiConverter.convert(reading: kana, lexemes: data.lexemes, connections: data.connections)
+            let conversions = KanaKanjiConverter.convert(
+                reading: kana,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                preserveSegmentations: true
+            )
             let converted = conversions
                 .map { KeyboardCandidate($0.surface, readings: [kana]) }
             let prefix = repository.suggestions(readingPrefix: kana, limit: 8).map {

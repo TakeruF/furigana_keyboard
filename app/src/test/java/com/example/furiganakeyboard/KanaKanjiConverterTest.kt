@@ -177,7 +177,7 @@ class KanaKanjiConverterTest {
         assertEquals("\uD842\uDFB7本", result.surface)
         assertEquals("\uD842\uDFB7", result.segments.first().surface)
         assertEquals(0, result.segments.first().start)
-        assertEquals(2, result.segments.first().end)
+        assertEquals(1, result.segments.first().end)
     }
 
     @Test
@@ -223,7 +223,9 @@ class KanaKanjiConverterTest {
                 "いく", "よむ" -> PosClass.VERB
                 else -> PosClass.NOUN
             }
-            ConversionLexeme(start, searchFrom, reading, surface, pos.id, pos.id, 100)
+            val scalarStart = input.codePointCount(0, start)
+            val scalarEnd = input.codePointCount(0, searchFrom)
+            ConversionLexeme(scalarStart, scalarEnd, reading, surface, pos.id, pos.id, 100)
         }
     }
 
@@ -236,7 +238,17 @@ class KanaKanjiConverterTest {
     ): ConversionLexeme {
         val start = input.indexOf(reading)
         require(start >= 0)
-        return ConversionLexeme(start, start + reading.length, reading, surface, pos.id, pos.id, wordCost)
+        val scalarStart = input.codePointCount(0, start)
+        val scalarEnd = scalarStart + reading.codePointCount(0, reading.length)
+        return ConversionLexeme(
+            scalarStart,
+            scalarEnd,
+            reading,
+            surface,
+            pos.id,
+            pos.id,
+            wordCost,
+        )
     }
 
     private fun zeroConnections(): List<ConversionConnection> =

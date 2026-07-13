@@ -240,7 +240,7 @@ final class KeyboardViewController: UIInputViewController {
                conversion.segments.contains(where: { !$0.isCopy }),
                let initialLength = KanaKanjiConverter.leadingBunsetsuLength(
                    segments: conversion.segments,
-                   totalLength: Array(converted.kana).count
+                   totalLength: converted.kana.unicodeScalars.count
                ) {
                 beginBunsetsu(reading: converted.kana, initialLength: initialLength)
             } else {
@@ -291,7 +291,7 @@ final class KeyboardViewController: UIInputViewController {
             return
         }
         renderBunsetsu(state)
-        let remaining = String(state.remainingCharacters)
+        let remaining = state.remainingReading
         candidateEngine.analyzeKana(remaining) { [weak self, weak state] analysis in
             guard let self, let state, bunsetsuState === state else { return }
             if let conversion = analysis.conversions.first {

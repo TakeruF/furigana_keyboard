@@ -129,7 +129,14 @@ targets:
     hostApplication: FuriganaKeyboard
     sources:
       - Tests
+      - path: ../fixtures/conversion-cost.tsv
+        buildPhase: resources
+      - path: ../fixtures/conversion-nbest.json
+        buildPhase: resources
+      - path: ../fixtures/sentence-conversion-regression.json
+        buildPhase: resources
       - Sources/KeyboardExtension/BunsetsuState.swift
+      - Sources/KeyboardExtension/ConversionCost.swift
       - Sources/KeyboardExtension/KanaKanjiConverter.swift
       - Sources/KeyboardExtension/HandwritingStrokeSegmenter.swift
       - Sources/KeyboardExtension/ReadingRepository.swift
