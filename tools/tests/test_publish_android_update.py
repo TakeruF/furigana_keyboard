@@ -88,15 +88,19 @@ class PublishAndroidUpdateTest(unittest.TestCase):
                 MODULE.main()
 
             self.assertEqual(
-                {path.name for path in output.iterdir()},
-                {"1.2.0.apk", "latest.json"},
+                {
+                    str(path.relative_to(output))
+                    for path in output.rglob("*")
+                    if path.is_file()
+                },
+                {"furigana-keyboard/1.2.0.apk", "latest.json"},
             )
             manifest = json.loads((output / "latest.json").read_text(encoding="utf-8"))
             self.assertEqual(manifest["versionCode"], 12)
             self.assertEqual(manifest["versionName"], "1.2.0")
             self.assertEqual(
                 manifest["downloadUrl"],
-                "https://downloads.hanlu.app/1.2.0.apk",
+                "https://downloads.hanlu.app/furigana-keyboard/1.2.0.apk",
             )
             self.assertNotIn("latest.apk", manifest["downloadUrl"])
 

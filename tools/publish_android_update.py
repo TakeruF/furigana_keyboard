@@ -12,6 +12,7 @@ from pathlib import Path
 
 
 SAFE_FILE_COMPONENT = re.compile(r"^[A-Za-z0-9._-]+$")
+DOWNLOAD_BASE_URL = "https://downloads.hanlu.app/furigana-keyboard"
 
 
 def read_built_apk_version(apk: Path) -> tuple[int, str]:
@@ -44,8 +45,8 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--release-notes")
     parser.add_argument(
         "--base-url",
-        default="https://downloads.hanlu.app",
-        help="HTTPS origin where the generated files will be uploaded",
+        default=DOWNLOAD_BASE_URL,
+        help="HTTPS directory where versioned APKs will be uploaded",
     )
     parser.add_argument("--output", type=Path, default=Path("android-update-dist"))
     return parser.parse_args()
@@ -59,8 +60,8 @@ def main() -> None:
         raise SystemExit("--version-code must be positive")
     if not SAFE_FILE_COMPONENT.fullmatch(args.version_name):
         raise SystemExit("--version-name may contain only letters, digits, '.', '_' and '-'")
-    if args.base_url.rstrip("/") != "https://downloads.hanlu.app":
-        raise SystemExit("--base-url must be https://downloads.hanlu.app")
+    if args.base_url.rstrip("/") != DOWNLOAD_BASE_URL:
+        raise SystemExit(f"--base-url must be {DOWNLOAD_BASE_URL}")
     built_version_code, built_version_name = read_built_apk_version(args.apk)
     if (built_version_code, built_version_name) != (
         args.version_code,
@@ -74,7 +75,8 @@ def main() -> None:
 
     args.output.mkdir(parents=True, exist_ok=True)
     apk_name = f"{args.version_name}.apk"
-    output_apk = args.output / apk_name
+    output_apk = args.output / "furigana-keyboard" / apk_name
+    output_apk.parent.mkdir(parents=True, exist_ok=True)
     shutil.copy2(args.apk, output_apk)
     digest = hashlib.sha256()
     with output_apk.open("rb") as apk_file:
@@ -85,7 +87,7 @@ def main() -> None:
     manifest: dict[str, object] = {
         "versionCode": args.version_code,
         "versionName": args.version_name,
-        "downloadUrl": f"https://downloads.hanlu.app/{apk_name}",
+        "downloadUrl": f"{DOWNLOAD_BASE_URL}/{apk_name}",
         "sha256": sha256,
     }
     if args.release_notes:

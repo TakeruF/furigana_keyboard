@@ -25,7 +25,7 @@
     <string name="onboarding_title">후리가나 키보드 설정</string>
     <string name="onboarding_description">키보드를 사용하려면 다음 두 가지 Android 설정을 완료하세요.</string>
     <string name="onboarding_step_enable">1단계　시스템 입력기 활성화</string>
-    <string name="onboarding_step_select">이 키보드 선택</string>
+    <string name="onboarding_step_select">2단계　이 키보드 선택</string>
     <string name="onboarding_privacy_note">입력 방법을 활성화하면 Android의 표준 보안 안내가 표시됩니다. 입력 내용은 기기에서 처리됩니다.</string>
     <string name="settings_check_update">업데이트 확인</string>
     <string name="settings_check_update_desc">Google Play에서 최신 버전을 확인합니다</string>

@@ -16,6 +16,7 @@ from urllib.parse import urlsplit
 
 MANIFEST_URL = "https://downloads.hanlu.app/latest.json"
 DOWNLOAD_HOST = "downloads.hanlu.app"
+DOWNLOAD_PATH_PREFIX = "/furigana-keyboard/"
 MAX_MANIFEST_BYTES = 64 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
 
@@ -43,8 +44,18 @@ def _require_downloads_url(value: str, *, apk: bool) -> None:
         raise UpdateCheckError(f"URL must use https://{DOWNLOAD_HOST}: {value}")
     if url.username or url.password or port not in (None, 443) or url.fragment:
         raise UpdateCheckError(f"URL contains unsupported authority or fragment: {value}")
-    if apk and not url.path.lower().endswith(".apk"):
-        raise UpdateCheckError(f"Download URL does not point to an APK: {value}")
+    if apk:
+        file_name = url.path.removeprefix(DOWNLOAD_PATH_PREFIX)
+        if (
+            not url.path.startswith(DOWNLOAD_PATH_PREFIX)
+            or not file_name
+            or "/" in file_name
+        ):
+            raise UpdateCheckError(
+                f"Download URL must use {DOWNLOAD_PATH_PREFIX}: {value}"
+            )
+        if not url.path.lower().endswith(".apk"):
+            raise UpdateCheckError(f"Download URL does not point to an APK: {value}")
 
 
 def parse_manifest(payload: bytes) -> UpdateManifest:

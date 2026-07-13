@@ -78,7 +78,7 @@ python3 tools/publish_android_update.py \
   --release-notes "ユーザー向けリリースノート"
 ```
 
-1. `android-update-dist/<versionName>.apk`を先にアップロードする。
+1. `android-update-dist/furigana-keyboard/<versionName>.apk`を同じオブジェクトパスへ先にアップロードする。
 2. 公開URLからAPKを取得でき、SHA-256が`latest.json`と一致することを確認する。
 3. `latest.json`を最後にアップロードする。
 4. 旧版の直接配布APKから更新通知、ダウンロード、署名検証、Androidインストーラ起動まで確認する。

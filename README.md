@@ -239,7 +239,7 @@ python3 tools/publish_android_update.py \
 
 Upload both files from `android-update-dist/` without changing their names:
 
-- `<versionName>.apk` → `https://downloads.hanlu.app/<versionName>.apk`
+- `furigana-keyboard/<versionName>.apk` → `https://downloads.hanlu.app/furigana-keyboard/<versionName>.apk`
 - `latest.json` → `https://downloads.hanlu.app/latest.json`
 
 Upload the APK first and `latest.json` last so clients are never directed to

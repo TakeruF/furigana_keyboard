@@ -35,6 +35,14 @@ data class DirectUpdateManifest(
             require(url.host.equals(DOWNLOAD_HOST, ignoreCase = true)) {
                 "APK download must use $DOWNLOAD_HOST"
             }
+            val fileName = url.path.removePrefix(DOWNLOAD_PATH_PREFIX)
+            require(
+                url.path.startsWith(DOWNLOAD_PATH_PREFIX) &&
+                    fileName.isNotEmpty() &&
+                    !fileName.contains('/')
+            ) {
+                "APK download must use $DOWNLOAD_PATH_PREFIX"
+            }
             require(url.path.endsWith(".apk", ignoreCase = true)) {
                 "APK download URL must point to an APK"
             }
@@ -82,5 +90,6 @@ internal fun readDirectUpdateManifest(stream: InputStream): String {
 }
 
 private const val DOWNLOAD_HOST = "downloads.hanlu.app"
+private const val DOWNLOAD_PATH_PREFIX = "/furigana-keyboard/"
 private const val MANIFEST_URL = "https://downloads.hanlu.app/latest.json"
 private const val MAX_MANIFEST_BYTES = 64 * 1024

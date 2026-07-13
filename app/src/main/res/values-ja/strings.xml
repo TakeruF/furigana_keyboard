@@ -40,7 +40,7 @@
     <string name="onboarding_title">ふりがなキーボードを設定</string>
     <string name="onboarding_description">キーボードを使い始めるには、Androidで次の2つを設定してください。</string>
     <string name="onboarding_step_enable">ステップ1　システム入力を有効にする</string>
-    <string name="onboarding_step_select">このキーボードを選択</string>
+    <string name="onboarding_step_select">ステップ2　このキーボードを選択</string>
     <string name="onboarding_privacy_note">入力方法を有効にすると、Android共通の注意事項が表示されます。入力内容は端末内で処理されます。</string>
     <string name="settings_check_update">アップデートを確認</string>
     <string name="settings_check_update_desc">Google Playで最新版を確認します</string>
