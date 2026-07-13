@@ -45,6 +45,7 @@ class CandidateBarView @JvmOverloads constructor(
     }
 
     private var candidates: List<CandidateUiModel> = emptyList()
+    private var selectedCandidateIndex: Int? = null
     private var readingMode: ReadingMode = ReadingMode.KANA
     private var accentColor: Int = color(R.color.kbd_accent)
     private var candidateTextSize: CandidateTextSize = CandidateTextSize.STANDARD
@@ -89,6 +90,14 @@ class CandidateBarView @JvmOverloads constructor(
 
     fun clear() = setCandidates(emptyList())
 
+    /** Highlight an IME-selected candidate without changing scroll position. */
+    fun setSelectedCandidateIndex(index: Int?) {
+        val bounded = index?.takeIf { it in candidates.indices }
+        if (selectedCandidateIndex == bounded) return
+        selectedCandidateIndex = bounded
+        bindCandidates(resetScroll = false)
+    }
+
     private fun bindCandidates(resetScroll: Boolean) {
         while (row.childCount < candidates.size) {
             row.addView(CandidateChipView(context))
@@ -99,7 +108,7 @@ class CandidateBarView @JvmOverloads constructor(
                 chip.visibility = View.VISIBLE
                 chip.bind(
                     candidates[index],
-                    highlight = index == 0,
+                    highlight = index == (selectedCandidateIndex ?: 0),
                     showDivider = index < candidates.lastIndex
                 )
             } else {

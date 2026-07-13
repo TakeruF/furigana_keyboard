@@ -26,6 +26,7 @@ class QwertyPadView(
 
     /** Input callbacks wired by the IME service. */
     var onText: ((String) -> Unit)? = null
+    var onSpace: (() -> Unit)? = null
     var onDelete: (() -> Boolean)? = null
     var onEnter: (() -> Unit)? = null
     var onBack: (() -> Unit)? = null
@@ -144,7 +145,7 @@ class QwertyPadView(
                 Kind.FUNCTION,
                 13f
             ) {
-                onText?.invoke(" ")
+                onSpace?.invoke() ?: onText?.invoke(" ")
             }.apply {
                 contentDescription = context.getString(R.string.key_space)
             },
