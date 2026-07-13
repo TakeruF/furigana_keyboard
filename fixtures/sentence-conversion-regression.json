@@ -1,0 +1,79 @@
+{
+  "schemaVersion": 1,
+  "description": "Sentence-level conversion expectations for the bundled reading.db. baselineKnownFailureIds records the real, natural expectations that were not satisfied when this fixture was added; they remain evaluated and are counted as improvements when they start passing.",
+  "baselineKnownFailureIds": [
+    "particle-01", "particle-02", "particle-03", "particle-04", "particle-06",
+    "homophone-01", "homophone-02", "homophone-03", "homophone-04", "homophone-06",
+    "conjugation-01", "conjugation-02", "conjugation-03", "conjugation-04", "conjugation-05", "conjugation-06",
+    "multi-01", "multi-02", "multi-03", "multi-06",
+    "proper-01", "proper-02", "proper-03", "proper-04", "proper-06",
+    "katakana-01", "katakana-02", "katakana-03", "katakana-04", "katakana-05", "katakana-06",
+    "unknown-01", "unknown-03", "unknown-05",
+    "number-01", "number-02", "number-03", "number-04", "number-05", "number-06",
+    "boundary-01", "boundary-02", "boundary-03", "boundary-05"
+  ],
+  "cases": [
+    {"id":"particle-01","category":"助詞・助動詞","reading":"これはぺんです","expectedTop1":"これはペンです","requiredNBest":["これはペンです"],"forbiddenCandidates":["これはペンで巣"]},
+    {"id":"particle-02","category":"助詞・助動詞","reading":"わたしはがっこうへいきます","expectedTop1":"私は学校へ行きます","requiredNBest":["私は学校へ行きます"],"forbiddenCandidates":["私派学校へ行きます"]},
+    {"id":"particle-03","category":"助詞・助動詞","reading":"かれがきたらはじめよう","expectedTop1":"彼が来たら始めよう","requiredNBest":["彼が来たら始めよう"],"forbiddenCandidates":["彼が来たら始め用"]},
+    {"id":"particle-04","category":"助詞・助動詞","reading":"ほんをよんでいる","expectedTop1":"本を読んでいる","requiredNBest":["本を読んでいる"],"forbiddenCandidates":["本を呼んでいる"]},
+    {"id":"particle-05","category":"助詞・助動詞","reading":"みせまであるいた","expectedTop1":"店まで歩いた","requiredNBest":["店まで歩いた"],"forbiddenCandidates":["店まで有るいた"]},
+    {"id":"particle-06","category":"助詞・助動詞","reading":"せんせいにもらった","expectedTop1":"先生にもらった","requiredNBest":["先生にもらった"],"forbiddenCandidates":["先生に貰った"]},
+
+    {"id":"homophone-01","category":"同音異義語","reading":"きょうはいいてんきです","expectedTop1":"今日はいい天気です","requiredNBest":["今日はいい天気です"],"forbiddenCandidates":["京はいい天気です"]},
+    {"id":"homophone-02","category":"同音異義語","reading":"はしをわたる","expectedTop1":"橋を渡る","requiredNBest":["橋を渡る"],"forbiddenCandidates":["箸を渡る"]},
+    {"id":"homophone-03","category":"同音異義語","reading":"せいかいをえらぶ","expectedTop1":"正解を選ぶ","requiredNBest":["正解を選ぶ"],"forbiddenCandidates":["政界を選ぶ"]},
+    {"id":"homophone-04","category":"同音異義語","reading":"きかいをなおす","expectedTop1":"機械を直す","requiredNBest":["機械を直す"],"forbiddenCandidates":["機会を直す"]},
+    {"id":"homophone-05","category":"同音異義語","reading":"かいしゃにいく","expectedTop1":"会社に行く","requiredNBest":["会社に行く"],"forbiddenCandidates":["解社に行く"]},
+    {"id":"homophone-06","category":"同音異義語","reading":"いしをひろう","expectedTop1":null,"requiredNBest":["石を拾う","意志を拾う"],"forbiddenCandidates":["医師を拾う"]},
+
+    {"id":"conjugation-01","category":"活用","reading":"おちゃをのみたい","expectedTop1":"お茶を飲みたい","requiredNBest":["お茶を飲みたい"],"forbiddenCandidates":["お茶を飲み対"]},
+    {"id":"conjugation-02","category":"活用","reading":"しゃしんをとってください","expectedTop1":"写真を撮ってください","requiredNBest":["写真を撮ってください"],"forbiddenCandidates":["写真を取ってください"]},
+    {"id":"conjugation-03","category":"活用","reading":"あしたとうきょうにいきます","expectedTop1":"明日東京に行きます","requiredNBest":["明日東京に行きます"],"forbiddenCandidates":["明日東京に生きます"]},
+    {"id":"conjugation-04","category":"活用","reading":"しゅくだいをおえた","expectedTop1":"宿題を終えた","requiredNBest":["宿題を終えた"],"forbiddenCandidates":["宿題を追えた"]},
+    {"id":"conjugation-05","category":"活用","reading":"まどをしめて","expectedTop1":"窓を閉めて","requiredNBest":["窓を閉めて"],"forbiddenCandidates":["窓を占めて"]},
+    {"id":"conjugation-06","category":"活用","reading":"ほんをかいている","expectedTop1":"本を書いている","requiredNBest":["本を書いている"],"forbiddenCandidates":["本を描いている"]},
+
+    {"id":"multi-01","category":"複文節","reading":"かんじへんかんのせいどをたしかめる","expectedTop1":"漢字変換の精度を確かめる","requiredNBest":["漢字変換の精度を確かめる"],"forbiddenCandidates":["漢字変換の制度を確かめる"]},
+    {"id":"multi-02","category":"複文節","reading":"てんきがいいからさんぽする","expectedTop1":"天気がいいから散歩する","requiredNBest":["天気がいいから散歩する"],"forbiddenCandidates":["天気がいいから三歩する"]},
+    {"id":"multi-03","category":"複文節","reading":"えきのまえでともだちにあう","expectedTop1":"駅の前で友達に会う","requiredNBest":["駅の前で友達に会う"],"forbiddenCandidates":["駅の前で友達に合う"]},
+    {"id":"multi-04","category":"複文節","reading":"きのうみたえいがはおもしろかった","expectedTop1":"昨日見た映画は面白かった","requiredNBest":["昨日見た映画は面白かった"],"forbiddenCandidates":["昨日見た映画は重白かった"]},
+    {"id":"multi-05","category":"複文節","reading":"にほんごをべんきょうしています","expectedTop1":"日本語を勉強しています","requiredNBest":["日本語を勉強しています"],"forbiddenCandidates":["日本語を便強しています"]},
+    {"id":"multi-06","category":"複文節","reading":"らいしゅうかいぎをよていしている","expectedTop1":null,"requiredNBest":["来週会議を予定している"],"forbiddenCandidates":["来週会議を予定死ている"]},
+
+    {"id":"proper-01","category":"固有名詞","reading":"とうきょうすかいつりーにいった","expectedTop1":"東京スカイツリーに行った","requiredNBest":["東京スカイツリーに行った"],"forbiddenCandidates":["東京スカイ釣りーに行った"]},
+    {"id":"proper-02","category":"固有名詞","reading":"しぶやえきでまちあわせる","expectedTop1":"渋谷駅で待ち合わせる","requiredNBest":["渋谷駅で待ち合わせる"],"forbiddenCandidates":["渋谷駅で町合わせる"]},
+    {"id":"proper-03","category":"固有名詞","reading":"おおさかじょうをみにいく","expectedTop1":"大阪城を見に行く","requiredNBest":["大阪城を見に行く"],"forbiddenCandidates":["大阪上を見に行く"]},
+    {"id":"proper-04","category":"固有名詞","reading":"ふじさんにのぼった","expectedTop1":"富士山に登った","requiredNBest":["富士山に登った"],"forbiddenCandidates":["藤山に登った"]},
+    {"id":"proper-05","category":"固有名詞","reading":"きょうとでてらをめぐる","expectedTop1":"京都で寺を巡る","requiredNBest":["京都で寺を巡る"],"forbiddenCandidates":["今日とで寺を巡る"]},
+    {"id":"proper-06","category":"固有名詞","reading":"ほっかいどうへりょこうする","expectedTop1":"北海道へ旅行する","requiredNBest":["北海道へ旅行する"],"forbiddenCandidates":["北海堂へ旅行する"]},
+
+    {"id":"katakana-01","category":"カタカナ外来語","reading":"ぷろじぇくとをりりーすする","expectedTop1":"プロジェクトをリリースする","requiredNBest":["プロジェクトをリリースする"],"forbiddenCandidates":["プロジェクトをリリー巣する"]},
+    {"id":"katakana-02","category":"カタカナ外来語","reading":"こーひーをのむ","expectedTop1":"コーヒーを飲む","requiredNBest":["コーヒーを飲む"],"forbiddenCandidates":["コーヒーを呑む"]},
+    {"id":"katakana-03","category":"カタカナ外来語","reading":"こんぴゅーたーをつかう","expectedTop1":"コンピューターを使う","requiredNBest":["コンピューターを使う"],"forbiddenCandidates":["コンピューターを遣う"]},
+    {"id":"katakana-04","category":"カタカナ外来語","reading":"すまーとふぉんをかう","expectedTop1":"スマートフォンを買う","requiredNBest":["スマートフォンを買う"],"forbiddenCandidates":["スマートフォンを飼う"]},
+    {"id":"katakana-05","category":"カタカナ外来語","reading":"いんたーねっとにつなぐ","expectedTop1":"インターネットにつなぐ","requiredNBest":["インターネットにつなぐ"],"forbiddenCandidates":["インターネットに繋ぐ"]},
+    {"id":"katakana-06","category":"カタカナ外来語","reading":"でーたをばっくあっぷする","expectedTop1":"データをバックアップする","requiredNBest":["データをバックアップする"],"forbiddenCandidates":["データをバックアッぷする"]},
+
+    {"id":"unknown-01","category":"未知語","reading":"ふわもこぱんだがいる","expectedTop1":null,"requiredNBest":["ふわもこぱんだがいる"],"forbiddenCandidates":["不和も子パンダがいる"]},
+    {"id":"unknown-02","category":"未知語","reading":"ぴょこぴょこあるく","expectedTop1":null,"requiredNBest":["ぴょこぴょこ歩く"],"forbiddenCandidates":["病子病子歩く"]},
+    {"id":"unknown-03","category":"未知語","reading":"ねこみーむをみた","expectedTop1":null,"requiredNBest":["ねこみーむを見た"],"forbiddenCandidates":["猫ミームを診た"]},
+    {"id":"unknown-04","category":"未知語","reading":"きらきらぽんをおぼえた","expectedTop1":null,"requiredNBest":["きらきらぽんを覚えた"],"forbiddenCandidates":["雲母雲母ポンを覚えた"]},
+    {"id":"unknown-05","category":"未知語","reading":"あぷりぴこをひらく","expectedTop1":null,"requiredNBest":["あぷりぴこを開く"],"forbiddenCandidates":["アプリピコを拓く"]},
+    {"id":"unknown-06","category":"未知語","reading":"るんるんでかえる","expectedTop1":null,"requiredNBest":["るんるんで帰る"],"forbiddenCandidates":["論論で返る"]},
+
+    {"id":"number-01","category":"数字","reading":"にせんにじゅうよねんにうまれた","expectedTop1":"2024年に生まれた","requiredNBest":["2024年に生まれた"],"forbiddenCandidates":["二千二十四年に産まれた"]},
+    {"id":"number-02","category":"数字","reading":"いちがつついたちにあう","expectedTop1":"1月1日に会う","requiredNBest":["1月1日に会う"],"forbiddenCandidates":["一月一日に合う"]},
+    {"id":"number-03","category":"数字","reading":"さんびゃくえんをはらう","expectedTop1":"300円を払う","requiredNBest":["300円を払う"],"forbiddenCandidates":["三百円を払う"]},
+    {"id":"number-04","category":"数字","reading":"にじゅうよじかんはたらく","expectedTop1":"24時間働く","requiredNBest":["24時間働く"],"forbiddenCandidates":["二十四時間働く"]},
+    {"id":"number-05","category":"数字","reading":"だいにしょうをよむ","expectedTop1":"第2章を読む","requiredNBest":["第2章を読む"],"forbiddenCandidates":["第二章を詠む"]},
+    {"id":"number-06","category":"数字","reading":"ごひゃくめーとるはしる","expectedTop1":"500メートル走る","requiredNBest":["500メートル走る"],"forbiddenCandidates":["五百メートル走る"]},
+
+    {"id":"boundary-01","category":"文節境界","reading":"ここではきものをぬぐ","expectedTop1":null,"requiredNBest":["ここでは着物を脱ぐ"],"forbiddenCandidates":["ここで履き物を脱ぐ"]},
+    {"id":"boundary-02","category":"文節境界","reading":"にわにはにわにわとりがいる","expectedTop1":null,"requiredNBest":["庭には二羽鶏がいる","庭には二羽にわとりがいる"],"forbiddenCandidates":["庭にハニワニワトリがいる"]},
+    {"id":"boundary-03","category":"文節境界","reading":"きってきってください","expectedTop1":null,"requiredNBest":["切って切ってください","切手切ってください"],"forbiddenCandidates":["切手切手ください"]},
+    {"id":"boundary-04","category":"文節境界","reading":"あめがふるまでまつ","expectedTop1":"雨が降るまで待つ","requiredNBest":["雨が降るまで待つ"],"forbiddenCandidates":["飴が降るまで待つ"]},
+    {"id":"boundary-05","category":"文節境界","reading":"かきくけこをれんしゅうする","expectedTop1":"かきくけこを練習する","requiredNBest":["かきくけこを練習する"],"forbiddenCandidates":["書き句家子を練習する"]},
+    {"id":"boundary-06","category":"文節境界","reading":"とうきょうとっきょきょかきょく","expectedTop1":"東京特許許可局","requiredNBest":["東京特許許可局"],"forbiddenCandidates":["東京都っ許許可局"]}
+  ]
+}
