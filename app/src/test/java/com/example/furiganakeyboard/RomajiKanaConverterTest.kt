@@ -62,11 +62,32 @@ class RomajiKanaConverterTest {
     }
 
     @Test
+    fun convertsMozcCompatibleExtendedRomaji() {
+        // Google Mozc: src/data/preedit/romanji-hiragana.tsv
+        val cases = mapOf(
+            "thi" to "てぃ", "thu" to "てゅ", "the" to "てぇ", "tho" to "てょ",
+            "dhi" to "でぃ", "dhu" to "でゅ", "dhe" to "でぇ", "dho" to "でょ",
+            "twu" to "とぅ", "dwu" to "どぅ", "ye" to "いぇ",
+            "kwa" to "くぁ", "kwi" to "くぃ", "kwe" to "くぇ", "kwo" to "くぉ",
+            "gwa" to "ぐぁ", "gwi" to "ぐぃ", "gwe" to "ぐぇ", "gwo" to "ぐぉ",
+            "xka" to "ヵ", "xke" to "ヶ", "lka" to "ヵ", "lke" to "ヶ",
+            "wha" to "うぁ", "whi" to "うぃ", "whe" to "うぇ", "who" to "うぉ"
+        )
+
+        cases.forEach { (romaji, kana) ->
+            assertEquals(romaji, kana, RomajiKanaConverter.convert(romaji).displayText)
+        }
+        assertEquals("ち", RomajiKanaConverter.convert("ti").displayText)
+        assertEquals("ぢ", RomajiKanaConverter.convert("di").displayText)
+    }
+
+    @Test
     fun deleteRemovesACompletedKanaInsteadOfOneRomajiKey() {
         assertEquals("", RomajiKanaConverter.deleteLastUnit("sa"))
         assertEquals("niho", RomajiKanaConverter.deleteLastUnit("nihon"))
         assertEquals("gakko", RomajiKanaConverter.deleteLastUnit("gakkou"))
         assertEquals("", RomajiKanaConverter.deleteLastUnit("shi"))
+        assertEquals("te", RomajiKanaConverter.deleteLastUnit("thi"))
     }
 
     @Test

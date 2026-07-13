@@ -45,6 +45,12 @@ object RomajiKanaConverter {
         "rya" to "りゃ", "ryu" to "りゅ", "ryo" to "りょ",
         "fa" to "ふぁ", "fi" to "ふぃ", "fe" to "ふぇ", "fo" to "ふぉ",
         "va" to "ゔぁ", "vi" to "ゔぃ", "vu" to "ゔ", "ve" to "ゔぇ", "vo" to "ゔぉ",
+        "thi" to "てぃ", "thu" to "てゅ", "the" to "てぇ", "tho" to "てょ",
+        "dhi" to "でぃ", "dhu" to "でゅ", "dhe" to "でぇ", "dho" to "でょ",
+        "twu" to "とぅ", "dwu" to "どぅ", "ye" to "いぇ",
+        "kwa" to "くぁ", "kwi" to "くぃ", "kwe" to "くぇ", "kwo" to "くぉ",
+        "gwa" to "ぐぁ", "gwi" to "ぐぃ", "gwe" to "ぐぇ", "gwo" to "ぐぉ",
+        "wha" to "うぁ", "whi" to "うぃ", "whe" to "うぇ", "who" to "うぉ",
         "she" to "しぇ", "je" to "じぇ", "che" to "ちぇ",
         "tsa" to "つぁ", "tsi" to "つぃ", "tse" to "つぇ", "tso" to "つぉ",
         "dya" to "ぢゃ", "dyu" to "ぢゅ", "dyo" to "ぢょ",
@@ -52,6 +58,7 @@ object RomajiKanaConverter {
         "lya" to "ゃ", "lyu" to "ゅ", "lyo" to "ょ",
         "xa" to "ぁ", "xi" to "ぃ", "xu" to "ぅ", "xe" to "ぇ", "xo" to "ぉ",
         "la" to "ぁ", "li" to "ぃ", "lu" to "ぅ", "le" to "ぇ", "lo" to "ぉ",
+        "xka" to "ヵ", "xke" to "ヶ", "lka" to "ヵ", "lke" to "ヶ",
         "xtsu" to "っ", "ltsu" to "っ", "xtu" to "っ", "ltu" to "っ"
     )
     private class TrieNode {
