@@ -237,9 +237,12 @@ final class KeyboardViewController: UIInputViewController {
         candidateEngine.analyzeKana(converted.kana) { [weak self] analysis in
             guard let self else { return }
             if let conversion = analysis.conversions.first,
-               conversion.segments.count > 1,
-               conversion.segments.contains(where: { !$0.isCopy }) {
-                beginBunsetsu(reading: converted.kana, initialLength: conversion.segments[0].end)
+               conversion.segments.contains(where: { !$0.isCopy }),
+               let initialLength = KanaKanjiConverter.leadingBunsetsuLength(
+                   segments: conversion.segments,
+                   totalLength: Array(converted.kana).count
+               ) {
+                beginBunsetsu(reading: converted.kana, initialLength: initialLength)
             } else {
                 currentCandidates = analysis.candidates; candidateBar.show(analysis.candidates)
             }
@@ -291,8 +294,13 @@ final class KeyboardViewController: UIInputViewController {
         let remaining = String(state.remainingCharacters)
         candidateEngine.analyzeKana(remaining) { [weak self, weak state] analysis in
             guard let self, let state, bunsetsuState === state else { return }
-            if let first = analysis.conversions.first?.segments.first {
-                state.setSuggestedLength(first.end)
+            if let conversion = analysis.conversions.first {
+                let totalLength = state.remainingCharacters.count
+                let suggestedLength = KanaKanjiConverter.leadingBunsetsuLength(
+                    segments: conversion.segments,
+                    totalLength: totalLength
+                ) ?? totalLength
+                state.setSuggestedLength(suggestedLength)
                 renderBunsetsu(state)
             }
             loadBunsetsuCandidates(state)

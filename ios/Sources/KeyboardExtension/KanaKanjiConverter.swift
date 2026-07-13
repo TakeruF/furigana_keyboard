@@ -105,6 +105,28 @@ enum KanaKanjiConverter {
         }.prefix(min(limit, 8)).map { $0 }
     }
 
+    /// Returns the leading boundary of the most plausible bunsetsu, rather than
+    /// exposing the converter's first (and often shortest) dictionary token.
+    static func leadingBunsetsuLength(segments: [ConversionSegment], totalLength: Int) -> Int? {
+        guard totalLength > 0 else { return nil }
+        for (left, right) in zip(segments, segments.dropFirst()) {
+            if closesBunsetsu(left.rightID) && startsContent(right.leftID) {
+                return left.end < totalLength ? left.end : nil
+            }
+        }
+        return nil
+    }
+
+    private static func closesBunsetsu(_ posID: Int) -> Bool {
+        posID == 5 || posID == 6 || posID == 11 // particle, auxiliary, suffix
+    }
+
+    private static func startsContent(_ posID: Int) -> Bool {
+        // pronoun, noun, proper noun, verb, adjective, adverb, prefix,
+        // expression, other, or an unknown copied character
+        [2, 3, 4, 7, 8, 9, 10, 12, 14, 15].contains(posID)
+    }
+
     private static func prune(_ values: [State]) -> [State] {
         var best: [StateKey: State] = [:]
         values.forEach { state in

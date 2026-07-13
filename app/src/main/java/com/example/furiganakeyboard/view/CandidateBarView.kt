@@ -16,6 +16,7 @@ import com.example.furiganakeyboard.reading.RomajiConverter
 import com.example.furiganakeyboard.settings.ReadingMode
 import com.example.furiganakeyboard.settings.AccentColor
 import com.example.furiganakeyboard.settings.CandidateTextSize
+import kotlin.math.ceil
 
 /**
  * Horizontal, scrollable candidate bar. The first (best) candidate is shown in
@@ -132,9 +133,8 @@ class CandidateBarView @JvmOverloads constructor(
         init {
             orientation = LinearLayout.VERTICAL
             gravity = Gravity.CENTER
-            val padH = dp(10)
-            setPadding(padH, dp(3), padH, dp(3))
-            minimumWidth = dp(48)
+            setPadding(0, dp(3), 0, dp(3))
+            minimumWidth = 0
             minimumHeight = dp(48)
             layoutParams = LinearLayout.LayoutParams(
                 LinearLayout.LayoutParams.WRAP_CONTENT,
@@ -167,6 +167,7 @@ class CandidateBarView @JvmOverloads constructor(
             reading.visibility = if (readingMode == ReadingMode.OFF || readingText.isEmpty()) {
                 View.GONE
             } else View.VISIBLE
+            updateCandidateWidth(value.text, readingText)
             isClickable = value.kind != CandidateKind.STATUS
             isFocusable = isClickable
             contentDescription = buildString {
@@ -183,6 +184,21 @@ class CandidateBarView @JvmOverloads constructor(
             isClickable = false
             isFocusable = false
             contentDescription = null
+        }
+
+        private fun updateCandidateWidth(primaryText: String, readingText: String) {
+            val primaryWidth = primary.paint.measureText(primaryText)
+            val readingWidth = if (reading.visibility == View.VISIBLE) {
+                reading.paint.measureText(readingText)
+            } else {
+                0f
+            }
+            val longestPaint = if (readingWidth > primaryWidth) reading.paint else primary.paint
+            val contentWidth = maxOf(primaryWidth, readingWidth)
+            val singleSpace = longestPaint.measureText(" ")
+            layoutParams = (layoutParams as LinearLayout.LayoutParams).apply {
+                width = ceil(contentWidth + singleSpace * 2).toInt()
+            }
         }
     }
 

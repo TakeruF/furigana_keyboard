@@ -84,21 +84,34 @@ final class CandidateBarView: UIView {
             let button = UIButton(type: .system)
             button.tintColor = index == 0 ? preferences.accent.color : .label
             button.backgroundColor = .clear
+            let titleFont = UIFont.systemFont(ofSize: preferences.candidateTextSize.primary, weight: .semibold)
+            let subtitleFont = UIFont.systemFont(ofSize: 10)
+            let reading = readingText(candidate.readings)
+            let horizontalInset = singleSpaceInset(
+                title: candidate.text,
+                reading: reading,
+                titleFont: titleFont,
+                subtitleFont: subtitleFont
+            )
             var configuration = UIButton.Configuration.plain()
-            configuration.contentInsets = NSDirectionalEdgeInsets(top: 3, leading: 12, bottom: 3, trailing: 12)
+            configuration.contentInsets = NSDirectionalEdgeInsets(
+                top: 3,
+                leading: horizontalInset,
+                bottom: 3,
+                trailing: horizontalInset
+            )
             configuration.title = candidate.text
-            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { [preferences] incoming in
+            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { [preferences, titleFont] incoming in
                 var outgoing = incoming
-                outgoing.font = UIFont.systemFont(ofSize: preferences.candidateTextSize.primary, weight: .semibold)
+                outgoing.font = titleFont
                 outgoing.foregroundColor = index == 0 ? preferences.accent.color : .label
                 return outgoing
             }
-            let reading = readingText(candidate.readings)
             if !reading.isEmpty {
                 configuration.subtitle = reading
-                configuration.subtitleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { incoming in
+                configuration.subtitleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { [subtitleFont] incoming in
                     var outgoing = incoming
-                    outgoing.font = UIFont.systemFont(ofSize: 10)
+                    outgoing.font = subtitleFont
                     outgoing.foregroundColor = .secondaryLabel
                     return outgoing
                 }
@@ -115,6 +128,18 @@ final class CandidateBarView: UIView {
             }
         }
         scroll.setContentOffset(.zero, animated: false)
+    }
+
+    private func singleSpaceInset(
+        title: String,
+        reading: String,
+        titleFont: UIFont,
+        subtitleFont: UIFont
+    ) -> CGFloat {
+        let titleWidth = (title as NSString).size(withAttributes: [.font: titleFont]).width
+        let readingWidth = (reading as NSString).size(withAttributes: [.font: subtitleFont]).width
+        let longestFont = readingWidth > titleWidth ? subtitleFont : titleFont
+        return ceil((" " as NSString).size(withAttributes: [.font: longestFont]).width)
     }
 
     func clear() {

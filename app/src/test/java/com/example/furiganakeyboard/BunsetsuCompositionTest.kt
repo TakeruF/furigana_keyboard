@@ -89,6 +89,55 @@ class BunsetsuCompositionTest {
     }
 
     @Test
+    fun mostLikelyBoundaryIsPreferredOverShortestBoundary() {
+        val reading = "ここではきもの"
+        val natural = listOf(
+            segment(0, 2, "ここ", PosClass.PRONOUN),
+            segment(2, 4, "では", PosClass.PARTICLE),
+            segment(4, 7, "きもの", PosClass.NOUN, surface = "着物"),
+        )
+        val shorter = listOf(
+            segment(0, 3, "ここで", PosClass.PARTICLE),
+            segment(3, 7, "はきもの", PosClass.NOUN, surface = "履き物"),
+        )
+
+        val plan = BunsetsuComposition.plan(
+            reading,
+            listOf(
+                conversion(reading, "ここで履き物", shorter, cost = 500),
+                conversion(reading, "ここでは着物", natural, cost = 100),
+            ),
+        )!!
+
+        assertEquals("ここでは", BunsetsuComposition.create(reading, plan.initialSegments).activeReading)
+        assertEquals(listOf("ここでは", "ここで"), plan.candidates.map { it.reading })
+    }
+
+    @Test
+    fun equallyLikelyBoundariesDoNotDefaultToShortestFirst() {
+        val reading = "ここではきもの"
+        val longer = listOf(
+            segment(0, 2, "ここ", PosClass.PRONOUN),
+            segment(2, 4, "では", PosClass.PARTICLE),
+            segment(4, 7, "きもの", PosClass.NOUN),
+        )
+        val shorter = listOf(
+            segment(0, 3, "ここで", PosClass.PARTICLE),
+            segment(3, 7, "はきもの", PosClass.NOUN),
+        )
+
+        val plan = BunsetsuComposition.plan(
+            reading,
+            listOf(
+                conversion(reading, "ここではきもの", shorter),
+                conversion(reading, "ここではきもの", longer),
+            ),
+        )!!
+
+        assertEquals(listOf("ここでは", "ここで"), plan.candidates.map { it.reading })
+    }
+
+    @Test
     fun selectingCompetingBoundaryCommitsOnlyItsReadingPrefix() {
         val state = BunsetsuComposition.create("ここではきもの", emptyList())
 
@@ -128,5 +177,6 @@ class BunsetsuCompositionTest {
         reading: String,
         surface: String,
         segments: List<ConversionSegment>,
-    ) = ConversionResult(surface, reading, 0, segments)
+        cost: Int = 0,
+    ) = ConversionResult(surface, reading, cost, segments)
 }

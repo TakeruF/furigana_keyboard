@@ -160,25 +160,47 @@ class BunsetsuComposition private constructor(
             reading: String,
             conversions: List<ConversionResult>,
         ): BunsetsuConversionPlan? {
-            var initialSegments: List<ConversionSegment>? = null
-            val candidates = LinkedHashSet<BunsetsuCandidateOption>()
-            conversions.forEach { conversion ->
+            data class LeadingCandidate(
+                val conversion: ConversionResult,
+                val firstReading: String,
+                val firstSurface: String,
+                val copySegments: Int,
+            )
+
+            val leadingCandidates = conversions.mapNotNull { conversion ->
                 val state = create(reading, conversion.segments)
-                if (state.composingSegments.size <= 1) return@forEach
-                if (initialSegments == null) initialSegments = conversion.segments
+                if (state.composingSegments.size <= 1) return@mapNotNull null
                 val firstReading = state.activeReading
                 val boundary = firstReading.length
                 val firstSegments = conversion.segments.takeWhile { it.end <= boundary }
-                if (firstSegments.isNotEmpty() && firstSegments.last().end == boundary) {
-                    candidates += BunsetsuCandidateOption(
-                        surface = firstSegments.joinToString("") { it.surface },
-                        reading = firstReading,
-                    )
+                if (firstSegments.isEmpty() || firstSegments.last().end != boundary) {
+                    return@mapNotNull null
                 }
+                LeadingCandidate(
+                    conversion = conversion,
+                    firstReading = firstReading,
+                    firstSurface = firstSegments.joinToString("") { it.surface },
+                    copySegments = conversion.segments.count { it.isCopy },
+                )
+            }.sortedWith(
+                compareBy<LeadingCandidate> { it.conversion.cost }
+                    .thenBy { it.copySegments }
+                    // A tie in the linguistic cost must not turn into shortest-first splitting.
+                    .thenByDescending { it.firstReading.codePointCount(0, it.firstReading.length) }
+                    .thenBy { it.conversion.segments.size }
+                    .thenBy { it.firstSurface },
+            )
+
+            val initialSegments = leadingCandidates.firstOrNull()?.conversion?.segments ?: return null
+            val candidates = LinkedHashSet<BunsetsuCandidateOption>()
+            leadingCandidates.forEach { candidate ->
+                candidates += BunsetsuCandidateOption(
+                    surface = candidate.firstSurface,
+                    reading = candidate.firstReading,
+                )
             }
-            val segments = initialSegments ?: return null
             if (candidates.isEmpty()) return null
-            return BunsetsuConversionPlan(segments, candidates.toList())
+            return BunsetsuConversionPlan(initialSegments, candidates.toList())
         }
 
         fun create(reading: String, conversionSegments: List<ConversionSegment>): BunsetsuComposition {
