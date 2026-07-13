@@ -46,6 +46,31 @@ MAX_CONVERSION_LEXEMES_PER_READING = 12
 USUALLY_KANA = "word usually written using kana alone"
 GEOGRAPHIC_CONVERSION_COST = 9_000
 
+# Particles and auxiliaries are productive modern function words whose normal
+# IME spelling is the reading itself. Suffixes are included in the broader set
+# so an explicitly kana suffix is protected by the vocabulary cap, but kanji
+# suffixes such as 化 are not automatically converted to kana.
+KANA_DEFAULT_FUNCTION_POS_IDS = {5, 6}
+FUNCTION_WORD_POS_IDS = KANA_DEFAULT_FUNCTION_POS_IDS | {11}
+FUNCTION_WORD_KANA_COST_REDUCTION = 2_300
+HISTORICAL_FUNCTION_WORD_COST_PENALTY = 4_000
+
+# JMdict records unusual orthography on k_ele and historical/register usage on
+# sense. These annotations distinguish forms such as 乃/之/の and 〼/ます from
+# ordinary modern kanji suffixes without maintaining a surface blacklist.
+LOW_PRIORITY_KANJI_INFORMATION = {
+    "word containing out-dated kanji or kanji usage",
+    "rarely used kanji form",
+    "search-only kanji form",
+}
+HISTORICAL_OR_LITERARY_INFORMATION = {
+    "archaic",
+    "dated term",
+    "formal or literary term",
+    "historical term",
+    "obsolete term",
+}
+
 POS_EXACT = {
     "pronoun": 2,
     "proper noun": 4,
@@ -276,6 +301,18 @@ def is_han(value: str) -> bool:
     )
 
 
+def is_kana_spelling(value: str) -> bool:
+    """Return whether a surface consists only of Japanese kana characters."""
+    if not value:
+        return False
+    return all(
+        0x3040 <= ord(char) <= 0x30FF
+        or 0x31F0 <= ord(char) <= 0x31FF
+        or 0xFF66 <= ord(char) <= 0xFF9F
+        for char in value
+    )
+
+
 def priority(tags: list[str]) -> int:
     ranks: list[int] = []
     for tag in tags:
@@ -322,11 +359,25 @@ def conversion_word_cost(
     surface: str,
     reading: str,
     usually_kana: bool,
+    pos_id: int,
+    spelling_information: set[str] | frozenset[str] = frozenset(),
+    sense_information: set[str] | frozenset[str] = frozenset(),
     form_rank: int = 0,
 ) -> int:
     cost = 400 + min(pair_priority, 100) * 20 + reading_position * 4 + form_rank * 16
     if usually_kana:
         cost += -700 if surface == reading else 900
+    if pos_id in KANA_DEFAULT_FUNCTION_POS_IDS and surface == reading:
+        cost -= FUNCTION_WORD_KANA_COST_REDUCTION
+    if (
+        pos_id in FUNCTION_WORD_POS_IDS
+        and not is_kana_spelling(surface)
+        and (
+            spelling_information & LOW_PRIORITY_KANJI_INFORMATION
+            or sense_information & HISTORICAL_OR_LITERARY_INFORMATION
+        )
+    ):
+        cost += HISTORICAL_FUNCTION_WORD_COST_PENALTY
     return max(100, cost)
 
 
@@ -624,12 +675,20 @@ def import_jmdict_conversion(db: sqlite3.Connection, source: Path) -> None:
             if elem.tag != "entry":
                 continue
             surfaces = {
-                node.findtext("keb") or "":
-                    [value.text or "" for value in node.findall("ke_pri")]
+                node.findtext("keb") or "": {
+                    "priority": [
+                        value.text or "" for value in node.findall("ke_pri")
+                    ],
+                    "information": {
+                        value.text for value in node.findall("ke_inf") if value.text
+                    },
+                }
                 for node in elem.findall("k_ele")
                 if node.findtext("keb")
             }
-            has_surface_priority = any(tags for tags in surfaces.values())
+            has_surface_priority = any(
+                item["priority"] for item in surfaces.values()
+            )
             readings = []
             for reading_position, r_ele in enumerate(elem.findall("r_ele")):
                 reading = r_ele.findtext("reb")
@@ -676,33 +735,53 @@ def import_jmdict_conversion(db: sqlite3.Connection, source: Path) -> None:
                     reading_priority_tags = list(item["priority"])
                     restrictions = set(item["restrictions"])
                     no_kanji = bool(item["no_kanji"])
-                    applicable: dict[str, tuple[int, str]] = {}
+                    applicable: dict[
+                        str, tuple[int, str, set[str] | frozenset[str]]
+                    ] = {}
 
-                    if not surfaces or no_kanji or usually_kana:
+                    if (
+                        not surfaces
+                        or no_kanji
+                        or usually_kana
+                        or set(pos_ids) & KANA_DEFAULT_FUNCTION_POS_IDS
+                    ):
                         applicable[reading] = (
-                            priority(reading_priority_tags), "jmdict_kana"
+                            priority(reading_priority_tags),
+                            "jmdict_kana",
+                            frozenset(),
                         )
                     if not no_kanji:
-                        for surface, surface_priority_tags in surfaces.items():
+                        for surface, surface_item in surfaces.items():
                             if restrictions and surface not in restrictions:
                                 continue
                             if sense_surfaces and surface not in sense_surfaces:
                                 continue
                             pair_priority = priority(
-                                surface_priority_tags
+                                list(surface_item["priority"])
                                 if has_surface_priority else reading_priority_tags
                             )
-                            applicable[surface] = (pair_priority, "jmdict")
+                            applicable[surface] = (
+                                pair_priority,
+                                "jmdict",
+                                set(surface_item["information"]),
+                            )
 
-                    for surface, (pair_priority, source_name) in applicable.items():
-                        base_cost = conversion_word_cost(
-                            pair_priority,
-                            int(item["position"]),
-                            surface=surface,
-                            reading=reading,
-                            usually_kana=usually_kana,
-                        )
+                    for surface, (
+                        pair_priority,
+                        source_name,
+                        spelling_information,
+                    ) in applicable.items():
                         for pos_id in pos_ids:
+                            base_cost = conversion_word_cost(
+                                pair_priority,
+                                int(item["position"]),
+                                surface=surface,
+                                reading=reading,
+                                usually_kana=usually_kana,
+                                pos_id=pos_id,
+                                spelling_information=spelling_information,
+                                sense_information=inherited_misc,
+                            )
                             append(reading, surface, pos_id, base_cost, 0, source_name)
                         if pair_priority < 100:
                             inflected_pos_id = inflected_conversion_pos(pos_tags)
@@ -719,6 +798,9 @@ def import_jmdict_conversion(db: sqlite3.Connection, source: Path) -> None:
                                         surface=inflected_surface,
                                         reading=inflected_reading,
                                         usually_kana=usually_kana,
+                                        pos_id=inflected_pos_id,
+                                        spelling_information=spelling_information,
+                                        sense_information=inherited_misc,
                                         form_rank=form_rank,
                                     ),
                                     form_rank,
@@ -816,7 +898,12 @@ def limit_conversion_lexemes(db: sqlite3.Connection) -> int:
             SELECT conversion_lexeme.*,
                    row_number() OVER (
                        PARTITION BY reading
-                       ORDER BY word_cost, form_rank, surface,
+                       ORDER BY CASE
+                                    WHEN surface=reading
+                                     AND left_id IN ({','.join(map(str, sorted(FUNCTION_WORD_POS_IDS)))})
+                                    THEN 0 ELSE 1
+                                END,
+                                word_cost, form_rank, surface,
                                 left_id, right_id, source
                    ) AS position
             FROM conversion_lexeme

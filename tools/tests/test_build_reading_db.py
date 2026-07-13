@@ -7,7 +7,29 @@ from pathlib import Path
 from tools import build_reading_db as builder
 
 
-JMDICT_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
+REQUIRED_PARTICLES = (
+    "は", "が", "を", "に", "で", "と", "の", "へ", "も", "や", "か", "ね", "よ",
+)
+REQUIRED_AUXILIARIES = ("た", "だ", "です", "ます", "ない", "たい")
+
+
+def kana_function_entries() -> str:
+    entries = []
+    readings = (
+        [(reading, "particle") for reading in REQUIRED_PARTICLES if reading != "の"]
+        + [(reading, "auxiliary verb") for reading in REQUIRED_AUXILIARIES if reading != "ます"]
+    )
+    for sequence, (reading, pos) in enumerate(readings, start=100):
+        entries.append(f"""
+  <entry>
+    <ent_seq>{sequence}</ent_seq>
+    <r_ele><reb>{reading}</reb><re_pri>spec1</re_pri></r_ele>
+    <sense><pos>{pos}</pos></sense>
+  </entry>""")
+    return "".join(entries)
+
+
+JMDICT_FIXTURE = f"""<?xml version="1.0" encoding="UTF-8"?>
 <JMdict>
   <entry>
     <ent_seq>1</ent_seq>
@@ -44,6 +66,33 @@ JMDICT_FIXTURE = """<?xml version="1.0" encoding="UTF-8"?>
     <r_ele><reb>よむ</reb><re_pri>ichi1</re_pri></r_ele>
     <sense><pos>Godan verb with 'mu' ending</pos></sense>
   </entry>
+  <entry>
+    <ent_seq>6</ent_seq>
+    <k_ele><keb>乃</keb><ke_inf>search-only kanji form</ke_inf></k_ele>
+    <k_ele><keb>之</keb><ke_inf>search-only kanji form</ke_inf></k_ele>
+    <r_ele><reb>の</reb><re_pri>spec1</re_pri></r_ele>
+    <sense><pos>particle</pos></sense>
+  </entry>
+  <entry>
+    <ent_seq>7</ent_seq>
+    <k_ele><keb>〼</keb><ke_inf>search-only kanji form</ke_inf></k_ele>
+    <r_ele><reb>ます</reb></r_ele>
+    <sense><pos>auxiliary verb</pos></sense>
+  </entry>
+  <entry>
+    <ent_seq>8</ent_seq>
+    <k_ele><keb>辺</keb></k_ele>
+    <r_ele><reb>へ</reb></r_ele>
+    <sense><pos>suffix</pos><misc>archaic</misc></sense>
+  </entry>
+  <entry>
+    <ent_seq>9</ent_seq>
+    <k_ele><keb>他</keb><ke_pri>ichi1</ke_pri></k_ele>
+    <k_ele><keb>田</keb><ke_pri>ichi1</ke_pri></k_ele>
+    <r_ele><reb>た</reb><re_pri>ichi1</re_pri></r_ele>
+    <sense><pos>noun (common) (futsuumeishi)</pos></sense>
+  </entry>
+  {kana_function_entries()}
 </JMdict>
 """
 
@@ -104,6 +153,92 @@ class BuildReadingDatabaseTest(unittest.TestCase):
         self.assertIsNotNone(db.execute(
             "SELECT 1 FROM conversion_lexeme WHERE reading='よんで' AND surface='読んで' AND left_id=7 AND form_rank>0"
         ).fetchone())
+
+    def test_required_modern_function_words_have_preferred_kana_lexemes(self):
+        db = self.build_conversion()
+        for reading, pos_id in (
+            [(reading, 5) for reading in REQUIRED_PARTICLES]
+            + [(reading, 6) for reading in REQUIRED_AUXILIARIES]
+        ):
+            row = db.execute(
+                """SELECT word_cost, source FROM conversion_lexeme
+                   WHERE reading=? AND surface=? AND left_id=?""",
+                (reading, reading, pos_id),
+            ).fetchone()
+            self.assertIsNotNone(row, f"missing kana function word {reading}/{pos_id}")
+            self.assertEqual("jmdict_kana", row[1])
+            self.assertLess(row[0], 420, f"kana function word is too costly: {reading}")
+
+    def test_historical_function_spellings_are_retained_but_demoted(self):
+        db = self.build_conversion()
+        builder.limit_conversion_lexemes(db)
+        kana_no = db.execute(
+            """SELECT word_cost FROM conversion_lexeme
+               WHERE reading='の' AND surface='の' AND left_id=5"""
+        ).fetchone()[0]
+        for historical in ("乃", "之"):
+            row = db.execute(
+                """SELECT word_cost FROM conversion_lexeme
+                   WHERE reading='の' AND surface=? AND left_id=5""",
+                (historical,),
+            ).fetchone()
+            self.assertIsNotNone(row, f"historical spelling was removed: {historical}")
+            self.assertGreater(row[0], kana_no)
+
+        kana_masu = db.execute(
+            """SELECT word_cost FROM conversion_lexeme
+               WHERE reading='ます' AND surface='ます' AND left_id=6"""
+        ).fetchone()[0]
+        historical_masu = db.execute(
+            """SELECT word_cost FROM conversion_lexeme
+               WHERE reading='ます' AND surface='〼' AND left_id=6"""
+        ).fetchone()[0]
+        self.assertGreater(historical_masu, kana_masu)
+
+        particle_he = db.execute(
+            """SELECT word_cost FROM conversion_lexeme
+               WHERE reading='へ' AND surface='へ' AND left_id=5"""
+        ).fetchone()[0]
+        archaic_suffix = db.execute(
+            """SELECT word_cost FROM conversion_lexeme
+               WHERE reading='へ' AND surface='辺' AND left_id=11"""
+        ).fetchone()[0]
+        self.assertGreater(archaic_suffix, particle_he)
+
+    def test_past_auxiliary_outranks_common_noun_homophones(self):
+        db = self.build_conversion()
+        auxiliary_cost = db.execute(
+            """SELECT word_cost FROM conversion_lexeme
+               WHERE reading='た' AND surface='た' AND left_id=6"""
+        ).fetchone()[0]
+        noun_costs = [
+            row[0] for row in db.execute(
+                """SELECT word_cost FROM conversion_lexeme
+                   WHERE reading='た' AND surface IN ('他', '田') AND left_id=3"""
+            )
+        ]
+        self.assertEqual(2, len(noun_costs))
+        self.assertTrue(all(auxiliary_cost < cost for cost in noun_costs))
+
+    def test_vocabulary_cap_reserves_kana_function_words(self):
+        db = self.build_conversion()
+        rows = [
+            ("ほご", f"候補{number:02d}", 3, 3, 0, 0, "test")
+            for number in range(20)
+        ]
+        rows.append(("ほご", "ほご", 5, 5, 9_999, 0, "jmdict_kana"))
+        builder.insert_conversion_lexemes(db, rows)
+        builder.limit_conversion_lexemes(db)
+        self.assertIsNotNone(db.execute(
+            """SELECT 1 FROM conversion_lexeme
+               WHERE reading='ほご' AND surface='ほご' AND left_id=5"""
+        ).fetchone())
+        self.assertEqual(
+            builder.MAX_CONVERSION_LEXEMES_PER_READING,
+            db.execute(
+                "SELECT count(*) FROM conversion_lexeme WHERE reading='ほご'"
+            ).fetchone()[0],
+        )
 
     def test_vocabulary_cap_and_content_are_deterministic(self):
         snapshots = []
