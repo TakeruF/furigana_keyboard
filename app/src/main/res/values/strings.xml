@@ -26,8 +26,6 @@
     <string name="key_send">Send</string>
     <string name="key_search">Search</string>
     <string name="key_back_hw">Write</string>
-    <string name="key_clear_ink">Clear</string>
-    <string name="key_clear_ink_desc">Clear handwriting</string>
     <string name="mode_kana">Kana</string>
     <string name="mode_romaji">Romaji</string>
     <string name="mode_off">Off</string>

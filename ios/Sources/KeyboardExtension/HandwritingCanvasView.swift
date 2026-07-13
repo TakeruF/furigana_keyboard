@@ -29,6 +29,8 @@ final class HandwritingCanvasView: UIView {
 
     func markResultsDelivered() { resultsDelivered = true }
 
+    var hasInk: Bool { !strokes.isEmpty }
+
     func clear() {
         recognitionWork?.cancel()
         strokes.removeAll(); strokeWidths.removeAll()
@@ -37,11 +39,33 @@ final class HandwritingCanvasView: UIView {
         setNeedsDisplay()
     }
 
+    @discardableResult
+    func deleteLastCharacter() -> Bool {
+        guard let remaining = HandwritingStrokeSegmenter.removingLastCharacter(
+            from: strokes,
+            canvasSize: bounds.size
+        ) else { return false }
+        recognitionWork?.cancel()
+        strokes = remaining
+        strokeWidths = Array(strokeWidths.prefix(remaining.count))
+        activeStroke.removeAll(); activeWidths.removeAll()
+        resultsDelivered = false
+        setNeedsDisplay()
+        if !strokes.isEmpty { scheduleRecognition() }
+        return true
+    }
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         recognitionWork?.cancel()
         let point = touch.location(in: self)
-        if resultsDelivered, !isClearlyStartingRightCharacter(at: point.x), onNewCharacterGate?() == true {
+        if resultsDelivered,
+           !HandwritingStrokeSegmenter.isSecondCharacterStart(
+               strokes: strokes,
+               canvasWidth: bounds.width,
+               x: point.x
+           ),
+           onNewCharacterGate?() == true {
             clear()
         }
         resultsDelivered = false
@@ -64,6 +88,11 @@ final class HandwritingCanvasView: UIView {
         if !activeStroke.isEmpty { strokes.append(activeStroke); strokeWidths.append(activeWidths) }
         activeStroke.removeAll(); activeWidths.removeAll(); lastPoint = nil
         setNeedsDisplay()
+        scheduleRecognition()
+    }
+
+    private func scheduleRecognition() {
+        recognitionWork?.cancel()
         let work = DispatchWorkItem { [weak self] in
             guard let self, !self.strokes.isEmpty else { return }
             self.onInkChanged?(self.strokes, self.bounds.size)
@@ -86,15 +115,6 @@ final class HandwritingCanvasView: UIView {
         let width = (activeWidths.last ?? 4.5) + (target - (activeWidths.last ?? 4.5)) * 0.3
         activeStroke.append(point); activeWidths.append(width)
         lastPoint = point; lastTime = touch.timestamp
-    }
-
-    private func isClearlyStartingRightCharacter(at x: CGFloat) -> Bool {
-        let points = strokes.flatMap { $0 }
-        guard !points.isEmpty else { return false }
-        let minX = points.map(\.x).min()!, maxX = points.map(\.x).max()!
-        let center = (minX + maxX) / 2
-        return center < bounds.width * 0.48 && maxX < bounds.width * 0.58 &&
-            x > bounds.width * 0.52 && x - maxX >= max(8, bounds.width * 0.035)
     }
 
     override func draw(_ rect: CGRect) {

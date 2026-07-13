@@ -469,9 +469,8 @@ class FuriganaImeService : InputMethodService() {
         root.findViewById<Button>(R.id.keySymbol).onKey { switchPanel(Panel.SYMBOLS) }
         root.findViewById<Button>(R.id.keyEnglish).onKey { switchPanel(Panel.ENGLISH) }
         root.findViewById<Button>(R.id.keyRomaji).onKey { switchPanel(Panel.ROMAJI) }
-        root.findViewById<Button>(R.id.keyClearInk).onKey { clearHandwritingInput() }
         root.findViewById<Button>(R.id.keyDelete)
-            .setOnTouchListener(RepeatOnTouchListener { deleteBeforeCursor() })
+            .setOnTouchListener(RepeatOnTouchListener { deleteHandwritingOrText() })
         root.findViewById<Button>(R.id.keySpace).onKey { commitDirect(" ") }
         root.findViewById<Button>(R.id.keyComma).onKey { commitDirect("、") }
         root.findViewById<Button>(R.id.keyPeriod).onKey { commitDirect("。") }
@@ -479,12 +478,11 @@ class FuriganaImeService : InputMethodService() {
         enterKey.onKey { sendEnter() }
     }
 
-    private fun clearHandwritingInput() {
-        recognizer?.cancelPending()
-        candidatePipeline.invalidate()
-        handwritingView.clear()
+    private fun deleteHandwritingOrText(): Boolean {
+        if (!handwritingView.deleteLastCharacter()) return deleteBeforeCursor()
         latestCharacterAlternatives = emptyList()
         if (composition.isEmpty) candidateBar.clear() else showWordSuggestions()
+        return true
     }
 
     private fun applyReadingMode(mode: ReadingMode) {

@@ -218,7 +218,6 @@ class QwertyFastInputTest {
                 R.id.keySpace,
                 R.id.keyRomaji,
                 R.id.keyEnter,
-                R.id.keyClearInk,
                 R.id.keyDelete,
                 R.id.keyComma,
                 R.id.keyPeriod,

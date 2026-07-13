@@ -23,7 +23,7 @@ final class OfflineRecognizer {
                 DispatchQueue.main.async { completion([]) }
                 return
             }
-            let segments = Self.split(strokes: strokes, canvasSize: canvasSize)
+            let segments = HandwritingStrokeSegmenter.split(strokes: strokes, canvasSize: canvasSize)
             let raw: [(text: String, score: Float)]
             if segments.count == 2 {
                 let left = self.recognize(engine: engine, strokes: segments[0].strokes, size: segments[0].size, limit: 4)
@@ -76,43 +76,4 @@ final class OfflineRecognizer {
         }.map(\.element)
     }
 
-    private struct InkSegment { let strokes: [[CGPoint]]; let size: CGSize }
-
-    /// Split only when stroke order and geometry clearly describe left/right characters.
-    private static func split(strokes: [[CGPoint]], canvasSize: CGSize) -> [InkSegment] {
-        let nonempty = strokes.filter { !$0.isEmpty }
-        guard nonempty.count >= 2, canvasSize.width > 1 else {
-            return [InkSegment(strokes: strokes, size: canvasSize)]
-        }
-        func bounds(_ values: ArraySlice<[CGPoint]>) -> CGRect? {
-            let points = values.flatMap { $0 }
-            guard let first = points.first else { return nil }
-            return points.dropFirst().reduce(CGRect(origin: first, size: .zero)) { $0.union(CGRect(origin: $1, size: .zero)) }
-        }
-        var best: (cut: Int, score: CGFloat)?
-        for cut in 1..<nonempty.count {
-            guard let left = bounds(nonempty[..<cut]), let right = bounds(nonempty[cut...]) else { continue }
-            let gap = right.minX - left.maxX
-            let centerDistance = right.midX - left.midX
-            let valid = left.midX < canvasSize.width * 0.48 && right.midX > canvasSize.width * 0.52 &&
-                gap >= max(8, canvasSize.width * 0.035) &&
-                right.maxX - left.minX >= canvasSize.width * 0.48 &&
-                centerDistance >= canvasSize.width * 0.25
-            let score = gap + centerDistance * 0.25
-            if valid, best == nil || score > best!.score { best = (cut, score) }
-        }
-        guard let cut = best?.cut else { return [InkSegment(strokes: strokes, size: canvasSize)] }
-        func crop(_ values: ArraySlice<[CGPoint]>) -> InkSegment {
-            let box = bounds(values)!
-            let content = max(box.width, box.height, 1)
-            let padding = max(4, content * 0.08)
-            let side = content + padding * 2
-            let offset = CGPoint(x: padding + (content - box.width) / 2 - box.minX,
-                                 y: padding + (content - box.height) / 2 - box.minY)
-            return InkSegment(strokes: values.map { stroke in
-                stroke.map { CGPoint(x: $0.x + offset.x, y: $0.y + offset.y) }
-            }, size: CGSize(width: side, height: side))
-        }
-        return [crop(nonempty[..<cut]), crop(nonempty[cut...])]
-    }
 }

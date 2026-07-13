@@ -131,6 +131,7 @@ targets:
       - Tests
       - Sources/KeyboardExtension/BunsetsuState.swift
       - Sources/KeyboardExtension/KanaKanjiConverter.swift
+      - Sources/KeyboardExtension/HandwritingStrokeSegmenter.swift
       - Sources/KeyboardExtension/ReadingRepository.swift
     dependencies:
       - target: FuriganaKeyboard

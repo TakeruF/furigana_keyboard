@@ -23,7 +23,6 @@ enum AppStrings {
         "recognizing": [.japanese: "認識中…", .english: "Recognizing…", .simplifiedChinese: "正在识别…", .korean: "인식 중…"],
         "no_candidates": [.japanese: "候補がありません", .english: "No candidates", .simplifiedChinese: "没有候选项", .korean: "후보 없음"],
         "model_error": [.japanese: "オフラインモデルを読み込めません", .english: "Offline model unavailable", .simplifiedChinese: "无法加载离线模型", .korean: "오프라인 모델을 불러올 수 없음"],
-        "clear": [.japanese: "消去", .english: "Clear", .simplifiedChinese: "清除", .korean: "지우기"],
         "space": [.japanese: "空白", .english: "space", .simplifiedChinese: "空格", .korean: "공백"],
         "return": [.japanese: "改行", .english: "return", .simplifiedChinese: "换行", .korean: "줄바꿈"],
         "convert": [.japanese: "変換", .english: "convert", .simplifiedChinese: "转换", .korean: "변환"],

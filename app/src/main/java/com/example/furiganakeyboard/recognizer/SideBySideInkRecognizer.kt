@@ -124,7 +124,28 @@ internal object SideBySideInkSegmenter {
     fun split(ink: HandwritingInk): List<HandwritingInk> {
         val strokes = ink.strokes.filter { it.points.isNotEmpty() }
         if (strokes.size < 2 || ink.width <= 1) return listOf(ink)
-        val canvasWidth = ink.width.toFloat()
+        val cut = findSplitIndex(strokes, ink.width.toFloat()) ?: return listOf(ink)
+        return listOf(
+            cropToSquare(strokes.subList(0, cut)),
+            cropToSquare(strokes.subList(cut, strokes.size))
+        )
+    }
+
+    /** Remove the right-hand character when split, otherwise remove the sole character. */
+    fun removeLastCharacter(ink: HandwritingInk): Boolean {
+        val strokes = ink.strokes.filter { it.points.isNotEmpty() }
+        if (strokes.isEmpty()) return false
+        val cut = findSplitIndex(strokes, ink.width.toFloat())
+        ink.strokes.clear()
+        if (cut != null) ink.strokes.addAll(strokes.take(cut))
+        return true
+    }
+
+    private fun findSplitIndex(
+        strokes: List<HandwritingInk.Stroke>,
+        canvasWidth: Float
+    ): Int? {
+        if (strokes.size < 2 || canvasWidth <= 1f) return null
         var best: Pair<Int, Float>? = null
 
         for (cut in 1 until strokes.size) {
@@ -143,12 +164,7 @@ internal object SideBySideInkSegmenter {
                 if (best == null || score > best.second) best = cut to score
             }
         }
-
-        val cut = best?.first ?: return listOf(ink)
-        return listOf(
-            cropToSquare(strokes.subList(0, cut)),
-            cropToSquare(strokes.subList(cut, strokes.size))
-        )
+        return best?.first
     }
 
     /** Keep previous results alive when the next stroke clearly starts the right-hand slot. */

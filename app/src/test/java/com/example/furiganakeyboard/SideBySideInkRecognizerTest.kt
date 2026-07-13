@@ -50,6 +50,30 @@ class SideBySideInkRecognizerTest {
     }
 
     @Test
+    fun deletesSideBySideInkOneCharacterAtATime() {
+        val ink = sideBySideInk()
+
+        assertTrue(SideBySideInkSegmenter.removeLastCharacter(ink))
+        assertEquals(2, ink.strokes.size)
+        assertTrue(SideBySideInkSegmenter.removeLastCharacter(ink))
+        assertTrue(ink.isEmpty)
+        assertFalse(SideBySideInkSegmenter.removeLastCharacter(ink))
+    }
+
+    @Test
+    fun deletesAllStrokesOfACompactSingleCharacter() {
+        val ink = HandwritingInk().apply {
+            width = 400
+            height = 240
+            strokes += stroke(135f, 120f, 185f, 40f)
+            strokes += stroke(205f, 40f, 255f, 120f)
+        }
+
+        assertTrue(SideBySideInkSegmenter.removeLastCharacter(ink))
+        assertTrue(ink.isEmpty)
+    }
+
+    @Test
     fun combinesLeftAndRightRecognitionCandidatesInReadingOrder() {
         val delegate = FakeRecognizer(
             listOf(candidate("日", 10f), candidate("目", 9f)),

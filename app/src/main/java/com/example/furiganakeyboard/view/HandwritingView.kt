@@ -240,6 +240,21 @@ class HandwritingView @JvmOverloads constructor(
         resultsDelivered = false
     }
 
+    /** Delete one handwritten character, preferring the right side of a two-character input. */
+    fun deleteLastCharacter(): Boolean {
+        if (ink.isEmpty) return false
+        handler.removeCallbacks(recognizeRunnable)
+        onInkChanged?.invoke()
+        SideBySideInkSegmenter.removeLastCharacter(ink)
+        activeStroke = null
+        hasRenderPoint = false
+        resultsDelivered = false
+        redrawInk()
+        invalidate()
+        if (!ink.isEmpty) handler.postDelayed(recognizeRunnable, RECOGNIZE_DELAY_MS)
+        return true
+    }
+
     /** Reset ink/rendering without touching timers or flags. */
     private fun clearInkOnly() {
         ink.strokes.clear()

@@ -131,10 +131,7 @@ final class KeyboardViewController: UIInputViewController {
         globe.addTarget(self, action: #selector(handleInputModeList(from:with:)), for: .allTouchEvents)
         let language = functionButton("かな", accessibility: AppStrings.text("japanese")) { [weak self] in self?.show(panel: .japanese) }
         handwritingControls.addArrangedSubview(controlRow(globe, language))
-        handwritingControls.addArrangedSubview(controlRow(
-            functionButton(AppStrings.text("clear"), accessibility: AppStrings.text("clear")) { [weak self] in self?.clearHandwriting() },
-            repeatDeleteButton()
-        ))
+        handwritingControls.addArrangedSubview(repeatDeleteButton())
         handwritingControls.addArrangedSubview(controlRow(
             functionButton(AppStrings.text("space"), accessibility: AppStrings.text("space")) { [weak self] in self?.commitDirect(" ") },
             functionButton("123", accessibility: AppStrings.text("symbols")) { [weak self] in self?.showSymbols() }
@@ -199,10 +196,9 @@ final class KeyboardViewController: UIInputViewController {
         return true
     }
 
-    private func clearHandwriting() {
-        recognizer.cancel(); candidateEngine.invalidate(); canvas.clear()
-        handwritingBase = composition; handwritingTop = nil
+    private func refreshCandidatesAfterHandwritingDeletion() {
         if composition.isEmpty {
+            currentCandidates = []
             candidateBar.show(status: recognizer.isReady ? AppStrings.text("write_hint") : AppStrings.text("model_error"))
         } else {
             candidateEngine.suggestSurface(composition) { [weak self] candidates in
@@ -334,6 +330,32 @@ final class KeyboardViewController: UIInputViewController {
 
     private func deleteBackward() {
         KeyboardFeedback.key(preferences: preferences)
+        if activePanel == .handwriting, canvas.hasInk {
+            recognizer.cancel(); candidateEngine.invalidate()
+            if canvas.deleteLastCharacter() {
+                handwritingTop = nil
+                if canvas.hasInk {
+                    candidateBar.show(status: AppStrings.text("recognizing"))
+                } else {
+                    let remaining = handwritingBase ?? composition
+                    if remaining != composition {
+                        composition = remaining
+                        if remaining.isEmpty {
+                            textDocumentProxy.setMarkedText("", selectedRange: NSRange(location: 0, length: 0))
+                            textDocumentProxy.unmarkText()
+                        } else {
+                            textDocumentProxy.setMarkedText(
+                                remaining,
+                                selectedRange: NSRange(location: remaining.utf16.count, length: 0)
+                            )
+                        }
+                    }
+                    handwritingBase = composition
+                    refreshCandidatesAfterHandwritingDeletion()
+                }
+                return
+            }
+        }
         if bunsetsuState != nil { bunsetsuState = nil; candidateEngine.invalidate() }
         if !romajiRaw.isEmpty {
             romajiRaw = RomajiKanaConverter.deleteLastUnit(romajiRaw)
