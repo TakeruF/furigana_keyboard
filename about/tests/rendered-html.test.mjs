@@ -103,7 +103,7 @@ for (const expectation of [
     assert.match(html, /apple-glyph/);
     assert.match(
       html,
-      /https:\/\/downloads\.hanlu\.app\/furigana-keyboard\/1\.0\.0-rc\.3\.apk/,
+      /https:\/\/downloads\.hanlu\.app\/furigana-keyboard\/1\.0\.0-rc\.4\.apk/,
     );
     assert.doesNotMatch(html, /Zinnia|Tegaki|KANJIDIC2|JMdict/);
     if (expectation.path === "/ja") {
