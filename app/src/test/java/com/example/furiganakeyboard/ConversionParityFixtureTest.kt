@@ -2,6 +2,7 @@ package com.example.furiganakeyboard
 
 import com.example.furiganakeyboard.conversion.ConversionConnection
 import com.example.furiganakeyboard.conversion.ConversionCost
+import com.example.furiganakeyboard.conversion.ConversionContextModel
 import com.example.furiganakeyboard.conversion.ConversionLexeme
 import com.example.furiganakeyboard.conversion.ConversionText
 import com.example.furiganakeyboard.conversion.KanaKanjiConverter
@@ -13,8 +14,108 @@ import org.junit.Test
 import java.io.File
 import java.sql.Connection
 import java.sql.DriverManager
+import java.security.MessageDigest
 
 class ConversionParityFixtureTest {
+    @Test
+    fun sharedContextModelMetadataAndTargetRankingsAreStable() {
+        val fixture = JSONObject(fixtureFile("context-conversion-nbest.json").readText())
+        assertEquals(1, fixture.getInt("schemaVersion"))
+        val expectedModel = fixture.getJSONObject("model")
+        val modelBytes = contextModelFile().readBytes()
+        val model = ConversionContextModel.decode(modelBytes)
+        assertEquals(expectedModel.getInt("formatVersion"), model.metadata.formatVersion)
+        assertEquals(expectedModel.getInt("modelVersion"), model.metadata.modelVersion)
+        assertEquals(expectedModel.getInt("unigramCount"), model.metadata.unigramCount)
+        assertEquals(expectedModel.getInt("bigramCount"), model.metadata.bigramCount)
+        assertEquals(expectedModel.getString("sourceSha256"), model.metadata.sourceSha256)
+        assertEquals(expectedModel.getInt("modelBytes"), modelBytes.size)
+        assertEquals(expectedModel.getString("modelSha256"), sha256(modelBytes))
+        assertTrue(model.hasBigram("学校", "行きます"))
+        assertTrue(model.hasBigram("写真", "撮って"))
+        assertTrue(model.hasBigram("変換", "精度"))
+        assertTrue(model.hasBigram("お茶", "飲み"))
+        assertEquals(0, model.cost("未登録", "未知語"))
+
+        val targets = fixture.getJSONArray("cases").let { values ->
+            (0 until values.length()).map { index ->
+                val entry = values.getJSONObject(index)
+                val expected = entry.getJSONArray("results").let { results ->
+                    (0 until results.length()).map { resultIndex ->
+                        val result = results.getJSONObject(resultIndex)
+                        RankedResult(result.getString("surface"), result.getInt("cost"))
+                    }
+                }
+                ContextCase(entry.getString("reading"), expected)
+            }
+        }
+        databaseConnection().use { database ->
+            val connections = loadConnections(database)
+            targets.forEach { target ->
+                val reading = target.reading
+                val lexemes = loadLexemes(database, reading)
+                val oneCandidate = KanaKanjiConverter.convert(
+                    reading = reading,
+                    lexemes = lexemes,
+                    connections = connections,
+                    limit = 1,
+                    contextModel = model,
+                    beamWidth = 12,
+                )
+                val production = KanaKanjiConverter.convert(
+                    reading = reading,
+                    lexemes = lexemes,
+                    connections = connections,
+                    limit = 8,
+                    contextModel = model,
+                    beamWidth = 12,
+                )
+                val wideReference = KanaKanjiConverter.convert(
+                    reading = reading,
+                    lexemes = lexemes,
+                    connections = connections,
+                    limit = 8,
+                    contextModel = model,
+                    beamWidth = 64,
+                )
+                val actual = production.map { RankedResult(it.surface, it.cost) }
+                assertEquals("shared context parity fixture: $reading", target.results, actual)
+                assertEquals(
+                    "candidate limit: $reading",
+                    target.results.first().surface,
+                    oneCandidate.firstOrNull()?.surface,
+                )
+                assertEquals(
+                    "production beam: $reading",
+                    target.results.first().surface,
+                    production.firstOrNull()?.surface,
+                )
+                assertEquals(
+                    "wide beam: $reading",
+                    target.results.first().surface,
+                    wideReference.firstOrNull()?.surface,
+                )
+                assertEquals(
+                    "production/wide N-best: $reading",
+                    wideReference.map { RankedResult(it.surface, it.cost) },
+                    production.map { RankedResult(it.surface, it.cost) },
+                )
+            }
+
+            val suffixReading = "いきます"
+            val contextualSuffix = KanaKanjiConverter.convert(
+                reading = suffixReading,
+                lexemes = loadLexemes(database, suffixReading),
+                connections = connections,
+                limit = 8,
+                initialRightId = 5,
+                initialContextSurface = "学校",
+                contextModel = model,
+            )
+            assertEquals("confirmed bunsetsu context", "行きます", contextualSuffix.first().surface)
+        }
+    }
+
     @Test
     fun sharedCostFixtureMatchesKotlinIntegerCalculation() {
         val cases = costCases()
@@ -98,7 +199,7 @@ class ConversionParityFixtureTest {
     @Test
     fun sharedSentenceRegressionFixtureReportsBundledDatabaseQuality() {
         val cases = sentenceCases()
-        assertEquals(54, cases.size)
+        assertEquals(57, cases.size)
         assertEquals(
             mapOf(
                 "助詞・助動詞" to 6,
@@ -106,7 +207,7 @@ class ConversionParityFixtureTest {
                 "活用" to 6,
                 "複文節" to 6,
                 "固有名詞" to 6,
-                "カタカナ外来語" to 6,
+                "カタカナ外来語" to 9,
                 "未知語" to 6,
                 "数字" to 6,
                 "文節境界" to 6,
@@ -116,23 +217,87 @@ class ConversionParityFixtureTest {
 
         databaseConnection().use { database ->
             val connections = loadConnections(database)
-            val outcomes = cases.map { case ->
-                val candidates = KanaKanjiConverter.convert(
+            val model = contextModel()
+            val ranked = cases.map { case ->
+                val lexemes = loadLexemes(database, case.reading)
+                val baseline = KanaKanjiConverter.convert(
                     reading = case.reading,
-                    lexemes = loadLexemes(database, case.reading),
+                    lexemes = lexemes,
                     connections = connections,
                     limit = 8,
                 ).map { it.surface }
-                SentenceOutcome(case, candidates)
+                val contextual = KanaKanjiConverter.convert(
+                    reading = case.reading,
+                    lexemes = lexemes,
+                    connections = connections,
+                    limit = 8,
+                    contextModel = model,
+                ).map { it.surface }
+                case to (baseline to contextual)
             }
-            val report = SentenceRegressionReport(outcomes)
-            println(report.render())
+            val baselineReport = SentenceRegressionReport(
+                ranked.map { (case, values) -> SentenceOutcome(case, values.first) }
+            )
+            val report = SentenceRegressionReport(
+                ranked.map { (case, values) -> SentenceOutcome(case, values.second) }
+            )
+            val parityPayload = buildString {
+                ranked.forEach { (case, values) ->
+                    append(case.id).append('\u0000')
+                    values.second.forEach { append(it).append('\u0000') }
+                    append('\u0001')
+                }
+            }.toByteArray(Charsets.UTF_8)
+            println("context-nbest-sha256=${sha256(parityPayload)}")
+            println("baseline\n${baselineReport.render()}context\n${report.render()}")
 
-            // Known failures are deliberately still executed. A pass is an improvement;
-            // only a previously passing expectation becoming a failure fails the build.
+            assertTrue(
+                "context top-1 must improve over baseline\n${report.render()}",
+                report.top1Correct > baselineReport.top1Correct,
+            )
+            baselineReport.top1ByCategory.forEach { (category, baselineTop1) ->
+                assertTrue(
+                    "category[$category] top-1 regressed: baseline=$baselineTop1 " +
+                        "context=${report.top1ByCategory.getValue(category)}",
+                    report.top1ByCategory.getValue(category) >= baselineTop1,
+                )
+            }
+            baselineReport.top3ByCategory.forEach { (category, baselineTop3) ->
+                assertTrue(
+                    "category[$category] top-3 regressed: baseline=$baselineTop3 " +
+                        "context=${report.top3ByCategory.getValue(category)}",
+                    report.top3ByCategory.getValue(category) >= baselineTop3,
+                )
+            }
+            baselineReport.nBestByCategory.forEach { (category, baselineNBest) ->
+                assertTrue(
+                    "category[$category] N-best regressed: baseline=$baselineNBest " +
+                        "context=${report.nBestByCategory.getValue(category)}",
+                    report.nBestByCategory.getValue(category) >= baselineNBest,
+                )
+            }
+            assertTrue(
+                "forbidden candidates increased: baseline=${baselineReport.forbiddenCount} " +
+                    "context=${report.forbiddenCount}",
+                report.forbiddenCount <= baselineReport.forbiddenCount,
+            )
+            // Known failures stay exercised; a newly failing baseline-pass case fails the build.
             assertTrue(report.regressionsMessage(), report.regressions.isEmpty())
         }
     }
+
+    private fun contextModel(): ConversionContextModel = ConversionContextModel.decode(
+        contextModelFile().readBytes()
+    )
+
+    private fun contextModelFile(): File = sequenceOf(
+        File("app/src/main/assets/context-model.bin"),
+        File("src/main/assets/context-model.bin"),
+    ).firstOrNull(File::isFile) ?: error("cannot locate context-model.bin")
+
+    private fun sha256(bytes: ByteArray): String = MessageDigest.getInstance("SHA-256")
+        .digest(bytes)
+        .joinToString("") { byte -> "%02x".format(byte.toInt() and 0xff) }
 
     private fun loadLexemes(database: Connection, reading: String): List<ConversionLexeme> =
         buildList {
@@ -146,29 +311,47 @@ class ConversionParityFixtureTest {
                            ORDER BY word_cost, form_rank, surface, left_id, right_id
                            LIMIT 12""".trimIndent()
                     ).use { statement ->
-                        statement.setString(1, token)
-                        statement.executeQuery().use { rows ->
-                            while (rows.next()) {
-                                val surface = rows.getString(1)
-                                val leftId = rows.getInt(2)
-                                add(
-                                    ConversionLexeme(
-                                        start = start,
-                                        end = end,
-                                        reading = token,
-                                        surface = surface,
-                                        leftId = leftId,
-                                        rightId = rows.getInt(3),
-                                        wordCost = ConversionCost.adjustedWordCost(
-                                            token,
-                                            surface,
-                                            leftId,
-                                            ConversionCost.clampInt32(rows.getLong(4)),
-                                            frequencies(database, surface),
-                                        ),
-                                    )
-                                )
+                        val katakanaReading = ConversionText.toKatakana(token)
+                        val stored = buildList {
+                            listOf(token, katakanaReading).forEach { databaseReading ->
+                                statement.setString(1, databaseReading)
+                                statement.executeQuery().use { rows ->
+                                    while (rows.next()) {
+                                        val surface = rows.getString(1)
+                                        if (databaseReading == katakanaReading &&
+                                            databaseReading != token &&
+                                            !ConversionText.isKatakanaTransliteration(token, surface)
+                                        ) continue
+                                        add(
+                                            StoredLexeme(
+                                                surface = surface,
+                                                leftId = rows.getInt(2),
+                                                rightId = rows.getInt(3),
+                                                wordCost = ConversionCost.clampInt32(rows.getLong(4)),
+                                            )
+                                        )
+                                    }
+                                }
                             }
+                        }.distinctBy { listOf(it.surface, it.leftId, it.rightId) }
+                        stored.forEach { lexeme ->
+                            add(
+                                ConversionLexeme(
+                                    start = start,
+                                    end = end,
+                                    reading = token,
+                                    surface = lexeme.surface,
+                                    leftId = lexeme.leftId,
+                                    rightId = lexeme.rightId,
+                                    wordCost = ConversionCost.adjustedWordCost(
+                                        token,
+                                        lexeme.surface,
+                                        lexeme.leftId,
+                                        lexeme.wordCost,
+                                        frequencies(database, lexeme.surface),
+                                    ),
+                                )
+                            )
                         }
                     }
                 }
@@ -287,6 +470,14 @@ class ConversionParityFixtureTest {
     }
 
     private data class RankedResult(val surface: String, val cost: Int)
+    private data class ContextCase(val reading: String, val results: List<RankedResult>)
+
+    private data class StoredLexeme(
+        val surface: String,
+        val leftId: Int,
+        val rightId: Int,
+        val wordCost: Int,
+    )
 
     private fun JSONObject.stringList(key: String): List<String> = getJSONArray(key).let { values ->
         (0 until values.length()).map(values::getString)
@@ -320,6 +511,18 @@ class ConversionParityFixtureTest {
 
     private class SentenceRegressionReport(private val outcomes: List<SentenceOutcome>) {
         val regressions: List<SentenceOutcome> get() = outcomes.filter(SentenceOutcome::isRegression)
+        val top1Correct: Int get() = outcomes.count {
+            it.case.expectedTop1 != null && it.top1Matches
+        }
+        val top1ByCategory: Map<String, Int> get() = outcomes.groupBy { it.case.category }
+            .mapValues { (_, values) ->
+                values.count { it.case.expectedTop1 != null && it.top1Matches }
+            }
+        val top3ByCategory: Map<String, Int> get() = outcomes.groupBy { it.case.category }
+            .mapValues { (_, values) -> values.count(SentenceOutcome::top3Matches) }
+        val nBestByCategory: Map<String, Int> get() = outcomes.groupBy { it.case.category }
+            .mapValues { (_, values) -> values.count(SentenceOutcome::nBestMatches) }
+        val forbiddenCount: Int get() = outcomes.sumOf(SentenceOutcome::forbiddenCount)
 
         fun regressionsMessage(): String = buildString {
             append(render())
@@ -329,17 +532,30 @@ class ConversionParityFixtureTest {
 
         fun render(): String = buildString {
             val top1Denominator = outcomes.count { it.case.expectedTop1 != null }
-            val top1Correct = outcomes.count { it.case.expectedTop1 != null && it.top1Matches }
+            val correctTop1 = top1Correct
             val top3Correct = outcomes.count(SentenceOutcome::top3Matches)
-            val forbidden = outcomes.sumOf(SentenceOutcome::forbiddenCount)
+            val forbidden = forbiddenCount
             val knownFailures = outcomes.count { it.case.baseline == SentenceBaseline.KNOWN_FAILURE }
             val unresolved = outcomes.count { it.case.baseline == SentenceBaseline.KNOWN_FAILURE && !it.passes }
             val improvements = outcomes.count(SentenceOutcome::isImprovement)
             appendLine("sentence-conversion-regression: cases=${outcomes.size}")
-            appendLine("top-1 accuracy: $top1Correct/$top1Denominator (${percent(top1Correct, top1Denominator)})")
+            appendLine("top-1 accuracy: $correctTop1/$top1Denominator (${percent(correctTop1, top1Denominator)})")
             appendLine("top-3 containment: $top3Correct/${outcomes.size} (${percent(top3Correct, outcomes.size)})")
             appendLine("forbidden candidate count: $forbidden")
             appendLine("known failures: unresolved=$unresolved/$knownFailures improvements=$improvements regressions=${regressions.size}")
+            outcomes.groupBy { it.case.category }.toSortedMap().forEach { (category, categoryOutcomes) ->
+                val categoryTop1Denominator = categoryOutcomes.count { it.case.expectedTop1 != null }
+                val categoryTop1 = categoryOutcomes.count {
+                    it.case.expectedTop1 != null && it.top1Matches
+                }
+                appendLine(
+                    "category[$category]: top1=$categoryTop1/$categoryTop1Denominator " +
+                        "top3=${categoryOutcomes.count(SentenceOutcome::top3Matches)}/${categoryOutcomes.size} " +
+                        "nbest=${categoryOutcomes.count(SentenceOutcome::nBestMatches)}/${categoryOutcomes.size} " +
+                        "pass=${categoryOutcomes.count(SentenceOutcome::passes)}/${categoryOutcomes.size} " +
+                        "forbidden=${categoryOutcomes.sumOf(SentenceOutcome::forbiddenCount)}"
+                )
+            }
             outcomes.filter { !it.passes }.forEach { outcome ->
                 appendLine("  ${outcome.case.id} [${outcome.case.baseline.name.lowercase()}] reading=${outcome.case.reading} expectedTop1=${outcome.case.expectedTop1 ?: "-"} required=${outcome.case.requiredNBest} actual=${outcome.candidates}")
             }

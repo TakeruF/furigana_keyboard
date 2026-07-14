@@ -5,10 +5,18 @@ object KanaKanjiConverter {
     private const val MAX_INPUT_CODE_POINTS = 48
     private const val MAX_LEXEME_CODE_POINTS = 16
     private const val MAX_VOCABULARY_PER_READING = 12
-    private const val BEAM_WIDTH = 12
+    private const val DEFAULT_BEAM_WIDTH = 12
     private const val MAX_OUTPUT = 8
     private const val DEFAULT_CONNECTION_COST = 3_000
     private const val COPY_WORD_COST = 4_000
+    private const val KATAKANA_FALLBACK_BASE_COST = 1_000
+    private const val KATAKANA_FALLBACK_SCALAR_COST = 500
+    private const val MAX_KATAKANA_FALLBACK_SCALARS = 8
+    private const val KATAKANA_COMPOUND_JOIN_COST = 200
+    private const val MAX_KATAKANA_COMPOUND_PIECES = 4
+    private const val SHORT_HAN_SEQUENCE_PENALTY = 900
+    private const val LOANWORD_FRAGMENT_PENALTY = 1_600
+    private const val LOANWORD_SCRIPT_ALTERNATION_PENALTY = 900
 
     fun convert(
         reading: String,
@@ -16,13 +24,19 @@ object KanaKanjiConverter {
         connections: List<ConversionConnection>,
         limit: Int = MAX_OUTPUT,
         preserveSegmentations: Boolean = false,
+        initialRightId: Int = PosClass.BOS.id,
+        initialContextSurface: String? = null,
+        requiredBoundary: Int? = null,
+        contextModel: ConversionContextModel = ConversionContextModel.empty(),
+        beamWidth: Int = DEFAULT_BEAM_WIDTH,
         isCancelled: () -> Boolean = { false },
     ): List<ConversionResult> {
-        if (isCancelled() || reading.isEmpty() || limit <= 0) return emptyList()
+        if (isCancelled() || reading.isEmpty() || limit <= 0 || beamWidth <= 0) return emptyList()
         if (reading.codePointCount(0, reading.length) > MAX_INPUT_CODE_POINTS) return emptyList()
 
         val utf16Boundaries = ConversionText.utf16Boundaries(reading)
         val scalarCount = utf16Boundaries.lastIndex
+        if (requiredBoundary != null && requiredBoundary !in 1..scalarCount) return emptyList()
         val connectionCosts = HashMap<ConnectionKey, Int>()
         for (connection in connections) {
             if (isCancelled()) return emptyList()
@@ -53,17 +67,44 @@ object KanaKanjiConverter {
         statesAt[0] = mutableListOf(
             PathState(
                 end = 0,
-                rightId = PosClass.BOS.id,
+                rightId = initialRightId,
                 surface = "",
                 cost = 0L,
                 copyCodePoints = 0,
+                loanwordAlternations = 0,
+                previousContextSurface = initialContextSurface,
                 segments = emptyList(),
             ),
         )
 
+        val katakanaPieces = usableLexemes.asSequence()
+            .filter { ConversionText.isKatakanaTransliteration(it.reading, it.surface) }
+            .map { lexeme ->
+                Edge(
+                    start = lexeme.start,
+                    end = lexeme.end,
+                    reading = lexeme.reading,
+                    surface = lexeme.surface,
+                    leftId = lexeme.leftId,
+                    rightId = lexeme.rightId,
+                    wordCost = lexeme.wordCost,
+                    isCopy = false,
+                    isKatakana = true,
+                )
+            }
+            .distinctBy { listOf(it.start, it.end, it.surface, it.leftId, it.rightId) }
+            .toList()
+        val syntheticKatakanaEdges = katakanaEdges(
+            reading,
+            utf16Boundaries,
+            katakanaPieces,
+            usableLexemes,
+        )
+        val loanwordPositions = loanwordPositions(reading, utf16Boundaries)
+
         for (start in 0 until scalarCount) {
             if (isCancelled()) return emptyList()
-            val incoming = prune(statesAt[start].orEmpty(), preserveSegmentations)
+            val incoming = prune(statesAt[start].orEmpty(), preserveSegmentations, beamWidth)
             if (incoming.isEmpty()) continue
 
             val copyEnd = start + 1
@@ -79,8 +120,13 @@ object KanaKanjiConverter {
                     rightId = lexeme.rightId,
                     wordCost = lexeme.wordCost,
                     isCopy = false,
+                    isKatakana = ConversionText.isKatakanaTransliteration(
+                        lexeme.reading,
+                        lexeme.surface,
+                    ),
                 )
             }
+            syntheticKatakanaEdges[start]?.let(edges::addAll)
             edges += Edge(
                 start = start,
                 end = copyEnd,
@@ -90,17 +136,32 @@ object KanaKanjiConverter {
                 rightId = PosClass.COPY.id,
                 wordCost = COPY_WORD_COST,
                 isCopy = true,
+                isKatakana = false,
             )
+            if (requiredBoundary != null && start < requiredBoundary) {
+                edges.removeAll { it.end > requiredBoundary }
+            }
             edges.sortWith(EDGE_ORDER)
 
             for (state in incoming) {
                 for (edge in edges) {
                     if (isCancelled()) return emptyList()
+                    val pathPenalty = pathPenalty(
+                        state.segments.lastOrNull(),
+                        edge,
+                        state.loanwordAlternations,
+                        loanwordPositions,
+                    )
+                    val context = contextTransition(
+                        contextModel,
+                        state.previousContextSurface,
+                        edge,
+                    )
                     val nextCost = state.cost + edge.wordCost + connectionCost(
                         connectionCosts,
                         state.rightId,
                         edge.leftId,
-                    )
+                    ) + pathPenalty.cost + context.cost
                     val segment = ConversionSegment(
                         start = edge.start,
                         end = edge.end,
@@ -117,6 +178,8 @@ object KanaKanjiConverter {
                         surface = state.surface + edge.surface,
                         cost = nextCost,
                         copyCodePoints = state.copyCodePoints + if (edge.isCopy) 1 else 0,
+                        loanwordAlternations = pathPenalty.alternations,
+                        previousContextSurface = context.previousSurface,
                         segments = state.segments + segment,
                     )
                 }
@@ -124,11 +187,18 @@ object KanaKanjiConverter {
         }
 
         if (isCancelled()) return emptyList()
-        val completed = prune(statesAt[scalarCount].orEmpty(), preserveSegmentations).map { state ->
+        val completed = prune(
+            statesAt[scalarCount].orEmpty(),
+            preserveSegmentations,
+            beamWidth,
+        ).map { state ->
             state.copy(
                 cost = state.cost + connectionCost(connectionCosts, state.rightId, PosClass.EOS.id),
             )
-        }.filter { state -> state.segments.any { !it.isCopy } }
+        }.filter { state ->
+            state.segments.any { !it.isCopy } &&
+                (requiredBoundary == null || state.segments.any { it.end == requiredBoundary })
+        }
 
         // Keep alternate paths when they produce the same surface with different
         // bunsetsu boundaries. The UI uses those paths to offer competing
@@ -182,6 +252,7 @@ object KanaKanjiConverter {
     private fun prune(
         states: List<PathState>,
         preserveSegmentations: Boolean,
+        beamWidth: Int,
     ): List<PathState> {
         val best = HashMap<StateKey, PathState>()
         states.forEach { state ->
@@ -189,12 +260,14 @@ object KanaKanjiConverter {
                 state.end,
                 state.rightId,
                 state.surface,
+                state.loanwordAlternations,
+                state.previousContextSurface,
                 if (preserveSegmentations) bunsetsuBoundaries(state.segments) else emptyList(),
             )
             val current = best[key]
             if (current == null || PATH_ORDER.compare(state, current) < 0) best[key] = state
         }
-        return best.values.sortedWith(PATH_ORDER).take(BEAM_WIDTH)
+        return best.values.sortedWith(PATH_ORDER).take(beamWidth)
     }
 
     private data class ConnectionKey(val rightId: Int, val leftId: Int)
@@ -203,6 +276,8 @@ object KanaKanjiConverter {
         val end: Int,
         val rightId: Int,
         val surface: String,
+        val loanwordAlternations: Int,
+        val previousContextSurface: String?,
         val bunsetsuBoundaries: List<Int>,
     )
     private data class ResultKey(val surface: String, val bunsetsuBoundaries: List<Int>)
@@ -216,6 +291,7 @@ object KanaKanjiConverter {
         val rightId: Int,
         val wordCost: Int,
         val isCopy: Boolean,
+        val isKatakana: Boolean,
     )
 
     private data class PathState(
@@ -224,8 +300,249 @@ object KanaKanjiConverter {
         val surface: String,
         val cost: Long,
         val copyCodePoints: Int,
+        val loanwordAlternations: Int,
+        val previousContextSurface: String?,
         val segments: List<ConversionSegment>,
     )
+
+    private data class PathPenalty(val cost: Int, val alternations: Int)
+    private data class ContextTransition(val cost: Int, val previousSurface: String?)
+
+    private enum class FragmentScript { HAN, UNCONVERTED_KANA, OTHER }
+
+    /** Carry the model's content-surface state across a confirmed bunsetsu. */
+    fun contextSurfaceAfter(
+        initialSurface: String?,
+        segments: List<ConversionSegment>,
+    ): String? = segments.fold(initialSurface) { previous, segment ->
+        if (segment.isCopy) return@fold null
+        when (PosClass.fromId(segment.leftId)) {
+            PosClass.PARTICLE, PosClass.AUXILIARY -> previous
+            PosClass.PRONOUN,
+            PosClass.NOUN,
+            PosClass.PROPER_NOUN,
+            PosClass.VERB,
+            PosClass.ADJECTIVE,
+            PosClass.ADVERB,
+            PosClass.EXPRESSION -> segment.surface
+            else -> null
+        }
+    }
+
+    /**
+     * The model observes content surfaces only. Particles and auxiliaries keep the
+     * previous content surface, allowing 学校 + へ + 行きます to use 学校→行きます.
+     */
+    private fun contextTransition(
+        model: ConversionContextModel,
+        previousSurface: String?,
+        edge: Edge,
+    ): ContextTransition {
+        if (edge.isCopy) return ContextTransition(0, null)
+        return when (PosClass.fromId(edge.leftId)) {
+            PosClass.PARTICLE, PosClass.AUXILIARY -> ContextTransition(0, previousSurface)
+            PosClass.PRONOUN,
+            PosClass.NOUN,
+            PosClass.PROPER_NOUN,
+            PosClass.VERB,
+            PosClass.ADJECTIVE,
+            PosClass.ADVERB,
+            PosClass.EXPRESSION -> ContextTransition(
+                model.cost(previousSurface, edge.surface),
+                edge.surface,
+            )
+            else -> ContextTransition(0, null)
+        }
+    }
+
+    /**
+     * Join adjacent dictionary-backed katakana pieces so a compound such as
+     * すかい + つりー is scored as one スカイツリー edge. The whole-input
+     * script candidate is also an ordinary (deliberately expensive) lattice
+     * edge instead of being appended after ranking.
+     */
+    private fun katakanaEdges(
+        reading: String,
+        boundaries: IntArray,
+        pieces: List<Edge>,
+        lexemes: List<ConversionLexeme>,
+    ): Map<Int, List<Edge>> {
+        val scalarCount = boundaries.lastIndex
+        val piecesByStart = pieces.groupBy(Edge::start)
+        val output = LinkedHashMap<Int, MutableList<Edge>>()
+        val seen = HashSet<List<Any>>()
+
+        fun append(edge: Edge) {
+            val key = listOf(edge.start, edge.end, edge.surface, edge.leftId, edge.rightId)
+            if (seen.add(key)) output.getOrPut(edge.start, ::mutableListOf) += edge
+        }
+
+        fun extend(first: Edge, last: Edge, surface: String, wordCost: Long, count: Int) {
+            if (count >= 2) {
+                append(
+                    Edge(
+                        start = first.start,
+                        end = last.end,
+                        reading = reading.substring(boundaries[first.start], boundaries[last.end]),
+                        surface = surface,
+                        leftId = first.leftId,
+                        rightId = last.rightId,
+                        wordCost = ConversionCost.clampInt32(wordCost),
+                        isCopy = false,
+                        isKatakana = true,
+                    ),
+                )
+            }
+            if (count >= MAX_KATAKANA_COMPOUND_PIECES) return
+            piecesByStart[last.end].orEmpty().forEach { next ->
+                if (next.end - first.start <= MAX_LEXEME_CODE_POINTS) {
+                    extend(
+                        first,
+                        next,
+                        surface + next.surface,
+                        wordCost + next.wordCost + KATAKANA_COMPOUND_JOIN_COST,
+                        count + 1,
+                    )
+                }
+            }
+        }
+
+        pieces.forEach { piece -> extend(piece, piece, piece.surface, piece.wordCost.toLong(), 1) }
+
+        for (start in 0 until scalarCount) {
+            for (end in start + 2..minOf(scalarCount, start + MAX_KATAKANA_FALLBACK_SCALARS)) {
+                val token = reading.substring(boundaries[start], boundaries[end])
+                if (!isCompletedHiraganaReading(token) ||
+                    !ConversionText.isLoanwordLikeReading(token) ||
+                    hasFunctionAffix(start, end, lexemes)
+                ) continue
+                append(
+                    Edge(
+                        start = start,
+                        end = end,
+                        reading = token,
+                        surface = ConversionText.toKatakana(token),
+                        leftId = PosClass.NOUN.id,
+                        rightId = PosClass.NOUN.id,
+                        wordCost = KATAKANA_FALLBACK_BASE_COST +
+                            KATAKANA_FALLBACK_SCALAR_COST * (end - start),
+                        isCopy = false,
+                        isKatakana = true,
+                    ),
+                )
+            }
+        }
+        return output.mapValues { (_, edges) -> edges.sortedWith(EDGE_ORDER) }
+    }
+
+    private fun hasFunctionAffix(
+        start: Int,
+        end: Int,
+        lexemes: List<ConversionLexeme>,
+    ): Boolean = lexemes.any { lexeme ->
+        lexeme.end - lexeme.start == 1 &&
+            ConversionText.scalarEquals(lexeme.reading, lexeme.surface) &&
+            (lexeme.leftId == PosClass.PARTICLE.id || lexeme.leftId == PosClass.AUXILIARY.id) &&
+            ((lexeme.start == start && lexeme.end < end) ||
+                (lexeme.end == end && lexeme.start > start))
+    }
+
+    private fun loanwordPositions(
+        reading: String,
+        boundaries: IntArray,
+    ): BooleanArray {
+        val result = BooleanArray(boundaries.lastIndex)
+        val markerPositions = ArrayList<Int>()
+        val smallTsuPositions = ArrayList<Int>()
+        for (position in 0 until boundaries.lastIndex) {
+            when (val scalar = reading.codePointAt(boundaries[position])) {
+                0x3063 -> smallTsuPositions += position
+                else -> if (ConversionText.isLoanwordMarker(scalar)) markerPositions += position
+            }
+        }
+        if (smallTsuPositions.size >= 2) markerPositions += smallTsuPositions
+        markerPositions.forEach { position ->
+            for (nearby in maxOf(0, position - 5)..minOf(result.lastIndex, position + 5)) {
+                result[nearby] = true
+            }
+        }
+        return result
+    }
+
+    private fun pathPenalty(
+        previous: ConversionSegment?,
+        edge: Edge,
+        previousAlternations: Int,
+        loanwordPositions: BooleanArray,
+    ): PathPenalty {
+        var cost = 0
+        val edgeInLoanword = overlaps(edge.start, edge.end, loanwordPositions)
+        if (previous != null && edgeInLoanword &&
+            overlaps(previous.start, previous.end, loanwordPositions) &&
+            isShortHan(previous.reading, previous.surface) && isShortHan(edge)
+        ) {
+            cost += SHORT_HAN_SEQUENCE_PENALTY
+        }
+
+        val followsKatakanaUnit = previous != null && previous.end - previous.start >= 2 &&
+            ConversionText.isKatakanaTransliteration(previous.reading, previous.surface)
+        val isShortUnconverted = edge.isCopy ||
+            ConversionText.isUnconvertedHiragana(edge.reading, edge.surface) &&
+            !followsKatakanaUnit
+        if (edgeInLoanword && !edge.isKatakana &&
+            (isShortHan(edge) || isShortUnconverted && edge.end - edge.start <= 2)
+        ) {
+            cost += LOANWORD_FRAGMENT_PENALTY
+        }
+
+        if (previous == null || !edgeInLoanword ||
+            !overlaps(previous.start, previous.end, loanwordPositions)
+        ) {
+            return PathPenalty(cost, 0)
+        }
+        val previousScript = fragmentScript(previous)
+        val nextScript = fragmentScript(edge)
+        if (previousScript == FragmentScript.OTHER || nextScript == FragmentScript.OTHER ||
+            previousScript == nextScript
+        ) {
+            return PathPenalty(cost, previousAlternations)
+        }
+        val alternations = previousAlternations + 1
+        if (alternations >= 2) cost += LOANWORD_SCRIPT_ALTERNATION_PENALTY
+        return PathPenalty(cost, alternations)
+    }
+
+    private fun fragmentScript(segment: ConversionSegment): FragmentScript = when {
+        ConversionText.isPureHan(segment.surface) -> FragmentScript.HAN
+        segment.isCopy || ConversionText.isUnconvertedHiragana(segment.reading, segment.surface) ->
+            FragmentScript.UNCONVERTED_KANA
+        else -> FragmentScript.OTHER
+    }
+
+    private fun fragmentScript(edge: Edge): FragmentScript = when {
+        ConversionText.isPureHan(edge.surface) -> FragmentScript.HAN
+        edge.isCopy || ConversionText.isUnconvertedHiragana(edge.reading, edge.surface) ->
+            FragmentScript.UNCONVERTED_KANA
+        else -> FragmentScript.OTHER
+    }
+
+    private fun isShortHan(reading: String, surface: String): Boolean =
+        ConversionText.scalarCount(reading) == 1 && ConversionText.isPureHan(surface)
+
+    private fun isShortHan(edge: Edge): Boolean = isShortHan(edge.reading, edge.surface)
+
+    private fun overlaps(start: Int, end: Int, positions: BooleanArray): Boolean =
+        (start until minOf(end, positions.size)).any { positions[it] }
+
+    private fun isCompletedHiraganaReading(value: String): Boolean {
+        var offset = 0
+        while (offset < value.length) {
+            val scalar = value.codePointAt(offset)
+            if (scalar !in 0x3041..0x3096 && scalar != 0x30FC) return false
+            offset += Character.charCount(scalar)
+        }
+        return value.isNotEmpty()
+    }
 
     private fun bunsetsuBoundaries(segments: List<ConversionSegment>): List<Int> = buildList {
         segments.zipWithNext().forEach { (left, right) ->

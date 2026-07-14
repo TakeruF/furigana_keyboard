@@ -6,6 +6,7 @@ import android.util.Log
 import com.example.furiganakeyboard.conversion.KanaKanjiConverter
 import com.example.furiganakeyboard.conversion.ConversionSegment
 import com.example.furiganakeyboard.conversion.ConversionResult
+import com.example.furiganakeyboard.conversion.PosClass
 import com.example.furiganakeyboard.reading.KanjiUsagePriority
 import com.example.furiganakeyboard.reading.ReadingDataSource
 import com.example.furiganakeyboard.reading.WordReadingCandidate
@@ -35,6 +36,13 @@ data class RomajiConversionResult(
     val segments: List<ConversionSegment>
         get() = conversions.firstOrNull()?.segments.orEmpty()
 }
+
+private data class ConversionRequest(
+    val kana: String,
+    val initialRightId: Int,
+    val initialContextSurface: String?,
+    val requiredBoundary: Int?,
+)
 
 sealed interface HandwritingPipelineResult {
     data class Characters(val candidates: List<ResolvedCharacterCandidate>) :
@@ -72,7 +80,7 @@ class CandidatePipeline(
     private val suggestionCache =
         LruMap<SuggestionKey, List<WordReadingCandidate>>(SUGGESTION_CACHE_SIZE)
     private val conversionCache =
-        LruMap<String, RomajiConversionResult>(CONVERSION_CACHE_SIZE)
+        LruMap<ConversionRequest, RomajiConversionResult>(CONVERSION_CACHE_SIZE)
     private val priorityCache =
         LruMap<String, KanjiUsagePriority?>(PRIORITY_CACHE_SIZE)
 
@@ -95,11 +103,20 @@ class CandidatePipeline(
     fun submitRomajiAnalysis(
         kana: String,
         limit: Int,
+        initialRightId: Int = PosClass.BOS.id,
+        initialContextSurface: String? = null,
+        requiredBoundary: Int? = null,
         callback: (RomajiConversionResult) -> Unit,
     ) {
         submit(callback, failureValue = { RomajiConversionResult(emptyList(), emptyList()) }) {
             isCancelled ->
-            val result = conversionResult(kana, isCancelled)
+            val result = conversionResult(
+                kana,
+                isCancelled,
+                initialRightId,
+                initialContextSurface,
+                requiredBoundary,
+            )
             result.copy(candidates = result.candidates.take(limit.coerceAtLeast(0)))
         }
     }
@@ -224,7 +241,10 @@ class CandidatePipeline(
 
     private fun conversionResult(
         kana: String,
-        isCancelled: () -> Boolean
+        isCancelled: () -> Boolean,
+        initialRightId: Int = PosClass.BOS.id,
+        initialContextSurface: String? = null,
+        requiredBoundary: Int? = null,
     ): RomajiConversionResult {
         if (!isCompletedKana(kana) ||
             kana.codePointCount(0, kana.length) > MAX_CONVERSION_INPUT_CODE_POINTS ||
@@ -232,7 +252,13 @@ class CandidatePipeline(
         ) {
             return RomajiConversionResult(emptyList(), emptyList())
         }
-        conversionCache[kana]?.let { return it }
+        val request = ConversionRequest(
+            kana,
+            initialRightId,
+            initialContextSurface,
+            requiredBoundary,
+        )
+        conversionCache[request]?.let { return it }
         val dataSource = dataSource()
         val lexemes = dataSource.conversionLexemes(
             kana,
@@ -246,6 +272,10 @@ class CandidatePipeline(
             connections = dataSource.conversionConnections(),
             limit = MAX_CONVERSION_RESULTS,
             preserveSegmentations = true,
+            initialRightId = initialRightId,
+            initialContextSurface = initialContextSurface,
+            requiredBoundary = requiredBoundary,
+            contextModel = dataSource.conversionContextModel(),
             isCancelled = isCancelled
         )
         val converted = conversionResults.map { result ->
@@ -263,7 +293,7 @@ class CandidatePipeline(
                 .distinctBy { it.surface }
                 .take(MAX_CONVERSION_RESULTS),
             conversions = conversionResults,
-        ).also { conversionCache[kana] = it }
+        ).also { conversionCache[request] = it }
     }
 
     private fun isCompletedKana(value: String): Boolean {

@@ -3,6 +3,7 @@ package com.example.furiganakeyboard.reading
 import android.content.Context
 import android.database.sqlite.SQLiteDatabase
 import com.example.furiganakeyboard.conversion.ConversionConnection
+import com.example.furiganakeyboard.conversion.ConversionContextModel
 import com.example.furiganakeyboard.conversion.ConversionCost
 import com.example.furiganakeyboard.conversion.ConversionLexeme
 import com.example.furiganakeyboard.conversion.ConversionText
@@ -32,14 +33,19 @@ interface ReadingDataSource : AutoCloseable {
         limitPerReading: Int
     ): List<ConversionLexeme> = emptyList()
     fun conversionConnections(): List<ConversionConnection> = emptyList()
+    fun conversionContextModel(): ConversionContextModel = ConversionContextModel.empty()
 }
 
 /** Read-only access to the bundled KANJIDIC2 and JMdict snapshot. */
 class ReadingRepository(context: Context) : ReadingDataSource {
     private val database: SQLiteDatabase
+    private val contextModel: ConversionContextModel
     private var cachedConversionConnections: List<ConversionConnection>? = null
 
     init {
+        contextModel = context.applicationContext.assets.open(CONTEXT_MODEL_ASSET).use { input ->
+            ConversionContextModel.decode(input.readBytes())
+        }
         val dbFile = ReadingDataStore.activeOrBundled(
             context.applicationContext,
             DB_ASSET,
@@ -286,9 +292,9 @@ class ReadingRepository(context: Context) : ReadingDataSource {
     }
 
     /**
-     * Expand exact conversion-dictionary matches into lattice edges at every input occurrence.
-     * The normal 48-code-point input produces at most 648 bind values; chunking also keeps
-     * callers with larger inputs below Android SQLite's conservative bind-variable limit.
+     * Expand exact and full-width katakana conversion matches at every occurrence.
+     * The normal 48-code-point input produces at most 1,296 exact/transliterated readings;
+     * chunking keeps each query below Android SQLite's conservative bind-variable limit.
      */
     override fun conversionLexemes(
         reading: String,
@@ -306,11 +312,17 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         val occurrences = substringOccurrences(reading, tokenLimit)
         if (occurrences.isEmpty()) return emptyList()
 
+        val databaseReadings = occurrences.keys.flatMap { token ->
+            buildList {
+                add(token)
+                add(ConversionText.toKatakana(token))
+            }
+        }.distinct()
         val lexemesByReading = LinkedHashMap<String, MutableList<StoredConversionLexeme>>()
-        occurrences.keys.chunked(MAX_SQL_BIND_ARGS).forEach { chunk ->
+        databaseReadings.chunked(MAX_SQL_BIND_ARGS).forEach { chunk ->
             val placeholders = List(chunk.size) { "?" }.joinToString(",")
             database.rawQuery(
-                """SELECT reading, surface, left_id, right_id, word_cost
+                """SELECT reading, surface, left_id, right_id, word_cost, form_rank
                    FROM conversion_lexeme
                    WHERE reading IN ($placeholders)
                    ORDER BY reading, word_cost, form_rank, surface, left_id, right_id""".trimIndent(),
@@ -324,7 +336,8 @@ class ReadingRepository(context: Context) : ReadingDataSource {
                             surface = cursor.getString(1),
                             leftId = cursor.getInt(2),
                             rightId = cursor.getInt(3),
-                            wordCost = ConversionCost.clampInt32(cursor.getLong(4))
+                            wordCost = ConversionCost.clampInt32(cursor.getLong(4)),
+                            formRank = cursor.getInt(5),
                         )
                     }
                 }
@@ -340,7 +353,15 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         val frequencyByHanLiteral = usagePriorities.mapValues { it.value.frequency }
         return buildList {
             occurrences.forEach { (tokenReading, positions) ->
-                val stored = lexemesByReading[tokenReading].orEmpty()
+                val katakanaReading = ConversionText.toKatakana(tokenReading)
+                val stored = (
+                    lexemesByReading[tokenReading].orEmpty() +
+                        lexemesByReading[katakanaReading].orEmpty().filter { lexeme ->
+                            ConversionText.isKatakanaTransliteration(tokenReading, lexeme.surface)
+                        }
+                    )
+                    .distinctBy { listOf(it.surface, it.leftId, it.rightId) }
+                    .sortedWith(STORED_CONVERSION_ORDER)
                 positions.forEach { position ->
                     stored.forEach { lexeme ->
                         add(
@@ -383,6 +404,8 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         }.also { cachedConversionConnections = it }
     }
 
+    override fun conversionContextModel(): ConversionContextModel = contextModel
+
     private fun substringOccurrences(
         input: String,
         maxTokenCodePoints: Int
@@ -406,7 +429,8 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         val surface: String,
         val leftId: Int,
         val rightId: Int,
-        val wordCost: Int
+        val wordCost: Int,
+        val formRank: Int,
     )
 
     fun metadata(key: String): String? = database.rawQuery(
@@ -420,6 +444,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
 
     companion object {
         private const val DB_ASSET = "reading.db"
+        private const val CONTEXT_MODEL_ASSET = "context-model.bin"
         private const val DB_FILE = "reading-v8.db"
         private const val DB_SHA256 =
             "991a13b8552748ea2c35fb229446809869a0ceee14ba0107a65351c8527efbc2"
@@ -436,6 +461,13 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         private const val MAX_CONVERSION_INPUT_CODE_POINTS = 48
         private const val MAX_CONVERSION_TOKEN_CODE_POINTS = 16
         private const val MAX_CONVERSION_VOCABULARY_PER_READING = 12
+        private val STORED_CONVERSION_ORDER = Comparator<StoredConversionLexeme> { left, right ->
+            compareValues(left.wordCost, right.wordCost).takeUnless { it == 0 }
+                ?: compareValues(left.formRank, right.formRank).takeUnless { it == 0 }
+                ?: ConversionText.compareScalars(left.surface, right.surface).takeUnless { it == 0 }
+                ?: compareValues(left.leftId, right.leftId).takeUnless { it == 0 }
+                ?: compareValues(left.rightId, right.rightId)
+        }
         private const val COMPOSED_PER_SPLIT_LIMIT = 4
         private val COMPOSABLE_KANA_SUFFIXES = setOf(
             "は", "が", "を", "に", "で", "と", "も", "の", "へ", "や", "か", "ね", "よ",

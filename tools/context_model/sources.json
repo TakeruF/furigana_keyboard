@@ -1,0 +1,19 @@
+{
+  "schemaVersion": 1,
+  "corpus": {
+    "name": "Tatoeba Japanese sentences export",
+    "url": "https://downloads.tatoeba.org/exports/per_language/jpn/jpn_sentences.tsv.bz2",
+    "rollingWeeklyUrl": true,
+    "snapshotDate": "2026-07-11",
+    "bytes": 3415765,
+    "sha256": "6f363cf9acc1efc0bf7bad645d0fb693a6e08bf3110fbdadcfc123a9e9612b6f",
+    "license": "CC BY 2.0 FR",
+    "licenseUrl": "https://creativecommons.org/licenses/by/2.0/fr/",
+    "attribution": "Tatoeba contributors"
+  },
+  "dictionary": {
+    "path": "app/src/main/assets/reading.db",
+    "sha256": "991a13b8552748ea2c35fb229446809869a0ceee14ba0107a65351c8527efbc2"
+  },
+  "tokenizerVersion": 1
+}

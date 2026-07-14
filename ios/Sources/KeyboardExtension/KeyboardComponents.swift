@@ -47,6 +47,7 @@ final class CandidateBarView: UIView {
     private let stack = UIStackView()
     private let status = UILabel()
     private var preferences = KeyboardPreferences()
+    private var selectedCandidateIndex: Int?
 
     override init(frame: CGRect) {
         super.init(frame: frame)
@@ -78,11 +79,18 @@ final class CandidateBarView: UIView {
     }
 
     func show(_ candidates: [KeyboardCandidate]) {
-        clear()
-        guard !candidates.isEmpty else { return }
+        let previousSelection = selectedCandidateIndex
+        clearViews()
+        guard !candidates.isEmpty else {
+            selectedCandidateIndex = nil
+            return
+        }
+        selectedCandidateIndex = previousSelection.flatMap { candidates.indices.contains($0) ? $0 : nil }
         for (index, candidate) in candidates.enumerated() {
             let button = UIButton(type: .system)
-            button.tintColor = index == 0 ? preferences.accent.color : .label
+            let highlighted = index == (selectedCandidateIndex ?? 0)
+            button.tag = index
+            button.tintColor = highlighted ? preferences.accent.color : .label
             button.backgroundColor = .clear
             let titleFont = UIFont.systemFont(ofSize: preferences.candidateTextSize.primary, weight: .semibold)
             let subtitleFont = UIFont.systemFont(ofSize: 10)
@@ -104,7 +112,7 @@ final class CandidateBarView: UIView {
             configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { [preferences, titleFont] incoming in
                 var outgoing = incoming
                 outgoing.font = titleFont
-                outgoing.foregroundColor = index == 0 ? preferences.accent.color : .label
+                outgoing.foregroundColor = highlighted ? preferences.accent.color : .label
                 return outgoing
             }
             if !reading.isEmpty {
@@ -130,6 +138,30 @@ final class CandidateBarView: UIView {
         scroll.setContentOffset(.zero, animated: false)
     }
 
+    /// Highlight an IME-selected candidate without changing scroll position.
+    func setSelectedCandidateIndex(_ index: Int?) {
+        let candidateButtons = stack.arrangedSubviews.compactMap { $0 as? UIButton }
+        let bounded = index.flatMap { candidateButtons.indices.contains($0) ? $0 : nil }
+        guard selectedCandidateIndex != bounded else { return }
+        selectedCandidateIndex = bounded
+        for (candidateIndex, button) in candidateButtons.enumerated() {
+            let highlighted = candidateIndex == (bounded ?? 0)
+            button.tintColor = highlighted ? preferences.accent.color : .label
+            guard var configuration = button.configuration else { continue }
+            let titleFont = UIFont.systemFont(
+                ofSize: preferences.candidateTextSize.primary,
+                weight: .semibold
+            )
+            configuration.titleTextAttributesTransformer = UIConfigurationTextAttributesTransformer { [preferences, titleFont] incoming in
+                var outgoing = incoming
+                outgoing.font = titleFont
+                outgoing.foregroundColor = highlighted ? preferences.accent.color : .label
+                return outgoing
+            }
+            button.configuration = configuration
+        }
+    }
+
     private func singleSpaceInset(
         title: String,
         reading: String,
@@ -143,6 +175,11 @@ final class CandidateBarView: UIView {
     }
 
     func clear() {
+        selectedCandidateIndex = nil
+        clearViews()
+    }
+
+    private func clearViews() {
         stack.arrangedSubviews.forEach { stack.removeArrangedSubview($0); $0.removeFromSuperview() }
     }
 

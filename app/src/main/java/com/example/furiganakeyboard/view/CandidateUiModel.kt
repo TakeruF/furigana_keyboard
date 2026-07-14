@@ -8,4 +8,8 @@ data class CandidateUiModel(
     val kind: CandidateKind,
     /** Reading prefix committed by a bunsetsu candidate. */
     val bunsetsuReading: String? = null,
+    /** POS at the selected prefix's right edge. */
+    val bunsetsuRightId: Int? = null,
+    /** Rejects taps and async results produced for an older bunsetsu state. */
+    val bunsetsuGeneration: Long? = null,
 )

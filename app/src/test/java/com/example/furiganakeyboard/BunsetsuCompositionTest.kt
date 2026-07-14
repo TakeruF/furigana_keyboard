@@ -3,6 +3,7 @@ package com.example.furiganakeyboard
 import com.example.furiganakeyboard.conversion.ConversionSegment
 import com.example.furiganakeyboard.conversion.ConversionResult
 import com.example.furiganakeyboard.conversion.PosClass
+import com.example.furiganakeyboard.conversion.ConversionText
 import com.example.furiganakeyboard.ime.BunsetsuComposition
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertFalse
@@ -147,6 +148,101 @@ class BunsetsuCompositionTest {
         assertEquals("ここで", committed.committedText)
         assertEquals("はきもの", committed.remainingText)
     }
+
+    @Test
+    fun fullCommitKeepsOriginalPathAndPreviousRightPos() {
+        val state = contextualState()
+
+        state.commitActive("私も", PosClass.PARTICLE.id)
+        assertEquals("わたしもなぞをよむ", state.originalReading)
+        assertEquals("なぞを", state.activeReading)
+        assertEquals(PosClass.PARTICLE.id, state.previousRightId)
+        assertEquals("私", state.previousContextSurface)
+        assertEquals(listOf("なぞ", "を", "よむ"), state.remainingSegmentCandidates.map { it.reading })
+
+        state.commitActive("謎を", PosClass.PARTICLE.id)
+        assertEquals("よむ", state.activeReading)
+        assertEquals("謎", state.analysisToken().previousContextSurface)
+        state.commitActive("読む", PosClass.VERB.id)
+
+        assertEquals("", state.remainingReading)
+        assertEquals("私も謎を読む", state.committedSegments.joinToString("") { it.surface })
+    }
+
+    @Test
+    fun deletionKeepsCommittedContextAndDoesNotRestartComposition() {
+        val state = contextualState()
+        state.commitActive("私も", PosClass.PARTICLE.id)
+
+        assertEquals("なぞをよ", state.deleteLastCodePoint())
+        assertEquals("私も", state.committedSegments.single().surface)
+        assertEquals(PosClass.PARTICLE.id, state.previousRightId)
+        assertEquals("なぞを", state.activeReading)
+    }
+
+    @Test
+    fun rangeChangeInvalidatesOldAnalysisAndCanInstallAForcedFullPath() {
+        val state = contextualState()
+        val stale = state.analysisToken()
+
+        assertTrue(state.shrink())
+        assertEquals("わたし", state.activeReading)
+        assertFalse(state.isCurrent(stale))
+
+        val current = state.analysisToken()
+        val plan = BunsetsuComposition.plan(
+            reading = state.remainingReading,
+            conversions = listOf(conversion(state.remainingReading, "私も謎を読む", contextualSegments())),
+            requestedBoundary = 3,
+            allowSingle = true,
+        )!!
+        assertTrue(state.applyPlan(plan, current))
+        assertEquals("わたし", state.activeReading)
+        assertEquals(listOf("わたし", "も", "なぞを", "よむ"), state.composingSegments.map { it.reading })
+    }
+
+    @Test
+    fun emptyUnknownRemainderKeepsNaturalBoundaryInsteadOfOneCharacter() {
+        val state = contextualState()
+        state.commitActive("私も", PosClass.PARTICLE.id)
+        val token = state.analysisToken()
+
+        val emptyPlan = BunsetsuComposition.plan(
+            state.remainingReading,
+            emptyList(),
+            allowSingle = true,
+        )
+
+        assertEquals(null, emptyPlan)
+        assertTrue(state.isCurrent(token))
+        assertEquals("なぞを", state.activeReading)
+        assertEquals("謎を", state.retainedOptions().first().surface)
+        assertTrue(ConversionText.scalarCount(state.activeReading) > 1)
+    }
+
+    @Test
+    fun rapidCandidateTapCannotReuseAnOldGeneration() {
+        val state = contextualState()
+        val oldGeneration = state.generation
+        val oldToken = state.analysisToken()
+
+        state.commitActive("私も", PosClass.PARTICLE.id)
+
+        assertFalse(state.isCurrentCandidate("わたしも", oldGeneration))
+        assertFalse(state.isCurrent(oldToken))
+        assertEquals("なぞを", state.activeReading)
+    }
+
+    private fun contextualState(): BunsetsuComposition =
+        BunsetsuComposition.create("わたしもなぞをよむ", contextualSegments())
+
+    private fun contextualSegments(): List<ConversionSegment> = listOf(
+        segment(0, 3, "わたし", PosClass.PRONOUN, "私"),
+        segment(3, 4, "も", PosClass.PARTICLE),
+        segment(4, 6, "なぞ", PosClass.NOUN, "謎"),
+        segment(6, 7, "を", PosClass.PARTICLE),
+        segment(7, 9, "よむ", PosClass.VERB, "読む"),
+    )
 
     private fun expectedSegments(): List<ConversionSegment> = listOf(
         segment(0, 3, "わたし", PosClass.PRONOUN),

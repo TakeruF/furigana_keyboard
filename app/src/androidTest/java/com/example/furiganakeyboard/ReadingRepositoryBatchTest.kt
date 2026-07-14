@@ -45,6 +45,24 @@ class ReadingRepositoryBatchTest {
     }
 
     @Test
+    fun conversionLexemesIncludeFullWidthKatakanaReading() {
+        ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
+            val reading = "しゃつ"
+            val lexemes = repository.conversionLexemes(reading, 16, 12)
+
+            assertTrue(lexemes.any { it.reading == reading && it.surface == "シャツ" })
+            assertEquals(
+                "シャツ",
+                KanaKanjiConverter.convert(
+                    reading,
+                    lexemes,
+                    repository.conversionConnections(),
+                ).first().surface,
+            )
+        }
+    }
+
+    @Test
     fun conversionLexemeOffsetsDoNotSplitSupplementaryScalar() {
         ReadingRepository(ApplicationProvider.getApplicationContext()).use { repository ->
             val lexeme = repository.conversionLexemes("𠮟ほん", 16, 12)

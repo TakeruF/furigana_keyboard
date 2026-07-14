@@ -78,6 +78,8 @@ targets:
         buildPhase: resources
       - path: ../app/src/main/assets/reading.db
         buildPhase: resources
+      - path: ../app/src/main/assets/context-model.bin
+        buildPhase: resources
     info:
       path: Sources/KeyboardExtension/Info.plist
       properties:
@@ -133,13 +135,19 @@ targets:
         buildPhase: resources
       - path: ../fixtures/conversion-nbest.json
         buildPhase: resources
+      - path: ../fixtures/context-conversion-nbest.json
+        buildPhase: resources
       - path: ../fixtures/sentence-conversion-regression.json
         buildPhase: resources
+      - path: ../app/src/main/assets/context-model.bin
+        buildPhase: resources
       - Sources/KeyboardExtension/BunsetsuState.swift
+      - Sources/KeyboardExtension/ConversionContextModel.swift
       - Sources/KeyboardExtension/ConversionCost.swift
       - Sources/KeyboardExtension/KanaKanjiConverter.swift
       - Sources/KeyboardExtension/HandwritingStrokeSegmenter.swift
       - Sources/KeyboardExtension/ReadingRepository.swift
+      - Sources/KeyboardExtension/RomajiConversionState.swift
     dependencies:
       - target: FuriganaKeyboard
       - sdk: libsqlite3.tbd

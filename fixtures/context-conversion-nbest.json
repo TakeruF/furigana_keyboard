@@ -1,0 +1,66 @@
+{
+  "schemaVersion": 1,
+  "model": {
+    "formatVersion": 1,
+    "modelVersion": 1,
+    "unigramCount": 2048,
+    "bigramCount": 8194,
+    "sourceSha256": "5275f10c2273647da817b8ba49558d82406e9b1435ca5246094b4d67097001ba",
+    "modelSha256": "22e83b94a259d900d5d60c058d9ba6773506ee43fc81b4f644da02a6495b2fc3",
+    "modelBytes": 219009
+  },
+  "cases": [
+    {
+      "reading": "がっこうへいきます",
+      "results": [
+        {"surface":"学校へ行きます","cost":-1166},
+        {"surface":"学校へ生きます","cost":2234},
+        {"surface":"学校へいきます","cost":2334},
+        {"surface":"学校へ遺棄増す","cost":3783},
+        {"surface":"学校へ意気増す","cost":3876},
+        {"surface":"学校へ生き増す","cost":3876},
+        {"surface":"学校へ行き増す","cost":3876},
+        {"surface":"学校へ息増す","cost":3885}
+      ]
+    },
+    {
+      "reading": "しゃしんをとってください",
+      "results": [
+        {"surface":"写真を撮ってください","cost":79},
+        {"surface":"写真を撮って下さい","cost":1300},
+        {"surface":"写真を撮って管さ位","cost":1447},
+        {"surface":"写真を撮って管さ医","cost":1449},
+        {"surface":"写真を撮って管さ伊","cost":1452},
+        {"surface":"写真を撮って管さ胃","cost":1461},
+        {"surface":"写真を撮って管さ亥","cost":1475},
+        {"surface":"写真を撮って管さ井","cost":1548}
+      ]
+    },
+    {
+      "reading": "へんかんせいどをたしかめる",
+      "results": [
+        {"surface":"変換精度を確かめる","cost":1220},
+        {"surface":"変換精度を田し噛める","cost":2424},
+        {"surface":"変換精度を多し噛める","cost":2425},
+        {"surface":"変換精度を他し噛める","cost":2429},
+        {"surface":"変換精度を田し咬める","cost":2431},
+        {"surface":"変換精度を多し咬める","cost":2432},
+        {"surface":"変換精度を他し咬める","cost":2436},
+        {"surface":"変換精度を田しかめる","cost":2437}
+      ]
+    },
+    {
+      "reading": "おちゃをのみたい",
+      "results": [
+        {"surface":"お茶を飲みたい","cost":1273},
+        {"surface":"お茶を飲み対","cost":2474},
+        {"surface":"お茶を飲み帯","cost":2481},
+        {"surface":"お茶を飲み態","cost":2717},
+        {"surface":"お茶を飲み他意","cost":2955},
+        {"surface":"お茶を飲みタイ","cost":3353},
+        {"surface":"お茶を飲み鯛","cost":3402},
+        {"surface":"お茶をのみ対","cost":3885}
+      ]
+    }
+  ]
+}

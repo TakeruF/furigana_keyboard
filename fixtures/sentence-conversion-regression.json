@@ -54,6 +54,9 @@
     {"id":"katakana-04","category":"カタカナ外来語","reading":"すまーとふぉんをかう","expectedTop1":"スマートフォンを買う","requiredNBest":["スマートフォンを買う"],"forbiddenCandidates":["スマートフォンを飼う"]},
     {"id":"katakana-05","category":"カタカナ外来語","reading":"いんたーねっとにつなぐ","expectedTop1":"インターネットにつなぐ","requiredNBest":["インターネットにつなぐ"],"forbiddenCandidates":["インターネットに繋ぐ"]},
     {"id":"katakana-06","category":"カタカナ外来語","reading":"でーたをばっくあっぷする","expectedTop1":"データをバックアップする","requiredNBest":["データをバックアップする"],"forbiddenCandidates":["データをバックアッぷする"]},
+    {"id":"katakana-07","category":"カタカナ外来語","reading":"ぷろじぇくと","expectedTop1":"プロジェクト","requiredNBest":["プロジェクト"],"forbiddenCandidates":["ぷ路地ぇ区と"]},
+    {"id":"katakana-08","category":"カタカナ外来語","reading":"りりーす","expectedTop1":"リリース","requiredNBest":["リリース"],"forbiddenCandidates":["利利ー巣"]},
+    {"id":"katakana-09","category":"カタカナ外来語","reading":"すかいつりー","expectedTop1":"スカイツリー","requiredNBest":["スカイツリー"],"forbiddenCandidates":["素かい釣りー"]},
 
     {"id":"unknown-01","category":"未知語","reading":"ふわもこぱんだがいる","expectedTop1":null,"requiredNBest":["ふわもこぱんだがいる"],"forbiddenCandidates":["不和も子パンダがいる"]},
     {"id":"unknown-02","category":"未知語","reading":"ぴょこぴょこあるく","expectedTop1":null,"requiredNBest":["ぴょこぴょこ歩く"],"forbiddenCandidates":["病子病子歩く"]},

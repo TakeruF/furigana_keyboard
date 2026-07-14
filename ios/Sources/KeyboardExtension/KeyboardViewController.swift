@@ -22,6 +22,7 @@ final class KeyboardViewController: UIInputViewController {
     private var handwritingTop: KeyboardCandidate?
     private var currentCandidates: [KeyboardCandidate] = []
     private var bunsetsuState: BunsetsuState?
+    private let romajiConversionState = RomajiConversionState()
 
     override func viewDidLoad() {
         super.viewDidLoad()
@@ -211,7 +212,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func handleJapaneseKey(_ value: String) {
         if value == " " {
-            if let first = currentCandidates.first, !composition.isEmpty { select(first) } else { commitDirect(" ") }
+            handleJapaneseSpace()
             return
         }
         if bunsetsuState != nil { finishComposition() }
@@ -226,14 +227,15 @@ final class KeyboardViewController: UIInputViewController {
         candidateEngine.invalidate()
         let converted = RomajiKanaConverter.convert(romajiRaw)
         composition = converted.displayText
+        romajiConversionState.compositionEdited(hasComposition: !composition.isEmpty)
         textDocumentProxy.setMarkedText(composition, selectedRange: NSRange(location: composition.utf16.count, length: 0))
         if converted.hasUnresolvedInput || converted.kana.isEmpty {
             currentCandidates = [KeyboardCandidate(composition)]
-            candidateBar.show(currentCandidates); return
+            showRomajiCandidates(); return
         }
         let scripts = [KeyboardCandidate(converted.kana, readings: [converted.kana]),
                        KeyboardCandidate(RomajiKanaConverter.toKatakana(converted.kana), readings: [converted.kana])]
-        currentCandidates = scripts; candidateBar.show(scripts)
+        currentCandidates = scripts; showRomajiCandidates()
         candidateEngine.analyzeKana(converted.kana) { [weak self] analysis in
             guard let self else { return }
             if let conversion = analysis.conversions.first,
@@ -242,18 +244,30 @@ final class KeyboardViewController: UIInputViewController {
                    segments: conversion.segments,
                    totalLength: converted.kana.unicodeScalars.count
                ) {
-                beginBunsetsu(reading: converted.kana, initialLength: initialLength)
+                beginBunsetsu(
+                    reading: converted.kana,
+                    initialLength: initialLength,
+                    conversions: analysis.conversions
+                )
             } else {
-                currentCandidates = analysis.candidates; candidateBar.show(analysis.candidates)
+                currentCandidates = analysis.candidates; showRomajiCandidates()
             }
         }
     }
 
-    private func beginBunsetsu(reading: String, initialLength: Int) {
-        let state = BunsetsuState(reading: reading, initialLength: initialLength)
+    private func beginBunsetsu(
+        reading: String,
+        initialLength: Int,
+        conversions: [KanaKanjiConversion]
+    ) {
+        let state = BunsetsuState(
+            reading: reading,
+            initialLength: initialLength,
+            conversionPaths: conversions.map(\.segments)
+        )
         bunsetsuState = state; romajiRaw = ""; composition = reading
         renderBunsetsu(state)
-        loadBunsetsuCandidates(state)
+        loadBunsetsuCandidates(state, preserveBoundary: true)
     }
 
     private func renderBunsetsu(_ state: BunsetsuState) {
@@ -261,57 +275,111 @@ final class KeyboardViewController: UIInputViewController {
         textDocumentProxy.setMarkedText(composition, selectedRange: NSRange(location: composition.utf16.count, length: 0))
     }
 
-    private func loadBunsetsuCandidates(_ state: BunsetsuState) {
-        let active = state.activeReading
-        guard !active.isEmpty else { return }
-        candidateEngine.analyzeKana(active) { [weak self, weak state] analysis in
-            guard let self, let state, bunsetsuState === state, state.activeReading == active else { return }
-            var candidates = analysis.candidates.filter { candidate in
-                candidate.readings.isEmpty || candidate.readings.contains(active)
+    private func loadBunsetsuCandidates(_ state: BunsetsuState, preserveBoundary: Bool) {
+        let token = state.token()
+        guard !token.activeReading.isEmpty, !token.remainingReading.isEmpty else { return }
+        showBunsetsuCandidates(state)
+        let requiredBoundary = preserveBoundary ? state.activeLength : nil
+        candidateEngine.analyzeKana(
+            token.remainingReading,
+            initialRightID: token.previousRightID,
+            initialContextSurface: token.previousContextSurface,
+            requiredBoundary: requiredBoundary
+        ) { [weak self, weak state] analysis in
+            guard let self, let state, bunsetsuState === state, state.isCurrent(token) else { return }
+            if state.applyAnalysis(
+                analysis.conversions,
+                token: token,
+                requestedBoundary: requiredBoundary
+            ) {
+                renderBunsetsu(state)
             }
-            if state.canShrink { candidates.append(KeyboardCandidate("←", readings: [AppStrings.text("segment_shrink")], kind: .segmentShrink)) }
-            if state.canExpand { candidates.append(KeyboardCandidate("→", readings: [AppStrings.text("segment_expand")], kind: .segmentExpand)) }
-            currentCandidates = Array(candidates.prefix(10)); candidateBar.show(currentCandidates)
+            showBunsetsuCandidates(state)
         }
     }
 
-    private func adjustBunsetsu(expand: Bool) {
+    private func showBunsetsuCandidates(_ state: BunsetsuState) {
+        let generation = state.generation
+        var candidates = state.options().map { option in
+            KeyboardCandidate(
+                option.surface,
+                readings: [option.reading],
+                bunsetsuReading: option.reading,
+                bunsetsuRightID: option.rightID,
+                bunsetsuGeneration: generation
+            )
+        }
+        let scripts = [
+            state.activeReading,
+            RomajiKanaConverter.toKatakana(state.activeReading)
+        ]
+        for script in scripts where !candidates.contains(where: { $0.text == script }) {
+            candidates.append(KeyboardCandidate(
+                script,
+                readings: [state.activeReading],
+                bunsetsuReading: state.activeReading,
+                bunsetsuRightID: state.activeRightID,
+                bunsetsuGeneration: generation
+            ))
+        }
+        if state.canShrink {
+            candidates.append(KeyboardCandidate(
+                "←",
+                readings: [AppStrings.text("segment_shrink")],
+                kind: .segmentShrink,
+                bunsetsuGeneration: generation
+            ))
+        }
+        if state.canExpand {
+            candidates.append(KeyboardCandidate(
+                "→",
+                readings: [AppStrings.text("segment_expand")],
+                kind: .segmentExpand,
+                bunsetsuGeneration: generation
+            ))
+        }
+        currentCandidates = Array(candidates.prefix(10))
+        showRomajiCandidates()
+    }
+
+    private func adjustBunsetsu(expand: Bool, candidate: KeyboardCandidate) {
         guard let state = bunsetsuState else { return }
+        guard state.isCurrentCandidate(
+            reading: state.activeReading,
+            generation: candidate.bunsetsuGeneration
+        ) else { return }
         if expand { state.expand() } else { state.shrink() }
-        renderBunsetsu(state); loadBunsetsuCandidates(state)
+        romajiConversionState.compositionEdited(hasComposition: true)
+        renderBunsetsu(state)
+        loadBunsetsuCandidates(state, preserveBoundary: true)
     }
 
     private func selectBunsetsu(_ candidate: KeyboardCandidate) {
         guard let state = bunsetsuState else { return }
-        state.select(surface: candidate.text)
+        guard state.isCurrentCandidate(
+            reading: candidate.bunsetsuReading,
+            generation: candidate.bunsetsuGeneration
+        ), state.select(
+            surface: candidate.text,
+            reading: candidate.bunsetsuReading,
+            rightID: candidate.bunsetsuRightID
+        ) else { return }
         if state.isComplete {
             textDocumentProxy.setMarkedText(state.committedSurface,
                                             selectedRange: NSRange(location: state.committedSurface.utf16.count, length: 0))
             textDocumentProxy.unmarkText(); resetComposition(clearCandidates: true)
             return
         }
+        romajiConversionState.compositionEdited(hasComposition: true)
         renderBunsetsu(state)
-        let remaining = state.remainingReading
-        candidateEngine.analyzeKana(remaining) { [weak self, weak state] analysis in
-            guard let self, let state, bunsetsuState === state else { return }
-            if let conversion = analysis.conversions.first {
-                let totalLength = state.remainingCharacters.count
-                let suggestedLength = KanaKanjiConverter.leadingBunsetsuLength(
-                    segments: conversion.segments,
-                    totalLength: totalLength
-                ) ?? totalLength
-                state.setSuggestedLength(suggestedLength)
-                renderBunsetsu(state)
-            }
-            loadBunsetsuCandidates(state)
-        }
+        loadBunsetsuCandidates(state, preserveBoundary: false)
     }
 
     private func select(_ candidate: KeyboardCandidate) {
         guard candidate.kind != .status else { return }
         KeyboardFeedback.key(preferences: preferences)
-        if candidate.kind == .segmentShrink { adjustBunsetsu(expand: false); return }
-        if candidate.kind == .segmentExpand { adjustBunsetsu(expand: true); return }
+        if candidate.kind == .segmentShrink { adjustBunsetsu(expand: false, candidate: candidate); return }
+        if candidate.kind == .segmentExpand { adjustBunsetsu(expand: true, candidate: candidate); return }
         if bunsetsuState != nil { selectBunsetsu(candidate); return }
         if composition.isEmpty { textDocumentProxy.insertText(candidate.text) }
         else {
@@ -332,6 +400,7 @@ final class KeyboardViewController: UIInputViewController {
 
     private func resetComposition(clearCandidates: Bool) {
         composition = ""; romajiRaw = ""; currentCandidates = []; bunsetsuState = nil
+        romajiConversionState.clear()
         recognizer.cancel(); candidateEngine.invalidate()
         if clearCandidates { candidateBar.clear() }
     }
@@ -364,7 +433,23 @@ final class KeyboardViewController: UIInputViewController {
                 return
             }
         }
-        if bunsetsuState != nil { bunsetsuState = nil; candidateEngine.invalidate() }
+        if let state = bunsetsuState {
+            candidateEngine.invalidate()
+            guard state.deleteLastScalar() else { return }
+            if state.isComplete {
+                textDocumentProxy.setMarkedText(
+                    state.committedSurface,
+                    selectedRange: NSRange(location: state.committedSurface.utf16.count, length: 0)
+                )
+                textDocumentProxy.unmarkText()
+                resetComposition(clearCandidates: true)
+            } else {
+                romajiConversionState.compositionEdited(hasComposition: true)
+                renderBunsetsu(state)
+                loadBunsetsuCandidates(state, preserveBoundary: true)
+            }
+            return
+        }
         if !romajiRaw.isEmpty {
             romajiRaw = RomajiKanaConverter.deleteLastUnit(romajiRaw)
             if romajiRaw.isEmpty {
@@ -390,6 +475,50 @@ final class KeyboardViewController: UIInputViewController {
     }
 
     private func handleReturn() {
-        if !composition.isEmpty { finishComposition() } else { textDocumentProxy.insertText("\n") }
+        guard activePanel == .japanese else {
+            if !composition.isEmpty { finishComposition() } else { textDocumentProxy.insertText("\n") }
+            return
+        }
+        performRomajiAction(
+            romajiConversionState.enter(candidateCount: selectableRomajiCandidates.count)
+        )
+    }
+
+    private var selectableRomajiCandidates: [KeyboardCandidate] {
+        currentCandidates.filter { $0.kind == .word }
+    }
+
+    private func showRomajiCandidates() {
+        candidateBar.show(currentCandidates)
+        candidateBar.setSelectedCandidateIndex(
+            romajiConversionState.selectedCandidateIndex(
+                candidateCount: selectableRomajiCandidates.count
+            )
+        )
+    }
+
+    private func handleJapaneseSpace() {
+        performRomajiAction(
+            romajiConversionState.space(candidateCount: selectableRomajiCandidates.count)
+        )
+    }
+
+    private func performRomajiAction(_ action: RomajiConversionState.Action) {
+        switch action {
+        case .insertSpace:
+            commitDirect(" ")
+        case .sendEditorAction:
+            textDocumentProxy.insertText("\n")
+        case .commitComposition:
+            finishComposition()
+        case let .selectCandidate(index):
+            candidateBar.setSelectedCandidateIndex(index)
+        case let .commitCandidate(index):
+            guard selectableRomajiCandidates.indices.contains(index) else {
+                finishComposition()
+                return
+            }
+            select(selectableRomajiCandidates[index])
+        }
     }
 }

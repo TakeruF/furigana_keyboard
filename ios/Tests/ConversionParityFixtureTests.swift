@@ -1,4 +1,5 @@
 import XCTest
+import CryptoKit
 @testable import FuriganaKeyboard
 
 final class ConversionParityFixtureTests: XCTestCase {
@@ -60,13 +61,83 @@ final class ConversionParityFixtureTests: XCTestCase {
         }
     }
 
+    func testSharedContextModelAndNBestFixtureMatchSwiftRuntime() throws {
+        let fixture = try JSONDecoder().decode(
+            ContextFixture.self,
+            from: Data(contentsOf: fixtureURL("context-conversion-nbest.json"))
+        )
+        XCTAssertEqual(fixture.schemaVersion, 1)
+        let modelData = try Data(contentsOf: fixtureURL("context-model.bin"))
+        let model = try ConversionContextModel(data: modelData)
+        XCTAssertEqual(model.metadata.formatVersion, fixture.model.formatVersion)
+        XCTAssertEqual(model.metadata.modelVersion, fixture.model.modelVersion)
+        XCTAssertEqual(model.metadata.unigramCount, fixture.model.unigramCount)
+        XCTAssertEqual(model.metadata.bigramCount, fixture.model.bigramCount)
+        XCTAssertEqual(model.metadata.sourceSha256, fixture.model.sourceSha256)
+        XCTAssertEqual(modelData.count, fixture.model.modelBytes)
+        XCTAssertEqual(
+            SHA256.hash(data: modelData).map { String(format: "%02x", $0) }.joined(),
+            fixture.model.modelSha256
+        )
+        XCTAssertTrue(model.hasBigram(previousSurface: "学校", nextSurface: "行きます"))
+        XCTAssertTrue(model.hasBigram(previousSurface: "写真", nextSurface: "撮って"))
+        XCTAssertTrue(model.hasBigram(previousSurface: "変換", nextSurface: "精度"))
+        XCTAssertTrue(model.hasBigram(previousSurface: "お茶", nextSurface: "飲み"))
+        XCTAssertEqual(model.cost(previousSurface: "未登録", nextSurface: "未知語"), 0)
+
+        let repository = try bundledRepository()
+        for entry in fixture.cases {
+            let data = repository.conversionData(for: entry.reading)
+            let oneCandidate = KanaKanjiConverter.convert(
+                reading: entry.reading,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                limit: 1,
+                contextModel: model,
+                beamWidth: 12
+            )
+            let production = KanaKanjiConverter.convert(
+                reading: entry.reading,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                limit: 8,
+                contextModel: model,
+                beamWidth: 12
+            ).map { RankedResult(surface: $0.surface, cost: $0.cost) }
+            let wideReference = KanaKanjiConverter.convert(
+                reading: entry.reading,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                limit: 8,
+                contextModel: model,
+                beamWidth: 64
+            ).map { RankedResult(surface: $0.surface, cost: $0.cost) }
+            XCTAssertEqual(production, entry.results, entry.reading)
+            XCTAssertEqual(oneCandidate.first?.surface, entry.results.first?.surface, entry.reading)
+            XCTAssertEqual(wideReference, production, entry.reading)
+        }
+
+        let suffixReading = "いきます"
+        let suffixData = repository.conversionData(for: suffixReading)
+        let contextualSuffix = KanaKanjiConverter.convert(
+            reading: suffixReading,
+            lexemes: suffixData.lexemes,
+            connections: suffixData.connections,
+            limit: 8,
+            initialRightID: 5,
+            initialContextSurface: "学校",
+            contextModel: model
+        )
+        XCTAssertEqual(contextualSuffix.first?.surface, "行きます", "confirmed bunsetsu context")
+    }
+
     func testSharedSentenceRegressionFixtureReportsBundledDatabaseQuality() throws {
         let fixture = try JSONDecoder().decode(
             SentenceFixture.self,
             from: Data(contentsOf: fixtureURL("sentence-conversion-regression.json"))
         )
         XCTAssertEqual(fixture.schemaVersion, 1)
-        XCTAssertEqual(fixture.cases.count, 54)
+        XCTAssertEqual(fixture.cases.count, 57)
         XCTAssertEqual(
             Dictionary(grouping: fixture.cases, by: \.category).mapValues(\.count),
             [
@@ -75,7 +146,7 @@ final class ConversionParityFixtureTests: XCTestCase {
                 "活用": 6,
                 "複文節": 6,
                 "固有名詞": 6,
-                "カタカナ外来語": 6,
+                "カタカナ外来語": 9,
                 "未知語": 6,
                 "数字": 6,
                 "文節境界": 6
@@ -84,26 +155,170 @@ final class ConversionParityFixtureTests: XCTestCase {
 
         let repository = try bundledRepository()
         let knownFailureIDs = Set(fixture.baselineKnownFailureIDs)
-        let outcomes = fixture.cases.map { entry in
+        let ranked = fixture.cases.map { entry -> (SentenceCase, [String], [String]) in
             let data = repository.conversionData(for: entry.reading)
-            let candidates = KanaKanjiConverter.convert(
+            let baseline = KanaKanjiConverter.convert(
                 reading: entry.reading,
                 lexemes: data.lexemes,
                 connections: data.connections,
                 limit: 8
             ).map(\.surface)
+            let contextual = KanaKanjiConverter.convert(
+                reading: entry.reading,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                limit: 8,
+                contextModel: repository.contextModel
+            ).map(\.surface)
+            return (entry, baseline, contextual)
+        }
+        let baselineOutcomes = ranked.map { entry, baseline, _ in
             return SentenceOutcome(
                 entry: entry,
-                candidates: candidates,
+                candidates: baseline,
                 baseline: knownFailureIDs.contains(entry.id) ? .knownFailure : .pass
             )
         }
+        let outcomes = ranked.map { entry, _, contextual in
+            SentenceOutcome(
+                entry: entry,
+                candidates: contextual,
+                baseline: knownFailureIDs.contains(entry.id) ? .knownFailure : .pass
+            )
+        }
+        let baselineReport = SentenceRegressionReport(outcomes: baselineOutcomes)
         let report = SentenceRegressionReport(outcomes: outcomes)
-        print(report.render())
+        var parityPayload = ""
+        for (entry, _, contextual) in ranked {
+            parityPayload += entry.id + "\u{0}"
+            for candidate in contextual { parityPayload += candidate + "\u{0}" }
+            parityPayload += "\u{1}"
+        }
+        let parityDigest = SHA256.hash(data: Data(parityPayload.utf8))
+            .map { String(format: "%02x", $0) }
+            .joined()
+        print("context-nbest-sha256=\(parityDigest)")
+        print("baseline\n\(baselineReport.render())context\n\(report.render())")
 
-        // Known failures stay exercised. Their resolution is reported as an
-        // improvement; only a baseline passing case becoming a failure fails.
+        XCTAssertGreaterThan(report.top1Correct, baselineReport.top1Correct, report.render())
+        for (category, baselineTop1) in baselineReport.top1ByCategory {
+            XCTAssertGreaterThanOrEqual(
+                report.top1ByCategory[category] ?? -1,
+                baselineTop1,
+                "category[\(category)] top-1 regressed"
+            )
+        }
+        for (category, baselineTop3) in baselineReport.top3ByCategory {
+            XCTAssertGreaterThanOrEqual(
+                report.top3ByCategory[category] ?? -1,
+                baselineTop3,
+                "category[\(category)] top-3 regressed"
+            )
+        }
+        for (category, baselineNBest) in baselineReport.nBestByCategory {
+            XCTAssertGreaterThanOrEqual(
+                report.nBestByCategory[category] ?? -1,
+                baselineNBest,
+                "category[\(category)] N-best regressed"
+            )
+        }
+        XCTAssertLessThanOrEqual(report.forbiddenCount, baselineReport.forbiddenCount)
         XCTAssertTrue(report.regressions.isEmpty, report.regressionsMessage())
+    }
+
+    func testContextConversionP95Report() throws {
+        let repository = try bundledRepository()
+        let readings = [
+            "がっこうへいきます",
+            "しゃしんをとってください",
+            "へんかんせいどをたしかめる",
+            "おちゃをのみたい"
+        ]
+        let prepared = Dictionary(uniqueKeysWithValues: readings.map { reading in
+            (reading, repository.conversionData(for: reading))
+        })
+
+        func convertPrepared(_ reading: String, contextual: Bool) {
+            let data = prepared[reading]!
+            _ = KanaKanjiConverter.convert(
+                reading: reading,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                contextModel: contextual ? repository.contextModel : .empty
+            )
+        }
+        func convertWithLookup(_ reading: String, contextual: Bool) {
+            let data = repository.conversionData(for: reading)
+            _ = KanaKanjiConverter.convert(
+                reading: reading,
+                lexemes: data.lexemes,
+                connections: data.connections,
+                contextModel: contextual ? repository.contextModel : .empty
+            )
+        }
+
+        for _ in 0..<4 {
+            for reading in readings {
+                convertPrepared(reading, contextual: false)
+                convertPrepared(reading, contextual: true)
+                convertWithLookup(reading, contextual: false)
+                convertWithLookup(reading, contextual: true)
+            }
+        }
+        var baselineEngine: [Double] = []
+        var contextEngine: [Double] = []
+        for index in 0..<40 {
+            let reading = readings[index % readings.count]
+            if index.isMultiple(of: 2) {
+                baselineEngine.append(timing { convertPrepared(reading, contextual: false) })
+                contextEngine.append(timing { convertPrepared(reading, contextual: true) })
+            } else {
+                contextEngine.append(timing { convertPrepared(reading, contextual: true) })
+                baselineEngine.append(timing { convertPrepared(reading, contextual: false) })
+            }
+        }
+        var baselineConversion: [Double] = []
+        var contextConversion: [Double] = []
+        for index in 0..<20 {
+            let reading = readings[index % readings.count]
+            if index.isMultiple(of: 2) {
+                baselineConversion.append(timing { convertWithLookup(reading, contextual: false) })
+                contextConversion.append(timing { convertWithLookup(reading, contextual: true) })
+            } else {
+                contextConversion.append(timing { convertWithLookup(reading, contextual: true) })
+                baselineConversion.append(timing { convertWithLookup(reading, contextual: false) })
+            }
+        }
+        let baselineEngineP95 = percentile95(baselineEngine)
+        let contextEngineP95 = percentile95(contextEngine)
+        let baselineConversionP50 = percentile(baselineConversion, fraction: 0.50)
+        let contextConversionP50 = percentile(contextConversion, fraction: 0.50)
+        let baselineConversionP95 = percentile95(baselineConversion)
+        let contextConversionP95 = percentile95(contextConversion)
+        let modelBytes = try Data(contentsOf: fixtureURL("context-model.bin")).count
+        print(
+            String(
+                format: "context-performance: baseline_conversion_p50_ms=%.3f " +
+                    "context_conversion_p50_ms=%.3f " +
+                    "baseline_conversion_p95_ms=%.3f " +
+                    "context_conversion_p95_ms=%.3f context_conversion_delta_p95_ms=%.3f " +
+                    "baseline_engine_p95_ms=%.3f context_engine_p95_ms=%.3f " +
+                    "context_engine_delta_p95_ms=%.3f " +
+                    "context_model_bytes=%d",
+                locale: Locale(identifier: "en_US_POSIX"),
+                baselineConversionP50,
+                contextConversionP50,
+                baselineConversionP95,
+                contextConversionP95,
+                contextConversionP95 - baselineConversionP95,
+                baselineEngineP95,
+                contextEngineP95,
+                contextEngineP95 - baselineEngineP95,
+                modelBytes
+            )
+        )
+        XCTAssertLessThanOrEqual(contextConversionP95, baselineConversionP95 * 1.25 + 1)
+        XCTAssertLessThanOrEqual(contextEngineP95, baselineEngineP95 * 1.25 + 1)
     }
 
     private func bundledRepository() throws -> ReadingRepository {
@@ -158,6 +373,22 @@ final class ConversionParityFixtureTests: XCTestCase {
         return output
     }
 
+    private func timing(operation: () -> Void) -> Double {
+        let start = DispatchTime.now().uptimeNanoseconds
+        operation()
+        let elapsed = DispatchTime.now().uptimeNanoseconds - start
+        return Double(elapsed) / 1_000_000
+    }
+
+    private func percentile95(_ values: [Double]) -> Double {
+        percentile(values, fraction: 0.95)
+    }
+
+    private func percentile(_ values: [Double], fraction: Double) -> Double {
+        let sorted = values.sorted()
+        return sorted[Int(Double(sorted.count - 1) * fraction)]
+    }
+
     private func fixtureURL(_ name: String) -> URL {
         if let bundled = Bundle(for: Self.self).url(forResource: name, withExtension: nil) {
             return bundled
@@ -185,6 +416,22 @@ final class ConversionParityFixtureTests: XCTestCase {
     private struct NBestCase: Decodable {
         let reading: String
         let results: [RankedResult]
+    }
+
+    private struct ContextFixture: Decodable {
+        let schemaVersion: Int
+        let model: ContextModelFixture
+        let cases: [NBestCase]
+    }
+
+    private struct ContextModelFixture: Decodable {
+        let formatVersion: Int
+        let modelVersion: Int
+        let unigramCount: Int
+        let bigramCount: Int
+        let sourceSha256: String
+        let modelSha256: String
+        let modelBytes: Int
     }
 
     private struct RankedResult: Codable, Equatable {
@@ -256,6 +503,32 @@ final class ConversionParityFixtureTests: XCTestCase {
     private struct SentenceRegressionReport {
         let outcomes: [SentenceOutcome]
 
+        var top1Correct: Int {
+            outcomes.filter { $0.entry.expectedTop1 != nil && $0.top1Matches }.count
+        }
+
+        var top1ByCategory: [String: Int] {
+            Dictionary(grouping: outcomes, by: { $0.entry.category }).mapValues { values in
+                values.filter { $0.entry.expectedTop1 != nil && $0.top1Matches }.count
+            }
+        }
+
+        var top3ByCategory: [String: Int] {
+            Dictionary(grouping: outcomes, by: { $0.entry.category }).mapValues { values in
+                values.filter(\.top3Matches).count
+            }
+        }
+
+        var nBestByCategory: [String: Int] {
+            Dictionary(grouping: outcomes, by: { $0.entry.category }).mapValues { values in
+                values.filter(\.nBestMatches).count
+            }
+        }
+
+        var forbiddenCount: Int {
+            outcomes.reduce(0) { $0 + $1.forbiddenCount }
+        }
+
         var regressions: [SentenceOutcome] {
             outcomes.filter(\.isRegression)
         }
@@ -270,19 +543,32 @@ final class ConversionParityFixtureTests: XCTestCase {
 
         func render() -> String {
             let top1Denominator = outcomes.filter { $0.entry.expectedTop1 != nil }.count
-            let top1Correct = outcomes.filter { $0.entry.expectedTop1 != nil && $0.top1Matches }.count
+            let correctTop1 = top1Correct
             let top3Correct = outcomes.filter(\.top3Matches).count
-            let forbidden = outcomes.reduce(0) { $0 + $1.forbiddenCount }
+            let forbidden = forbiddenCount
             let knownFailures = outcomes.filter { $0.baseline == .knownFailure }.count
             let unresolved = outcomes.filter { $0.baseline == .knownFailure && !$0.passes }.count
             let improvements = outcomes.filter(\.isImprovement).count
             var lines = [
                 "sentence-conversion-regression: cases=\(outcomes.count)",
-                "top-1 accuracy: \(top1Correct)/\(top1Denominator) (\(percent(top1Correct, top1Denominator)))",
+                "top-1 accuracy: \(correctTop1)/\(top1Denominator) (\(percent(correctTop1, top1Denominator)))",
                 "top-3 containment: \(top3Correct)/\(outcomes.count) (\(percent(top3Correct, outcomes.count)))",
                 "forbidden candidate count: \(forbidden)",
                 "known failures: unresolved=\(unresolved)/\(knownFailures) improvements=\(improvements) regressions=\(regressions.count)"
             ]
+            let categories = Dictionary(grouping: outcomes, by: { $0.entry.category })
+            for category in categories.keys.sorted() {
+                let categoryOutcomes = categories[category] ?? []
+                let top1Denominator = categoryOutcomes.filter { $0.entry.expectedTop1 != nil }.count
+                let top1 = categoryOutcomes.filter { $0.entry.expectedTop1 != nil && $0.top1Matches }.count
+                lines.append(
+                    "category[\(category)]: top1=\(top1)/\(top1Denominator) " +
+                    "top3=\(categoryOutcomes.filter(\.top3Matches).count)/\(categoryOutcomes.count) " +
+                    "nbest=\(categoryOutcomes.filter(\.nBestMatches).count)/\(categoryOutcomes.count) " +
+                    "pass=\(categoryOutcomes.filter(\.passes).count)/\(categoryOutcomes.count) " +
+                    "forbidden=\(categoryOutcomes.reduce(0) { $0 + $1.forbiddenCount })"
+                )
+            }
             for outcome in outcomes where !outcome.passes {
                 lines.append("  \(outcome.entry.id) [\(outcome.baseline == .knownFailure ? "known_failure" : "pass")] reading=\(outcome.entry.reading) expectedTop1=\(outcome.entry.expectedTop1 ?? "-") required=\(outcome.entry.requiredNBest) actual=\(outcome.candidates)")
             }

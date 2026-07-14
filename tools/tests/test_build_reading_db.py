@@ -2,6 +2,7 @@ import gzip
 import sqlite3
 import tempfile
 import unittest
+from contextlib import closing
 from pathlib import Path
 
 from tools import build_reading_db as builder
@@ -269,7 +270,7 @@ class BuildReadingDatabaseTest(unittest.TestCase):
 
         builder.normalize_for_android(path)
 
-        with sqlite3.connect(path) as normalized:
+        with closing(sqlite3.connect(path)) as normalized:
             self.assertEqual("ok", normalized.execute("PRAGMA integrity_check").fetchone()[0])
             self.assertEqual("ok", normalized.execute("SELECT value FROM sample").fetchone()[0])
 

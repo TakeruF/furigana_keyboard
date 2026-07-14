@@ -24,4 +24,18 @@ final class ReadingRepositoryTests: XCTestCase {
         let converted = KanaKanjiConverter.convert(reading: "にほん", lexemes: data.lexemes, connections: data.connections)
         XCTAssertTrue(converted.contains { $0.surface == "日本" })
     }
+
+    func testBundledConversionLexemesIncludeFullWidthKatakanaReading() throws {
+        let repository = try repository()
+        let data = repository.conversionData(for: "しゃつ")
+        XCTAssertTrue(data.lexemes.contains { $0.reading == "しゃつ" && $0.surface == "シャツ" })
+        XCTAssertEqual(
+            KanaKanjiConverter.convert(
+                reading: "しゃつ",
+                lexemes: data.lexemes,
+                connections: data.connections
+            ).first?.surface,
+            "シャツ"
+        )
+    }
 }

@@ -73,6 +73,51 @@ class KanaKanjiConverterTest {
     }
 
     @Test
+    fun loanwordKatakanaIsAScoredLatticeEdge() {
+        val result = KanaKanjiConverter.convert(
+            "すかいつりー",
+            emptyList(),
+            zeroConnections(),
+            8,
+        ).first()
+
+        assertEquals("スカイツリー", result.surface)
+        assertEquals(1, result.segments.size)
+        assertFalse(result.segments.single().isCopy)
+
+        assertEquals(
+            "ヴァージョン",
+            KanaKanjiConverter.convert(
+                "ゔぁーじょん",
+                emptyList(),
+                zeroConnections(),
+                8,
+            ).first().surface,
+        )
+    }
+
+    @Test
+    fun loneSmallTsuDoesNotTurnNativeMixedWordsIntoKatakana() {
+        assertTrue(
+            KanaKanjiConverter.convert("ひっこし", emptyList(), zeroConnections(), 8).isEmpty()
+        )
+        assertFirst(
+            "ひっこし",
+            listOf(lexeme("ひっこし", "ひっこし", "引っ越し", PosClass.NOUN)),
+            "引っ越し",
+        )
+    }
+
+    @Test
+    fun legitimateKanjiKanaSurfaceIsNotBlanketPenalized() {
+        assertFirst(
+            "とりあつかい",
+            listOf(lexeme("とりあつかい", "とりあつかい", "取り扱い", PosClass.NOUN)),
+            "取り扱い",
+        )
+    }
+
+    @Test
     fun allCopyPathIsNeverReturned() {
         val invalid = ConversionLexeme(1, 2, "み", "見", 3, 3, 0)
 
@@ -99,6 +144,54 @@ class KanaKanjiConverterTest {
 
         assertEquals("これも橋", results.first().surface)
         assertTrue(results.indexOfFirst { it.surface == "これも箸" } > 0)
+    }
+
+    @Test
+    fun initialRightPosScoresTheSuffixFromCommittedContextInsteadOfBos() {
+        val input = "はし"
+        val bridge = lexeme(input, input, "橋", PosClass.NOUN, wordCost = 100)
+        val chopsticks = lexeme(input, input, "箸", PosClass.PROPER_NOUN, wordCost = 0)
+        val connections = listOf(
+            ConversionConnection(PosClass.BOS.id, PosClass.NOUN.id, 1_000),
+            ConversionConnection(PosClass.BOS.id, PosClass.PROPER_NOUN.id, 0),
+            ConversionConnection(PosClass.PARTICLE.id, PosClass.NOUN.id, 0),
+            ConversionConnection(PosClass.PARTICLE.id, PosClass.PROPER_NOUN.id, 1_000),
+            ConversionConnection(PosClass.NOUN.id, PosClass.EOS.id, 0),
+            ConversionConnection(PosClass.PROPER_NOUN.id, PosClass.EOS.id, 0),
+        )
+
+        val bos = KanaKanjiConverter.convert(input, listOf(bridge, chopsticks), connections)
+        val contextual = KanaKanjiConverter.convert(
+            input,
+            listOf(bridge, chopsticks),
+            connections,
+            initialRightId = PosClass.PARTICLE.id,
+        )
+
+        assertEquals("箸", bos.first().surface)
+        assertEquals("橋", contextual.first().surface)
+    }
+
+    @Test
+    fun requiredBoundaryReevaluatesTheWholePathThroughTheAdjustedEdge() {
+        val input = "あいう"
+        val lexemes = listOf(
+            lexeme(input, input, "一語", PosClass.NOUN, wordCost = 0),
+            ConversionLexeme(0, 1, "あ", "甲", PosClass.PARTICLE.id, PosClass.PARTICLE.id, 10),
+            ConversionLexeme(1, 3, "いう", "乙", PosClass.NOUN.id, PosClass.NOUN.id, 10),
+        )
+
+        val unconstrained = KanaKanjiConverter.convert(input, lexemes, zeroConnections())
+        val constrained = KanaKanjiConverter.convert(
+            input,
+            lexemes,
+            zeroConnections(),
+            requiredBoundary = 1,
+        )
+
+        assertEquals("一語", unconstrained.first().surface)
+        assertEquals("甲乙", constrained.first().surface)
+        assertTrue(constrained.first().segments.any { it.end == 1 })
     }
 
     @Test

@@ -9,14 +9,19 @@ private let sqliteTransient = unsafeBitCast(-1, to: sqlite3_destructor_type.self
 final class ReadingRepository {
     private var database: OpaquePointer?
     private lazy var connections: [ConversionConnection] = loadConnections()
+    let contextModel: ConversionContextModel
 
     init?(bundle: Bundle = .main) {
-        guard let url = ReadingDataLocation.databaseURL(bundle: bundle),
+        guard let contextURL = bundle.url(forResource: "context-model", withExtension: "bin"),
+              let contextData = try? Data(contentsOf: contextURL),
+              let loadedContextModel = try? ConversionContextModel(data: contextData),
+              let url = ReadingDataLocation.databaseURL(bundle: bundle),
               sqlite3_open_v2(url.path, &database, SQLITE_OPEN_READONLY, nil) == SQLITE_OK else {
             if database != nil { sqlite3_close(database) }
             database = nil
             return nil
         }
+        contextModel = loadedContextModel
     }
 
     deinit {
@@ -83,7 +88,7 @@ final class ReadingRepository {
         let boundaries = ConversionText.scalarBoundaries(reading)
         let scalarCount = boundaries.count - 1
         guard scalarCount <= 48 else { return ([], connections) }
-        let sql = "SELECT surface, left_id, right_id, word_cost FROM conversion_lexeme WHERE reading = ? ORDER BY word_cost, form_rank, surface, left_id, right_id LIMIT 12"
+        let sql = "SELECT surface, left_id, right_id, word_cost, form_rank FROM conversion_lexeme WHERE reading = ? ORDER BY word_cost, form_rank, surface, left_id, right_id LIMIT 12"
         var statement: OpaquePointer?
         guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { return ([], connections) }
         defer { sqlite3_finalize(statement) }
@@ -107,17 +112,35 @@ final class ReadingRepository {
         var storedByKey: [[UInt32]: [StoredConversionLexeme]] = [:]
         for key in tokenOrder {
             guard let token = tokenByKey[key] else { continue }
-            sqlite3_reset(statement); sqlite3_clear_bindings(statement)
-            bind(token, at: 1, to: statement)
-            while sqlite3_step(statement) == SQLITE_ROW {
-                guard let value = sqlite3_column_text(statement, 0) else { continue }
-                storedByKey[key, default: []].append(StoredConversionLexeme(
-                    surface: String(cString: value),
-                    leftID: Int(sqlite3_column_int(statement, 1)),
-                    rightID: Int(sqlite3_column_int(statement, 2)),
-                    wordCost: ConversionCost.clampInt32(sqlite3_column_int64(statement, 3))
-                ))
+            var stored: [StoredConversionLexeme] = []
+            var seen = Set<StoredConversionKey>()
+            let katakanaReading = ConversionText.toKatakana(token)
+            for databaseReading in [token, katakanaReading] {
+                sqlite3_reset(statement); sqlite3_clear_bindings(statement)
+                bind(databaseReading, at: 1, to: statement)
+                while sqlite3_step(statement) == SQLITE_ROW {
+                    guard let value = sqlite3_column_text(statement, 0) else { continue }
+                    let surface = String(cString: value)
+                    if databaseReading == katakanaReading && databaseReading != token &&
+                        !ConversionText.isKatakanaTransliteration(reading: token, surface: surface) {
+                        continue
+                    }
+                    let lexeme = StoredConversionLexeme(
+                        surface: surface,
+                        leftID: Int(sqlite3_column_int(statement, 1)),
+                        rightID: Int(sqlite3_column_int(statement, 2)),
+                        wordCost: ConversionCost.clampInt32(sqlite3_column_int64(statement, 3)),
+                        formRank: Int(sqlite3_column_int(statement, 4))
+                    )
+                    let storedKey = StoredConversionKey(
+                        surface: ConversionText.scalarValues(lexeme.surface),
+                        leftID: lexeme.leftID,
+                        rightID: lexeme.rightID
+                    )
+                    if seen.insert(storedKey).inserted { stored.append(lexeme) }
+                }
             }
+            storedByKey[key] = stored.sorted(by: storedConversionOrder)
         }
         let literals = storedByKey.values.flatMap { stored in
             stored.flatMap { ConversionCost.hanLiterals(in: $0.surface) }
@@ -191,5 +214,24 @@ final class ReadingRepository {
         let leftID: Int
         let rightID: Int
         let wordCost: Int
+        let formRank: Int
+    }
+
+    private struct StoredConversionKey: Hashable {
+        let surface: [UInt32]
+        let leftID: Int
+        let rightID: Int
+    }
+
+    private func storedConversionOrder(
+        _ left: StoredConversionLexeme,
+        _ right: StoredConversionLexeme
+    ) -> Bool {
+        if left.wordCost != right.wordCost { return left.wordCost < right.wordCost }
+        if left.formRank != right.formRank { return left.formRank < right.formRank }
+        let surface = ConversionText.scalarOrder(left.surface, right.surface)
+        if surface != .orderedSame { return surface == .orderedAscending }
+        if left.leftID != right.leftID { return left.leftID < right.leftID }
+        return left.rightID < right.rightID
     }
 }

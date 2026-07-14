@@ -2,6 +2,7 @@ package com.example.furiganakeyboard
 
 import com.example.furiganakeyboard.conversion.ConversionConnection
 import com.example.furiganakeyboard.conversion.ConversionLexeme
+import com.example.furiganakeyboard.conversion.PosClass
 import com.example.furiganakeyboard.ime.CandidatePipeline
 import com.example.furiganakeyboard.ime.HandwritingStageContext
 import com.example.furiganakeyboard.ime.HandwritingPipelineResult
@@ -72,6 +73,47 @@ class CandidatePipelineTest {
         }
 
         assertTrue(delivered.await(2, TimeUnit.SECONDS))
+        pipeline.close()
+    }
+
+    @Test
+    fun romajiAnalysisPassesCommittedRightPosAndCachesItSeparatelyFromBos() {
+        val source = FakeSource().apply {
+            conversionLexemeLoader = {
+                listOf(
+                    ConversionLexeme(0, 2, "はし", "橋", 3, 3, 100),
+                    ConversionLexeme(0, 2, "はし", "箸", 4, 4, 0),
+                )
+            }
+            connections = listOf(
+                ConversionConnection(0, 3, 1_000),
+                ConversionConnection(0, 4, 0),
+                ConversionConnection(5, 3, 0),
+                ConversionConnection(5, 4, 1_000),
+                ConversionConnection(3, 1, 0),
+                ConversionConnection(4, 1, 0),
+            )
+        }
+        val pipeline = pipeline(source)
+        val bosDelivered = CountDownLatch(1)
+        val contextualDelivered = CountDownLatch(1)
+
+        pipeline.submitRomajiAnalysis("はし", 6) { result ->
+            assertEquals("箸", result.conversions.first().surface)
+            bosDelivered.countDown()
+        }
+        assertTrue(bosDelivered.await(2, TimeUnit.SECONDS))
+        pipeline.submitRomajiAnalysis(
+            kana = "はし",
+            limit = 6,
+            initialRightId = PosClass.PARTICLE.id,
+        ) { result ->
+            assertEquals("橋", result.conversions.first().surface)
+            contextualDelivered.countDown()
+        }
+
+        assertTrue(contextualDelivered.await(2, TimeUnit.SECONDS))
+        assertEquals(2, source.conversionLexemeCalls.get())
         pipeline.close()
     }
 
