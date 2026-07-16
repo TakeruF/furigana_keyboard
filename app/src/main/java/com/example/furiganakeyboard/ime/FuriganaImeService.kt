@@ -25,6 +25,7 @@ import androidx.core.view.doOnAttach
 import com.example.furiganakeyboard.R
 import com.example.furiganakeyboard.conversion.ConversionText
 import com.example.furiganakeyboard.reading.ReadingRepository
+import com.example.furiganakeyboard.reading.WordReadingCandidate
 import com.example.furiganakeyboard.recognizer.InkRecognizer
 import com.example.furiganakeyboard.recognizer.PlusInkRecognizer
 import com.example.furiganakeyboard.recognizer.SideBySideInkRecognizer
@@ -47,7 +48,7 @@ import com.example.furiganakeyboard.view.KeySounds
 import com.example.furiganakeyboard.update.ReadingDataUpdates
 
 /** Japanese handwriting IME with optional Plus recognition and bundled fallback. */
-class FuriganaImeService : InputMethodService() {
+class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
     private enum class Panel { HANDWRITING, SYMBOLS, ENGLISH, ROMAJI }
 
     private lateinit var prefs: KeyboardPrefs
@@ -71,13 +72,16 @@ class FuriganaImeService : InputMethodService() {
     private var currentPanel = Panel.HANDWRITING
     private var appliedLocaleTag = ""
     private var latestCharacterAlternatives: List<String> = emptyList()
+    private var latestCharacterCandidates: List<ResolvedCharacterCandidate> = emptyList()
     private var wordRootBeforeLastCharacter = ""
     private var lastCharacterAlternatives: List<String> = emptyList()
-    private val romajiRaw = StringBuilder()
-    private val romajiBaseKana = StringBuilder()
+    private var lastCharacterCandidates: List<ResolvedCharacterCandidate> = emptyList()
     private var bunsetsuState: BunsetsuComposition? = null
     private val romajiConversionState = RomajiConversionState()
+    private val romajiCursor = RomajiCompositionCursor()
+    private val romajiEditor = RomajiCompositionEditor(romajiCursor)
     private var romajiCandidates: List<CandidateUiModel> = emptyList()
+    private var romajiCandidateRequest: RomajiCursorRequest? = null
     private var currentEnterLabel = ""
 
     override fun attachBaseContext(newBase: Context) {
@@ -159,9 +163,9 @@ class FuriganaImeService : InputMethodService() {
             setInputView(onCreateInputView())
         }
         composition.clear()
-        romajiRaw.setLength(0)
-        romajiBaseKana.setLength(0)
         bunsetsuState = null
+        romajiCursor.clear()
+        romajiCandidateRequest = null
         clearAlternativeContext()
         candidatePipeline.invalidate()
         recognizer?.cancelPending()
@@ -199,6 +203,42 @@ class FuriganaImeService : InputMethodService() {
     override fun onFinishInputView(finishingInput: Boolean) {
         finishComposition(clearCandidates = false)
         super.onFinishInputView(finishingInput)
+    }
+
+    override fun onUpdateSelection(
+        oldSelStart: Int,
+        oldSelEnd: Int,
+        newSelStart: Int,
+        newSelEnd: Int,
+        candidatesStart: Int,
+        candidatesEnd: Int,
+    ) {
+        super.onUpdateSelection(
+            oldSelStart,
+            oldSelEnd,
+            newSelStart,
+            newSelEnd,
+            candidatesStart,
+            candidatesEnd,
+        )
+        when (
+            val action = romajiCursor.onUpdateSelection(
+                newSelStart,
+                newSelEnd,
+                candidatesStart,
+                candidatesEnd,
+            )
+        ) {
+            RomajiSelectionAction.Ignored,
+            RomajiSelectionAction.SelfUpdate -> Unit
+            is RomajiSelectionAction.RestoreCursor -> restoreRomajiCursor(action.absoluteUtf16)
+            is RomajiSelectionAction.CursorChanged -> {
+                leaveBunsetsuModeForCursorMove()
+                romajiConversionState.onCompositionEdited(hasComposition = true)
+                refreshRomajiCandidatesForCursor()
+            }
+            RomajiSelectionAction.FinishComposition -> finishComposition()
+        }
     }
 
     private fun ensureRecognizer(): InkRecognizer {
@@ -295,6 +335,9 @@ class FuriganaImeService : InputMethodService() {
                     addPanel(pad)
                     pad.onText = { appendRomajiInput(it) }
                     pad.onSpace = { handleRomajiSpace() }
+                    pad.onCursorStep = { deltaInGraphemes ->
+                        onSpaceCursorDelta(deltaInGraphemes)
+                    }
                     pad.onDelete = { deleteRomajiInput() }
                     pad.onEnter = { handleRomajiEnter() }
                     pad.onBack = { switchPanel(Panel.HANDWRITING) }
@@ -323,7 +366,8 @@ class FuriganaImeService : InputMethodService() {
                     HandwritingStageContext(
                         baseBeforeCurrent = composition.text,
                         wordRootBeforeLast = wordRootBeforeLastCharacter,
-                        previousAlternatives = lastCharacterAlternatives
+                        previousAlternatives = lastCharacterAlternatives,
+                        previousCandidates = lastCharacterCandidates,
                     )
                 } else null
                 candidatePipeline.submitHandwriting(
@@ -346,7 +390,8 @@ class FuriganaImeService : InputMethodService() {
             if (first.kind != CandidateKind.CHARACTER) return@gate false
             appendToComposition(
                 first.text,
-                latestCharacterAlternatives.ifEmpty { listOf(first.text) }
+                latestCharacterAlternatives.ifEmpty { listOf(first.text) },
+                latestCharacterCandidates,
             )
             true
         }
@@ -354,10 +399,10 @@ class FuriganaImeService : InputMethodService() {
         candidateBar.onCandidateSelected = { candidate ->
             when (candidate.kind) {
                 CandidateKind.CHARACTER -> commitCharacterCandidate(candidate.text)
-                CandidateKind.WORD -> if (bunsetsuState == null) {
-                    commitWordCandidate(candidate.text)
+                CandidateKind.WORD -> if (currentPanel == Panel.ROMAJI && romajiCursor.isActive) {
+                    commitRomajiWordCandidate(candidate.text)
                 } else {
-                    commitBunsetsuCandidate(candidate)
+                    commitWordCandidate(candidate.text)
                 }
                 CandidateKind.BUNSETSU ->
                     commitBunsetsuCandidate(candidate)
@@ -370,13 +415,19 @@ class FuriganaImeService : InputMethodService() {
         }
     }
 
-    private fun appendToComposition(text: String, alternatives: List<String> = listOf(text)) {
+    private fun appendToComposition(
+        text: String,
+        alternatives: List<String> = listOf(text),
+        candidates: List<ResolvedCharacterCandidate> = emptyList(),
+    ) {
         wordRootBeforeLastCharacter = composition.text
         lastCharacterAlternatives = alternatives.distinct()
+        lastCharacterCandidates = candidates
         val value = composition.append(text)
         currentInputConnection?.setComposingText(value, 1)
         updateEnterLabel(currentInputEditorInfo)
         latestCharacterAlternatives = emptyList()
+        latestCharacterCandidates = emptyList()
         showWordSuggestions()
     }
 
@@ -393,6 +444,7 @@ class FuriganaImeService : InputMethodService() {
                     )
                 }
                 latestCharacterAlternatives = candidates.map { it.text }
+                latestCharacterCandidates = result.candidates
                 candidateBar.setCandidates(candidates)
                 handwritingView.markResultsDelivered()
             }
@@ -414,7 +466,9 @@ class FuriganaImeService : InputMethodService() {
                 )
                 wordRootBeforeLastCharacter = baseBeforeCurrent
                 lastCharacterAlternatives = result.currentAlternatives
+                lastCharacterCandidates = result.currentCandidates
                 latestCharacterAlternatives = emptyList()
+                latestCharacterCandidates = emptyList()
                 handwritingView.clear()
                 Haptics.selection(handwritingView)
             }
@@ -447,6 +501,42 @@ class FuriganaImeService : InputMethodService() {
         currentInputConnection?.setComposingText(surface, 1)
         finishComposition()
         handwritingView.clear()
+    }
+
+    private fun commitRomajiWordCandidate(surface: String) {
+        val request = romajiCandidateRequest ?: run {
+            commitWordCandidate(surface)
+            return
+        }
+        if (!romajiCursor.isCurrent(request)) return
+        val slice = romajiCursor.conversionSlice()?.takeIf { it.request == request } ?: return
+        val connection = currentInputConnection ?: return
+        val remaining = slice.resolvedSuffix + slice.unresolvedSuffix
+
+        connection.beginBatchEdit()
+        try {
+            // commitText replaces the whole composing span. Reinstall the untouched suffix as the
+            // next composing span so a prefix conversion can never consume text right of cursor.
+            connection.commitText(surface, 1)
+            if (remaining.isNotEmpty()) {
+                composition.replace(remaining)
+                bunsetsuState = null
+                romajiConversionState.onCompositionEdited(hasComposition = true)
+                romajiCursor.clear()
+                romajiCursor.replace(remaining, slice.resolvedSuffix, slice.unresolvedRaw)
+                setRomajiComposingText(remaining)
+            }
+        } finally {
+            connection.endBatchEdit()
+        }
+
+        if (remaining.isEmpty()) {
+            finishComposition()
+        } else {
+            clearAlternativeContext()
+            updateEnterLabel(currentInputEditorInfo)
+            refreshRomajiCandidatesForCursor()
+        }
     }
 
     /** A deliberate candidate tap selects and confirms the character immediately. */
@@ -533,65 +623,135 @@ class FuriganaImeService : InputMethodService() {
     private fun appendRomajiInput(text: String) {
         leaveBunsetsuModeForEditing()
         if (text.length == 1 && text[0].isLetter() && text[0].code < 128) {
-            romajiRaw.append(text.lowercase())
-            updateRomajiComposition()
+            applyRomajiEdit(romajiEditor.append(text.lowercase()))
         } else if (text == JAPANESE_LONG_VOWEL_MARK) {
-            romajiRaw.append(text)
-            updateRomajiComposition()
+            applyRomajiEdit(romajiEditor.append(text))
         } else {
             commitDirect(text)
         }
     }
 
-    private fun updateRomajiComposition() {
+    private fun applyRomajiEdit(mutation: CompositionCursorMutation) {
         candidatePipeline.invalidate()
-        val converted = RomajiKanaConverter.convert(romajiRaw.toString())
-        val display = romajiBaseKana.toString() + converted.displayText
-        val kana = romajiBaseKana.toString() + converted.kana
+        if (mutation !is CompositionCursorMutation.Applied) return
+        synchronizeRomajiComposition()
+    }
+
+    private fun synchronizeRomajiComposition() {
+        val display = romajiCursor.displayText
         composition.replace(display)
         bunsetsuState = null
         romajiConversionState.onCompositionEdited(display.isNotEmpty())
         clearAlternativeContext()
-        currentInputConnection?.setComposingText(display, 1)
+        setRomajiComposingText(display)
         updateEnterLabel(currentInputEditorInfo)
+        refreshRomajiCandidatesForCursor()
+    }
 
-        if (converted.hasUnresolvedInput || kana.isEmpty()) {
+    private fun setRomajiComposingText(value: CharSequence) {
+        val connection = currentInputConnection ?: return
+        romajiCursor.expectSelfSelection(romajiCursor.displayText.length)
+        connection.setComposingText(value, 1)
+        romajiCursor.absoluteCursorUtf16?.let { absoluteCursor ->
+            if (romajiCursor.cursorUtf16 != composition.text.length) {
+                restoreRomajiCursor(absoluteCursor)
+            }
+        }
+    }
+
+    private fun restoreRomajiCursor(absoluteUtf16: Int) {
+        romajiCursor.expectSelfSelection(romajiCursor.cursorUtf16)
+        currentInputConnection?.setSelection(absoluteUtf16, absoluteUtf16)
+    }
+
+    /** Space-drag emits user-visible grapheme steps, never pixels, scalars, or UTF-16 offsets. */
+    override fun onSpaceCursorDelta(deltaInGraphemes: Int) {
+        if (currentPanel != Panel.ROMAJI || !romajiCursor.isActive) return
+        leaveBunsetsuModeForCursorMove()
+        if (!romajiCursor.moveCursorByGrapheme(deltaInGraphemes)) return
+        romajiConversionState.onCompositionEdited(hasComposition = true)
+        val absoluteCursor = romajiCursor.absoluteCursorUtf16
+        if (absoluteCursor == null) {
+            setRomajiComposingText(composition.text)
+        } else {
+            restoreRomajiCursor(absoluteCursor)
+        }
+        refreshRomajiCandidatesForCursor()
+    }
+
+    private fun leaveBunsetsuModeForCursorMove() {
+        if (bunsetsuState != null) leaveBunsetsuModeForEditing()
+    }
+
+    /**
+     * End-of-composition requests keep the existing full/bunsetsu conversion policy. An interior
+     * cursor submits only [composition start, cursor], leaving the suffix outside conversion.
+     */
+    private fun refreshRomajiCandidatesForCursor() {
+        candidatePipeline.invalidate()
+        val slice = romajiCursor.conversionSlice()
+        if (slice == null) {
+            romajiCandidateRequest = null
             showRomajiCandidates(
-                listOf(CandidateUiModel(display, kind = CandidateKind.WORD))
+                listOf(CandidateUiModel(composition.text, kind = CandidateKind.WORD))
             )
             return
         }
 
-        val kanaCandidate = CandidateUiModel(
-            kana,
-            listOf(kana),
-            CandidateKind.WORD
-        )
-        val katakanaCandidate = CandidateUiModel(
-            RomajiKanaConverter.toKatakana(kana),
-            listOf(kana),
-            CandidateKind.WORD
-        )
+        val reading = slice.request.reading
+        romajiCandidateRequest = slice.request
+        val scriptFallbacks = listOf(
+            WordReadingCandidate(reading, listOf(reading)),
+            WordReadingCandidate(RomajiKanaConverter.toKatakana(reading), listOf(reading)),
+        ).distinctBy { it.surface }
+        val scriptCandidates = scriptFallbacks.map { fallback ->
+            CandidateUiModel(fallback.surface, fallback.readings, CandidateKind.WORD)
+        }
         // While the dictionary lookup is pending, and when it has no match,
         // keep the plain-script fallback in the familiar hiragana | katakana order.
-        val scriptCandidates = listOf(kanaCandidate, katakanaCandidate).distinctBy { it.text }
         showRomajiCandidates(scriptCandidates)
-        candidatePipeline.submitRomajiAnalysis(
-            kana,
+        // Preserve the existing hard contract: pending romaji never reaches dictionary lookup.
+        if (slice.unresolvedSuffix.isNotEmpty()) return
+        val analysisLimit = if (slice.isWholeComposition) {
+            CandidatePipeline.MAX_ROMAJI_ANALYSIS_CANDIDATES
+        } else {
             MAX_WORD_CANDIDATES
+        }
+        candidatePipeline.submitRomajiAnalysis(
+            reading,
+            analysisLimit,
         ) { result ->
-            val plan = BunsetsuComposition.plan(kana, result.conversions)
-            if (plan == null) {
-                val dictionaryCandidates = result.candidates.map {
-                    CandidateUiModel(it.surface, it.readings, CandidateKind.WORD)
-                }
-                showRomajiCandidates(
-                    (dictionaryCandidates + scriptCandidates)
-                        .distinctBy { it.text }
-                        .take(MAX_WORD_CANDIDATES)
-                )
+            if (!romajiCursor.isCurrent(slice.request)) return@submitRomajiAnalysis
+            val plan = if (slice.isWholeComposition) {
+                BunsetsuComposition.plan(reading, result.conversions)
             } else {
-                enterBunsetsuConversion(kana, plan)
+                null
+            }
+            val wholeCandidates = if (slice.isWholeComposition) {
+                WholeCompositionCandidatePolicy.build(
+                    reading = reading,
+                    dictionaryCandidates = result.candidates,
+                    scriptFallbacks = scriptFallbacks,
+                    limit = MAX_WORD_CANDIDATES,
+                ).map { candidate ->
+                    CandidateUiModel(candidate.surface, candidate.readings, CandidateKind.WORD)
+                }
+            } else {
+                val exactCandidates = result.candidates.asSequence()
+                    .filter { candidate -> candidate.readings.any { it == reading } }
+                    .map { candidate ->
+                        CandidateUiModel(candidate.surface, candidate.readings, CandidateKind.WORD)
+                    }
+                (exactCandidates + scriptCandidates.asSequence())
+                    .distinctBy { it.text }
+                    .take(MAX_WORD_CANDIDATES)
+                    .toList()
+            }
+            if (plan == null) {
+                bunsetsuState = null
+                showRomajiCandidates(wholeCandidates)
+            } else {
+                enterBunsetsuConversion(reading, plan, wholeCandidates)
             }
         }
     }
@@ -599,15 +759,16 @@ class FuriganaImeService : InputMethodService() {
     private fun enterBunsetsuConversion(
         reading: String,
         plan: BunsetsuConversionPlan,
+        wholeCandidates: List<CandidateUiModel>,
     ) {
         val state = BunsetsuComposition.create(reading, plan)
         bunsetsuState = state
-        romajiBaseKana.setLength(0)
-        romajiBaseKana.append(reading)
-        romajiRaw.setLength(0)
         composition.replace(reading)
         renderBunsetsuComposition(state)
-        showBunsetsuPlan(state, plan)
+        // At the terminal cursor, keep full-composition candidates visible. The retained state
+        // exists so the segment arrows can still enter explicit bunsetsu range adjustment.
+        state.setCandidates(wholeCandidates.map { it.text })
+        showRomajiCandidates(wholeCandidates, state)
     }
 
     private fun showBunsetsuPlan(
@@ -668,9 +829,8 @@ class FuriganaImeService : InputMethodService() {
         val changed = if (expand) state.expand() else state.shrink()
         if (!changed) return
         composition.replace(state.composingText)
+        romajiCursor.replace(state.composingText, state.composingText)
         romajiConversionState.onCompositionEdited(hasComposition = true)
-        romajiBaseKana.setLength(0)
-        romajiBaseKana.append(state.composingText)
         renderBunsetsuComposition(state)
         reanalyzeRemainingBunsetsu(
             state,
@@ -684,6 +844,9 @@ class FuriganaImeService : InputMethodService() {
     ) {
         candidatePipeline.invalidate()
         val token = state.analysisToken()
+        val cursorRequest = romajiCursor.conversionSlice()?.request
+            ?.takeIf { it.reading == token.remainingReading }
+            ?: return
         if (token.activeReading.isEmpty() || token.remainingReading.isEmpty()) {
             romajiCandidates = emptyList()
             candidateBar.clear()
@@ -710,7 +873,10 @@ class FuriganaImeService : InputMethodService() {
             initialContextSurface = token.previousContextSurface,
             requiredBoundary = requiredBoundary,
         ) { result ->
-            if (bunsetsuState !== state || !state.isCurrent(token)) return@submitRomajiAnalysis
+            if (bunsetsuState !== state ||
+                !state.isCurrent(token) ||
+                !romajiCursor.isCurrent(cursorRequest)
+            ) return@submitRomajiAnalysis
             val plan = BunsetsuComposition.plan(
                 reading = token.remainingReading,
                 conversions = result.conversions,
@@ -719,6 +885,7 @@ class FuriganaImeService : InputMethodService() {
             ) ?: return@submitRomajiAnalysis
             if (!state.applyPlan(plan, token)) return@submitRomajiAnalysis
             composition.replace(state.remainingReading)
+            romajiCursor.replace(state.remainingReading, state.remainingReading)
             renderBunsetsuComposition(state)
             showBunsetsuPlan(state, plan)
         }
@@ -802,11 +969,7 @@ class FuriganaImeService : InputMethodService() {
             return
         }
         when (candidate.kind) {
-            CandidateKind.WORD -> if (bunsetsuState == null) {
-                commitWordCandidate(candidate.text)
-            } else {
-                commitBunsetsuCandidate(candidate)
-            }
+            CandidateKind.WORD -> commitRomajiWordCandidate(candidate.text)
             CandidateKind.BUNSETSU -> commitBunsetsuCandidate(candidate)
             else -> finishComposition()
         }
@@ -834,13 +997,13 @@ class FuriganaImeService : InputMethodService() {
             // the untouched suffix as the next composing region immediately.
             connection.commitText(result.committedText, 1)
             composition.replace(result.remainingText)
-            romajiRaw.setLength(0)
-            romajiBaseKana.setLength(0)
-            romajiBaseKana.append(result.remainingText)
             if (result.remainingText.isEmpty()) {
+                romajiCursor.clear()
                 connection.finishComposingText()
             } else {
-                connection.setComposingText(styledBunsetsuText(state), 1)
+                romajiCursor.clear()
+                romajiCursor.replace(result.remainingText, result.remainingText)
+                setRomajiComposingText(styledBunsetsuText(state))
             }
         } finally {
             connection.endBatchEdit()
@@ -850,6 +1013,7 @@ class FuriganaImeService : InputMethodService() {
             bunsetsuState = null
             romajiConversionState.clear()
             romajiCandidates = emptyList()
+            romajiCandidateRequest = null
             candidatePipeline.invalidate()
             candidateBar.clear()
         } else {
@@ -879,7 +1043,7 @@ class FuriganaImeService : InputMethodService() {
     ).distinctBy { it.text }
 
     private fun renderBunsetsuComposition(state: BunsetsuComposition) {
-        currentInputConnection?.setComposingText(styledBunsetsuText(state), 1)
+        setRomajiComposingText(styledBunsetsuText(state))
         updateEnterLabel(currentInputEditorInfo)
     }
 
@@ -906,9 +1070,6 @@ class FuriganaImeService : InputMethodService() {
     private fun leaveBunsetsuModeForEditing() {
         val state = bunsetsuState ?: return
         candidatePipeline.invalidate()
-        romajiBaseKana.setLength(0)
-        romajiBaseKana.append(state.composingText)
-        romajiRaw.setLength(0)
         composition.replace(state.composingText)
         bunsetsuState = null
     }
@@ -916,11 +1077,11 @@ class FuriganaImeService : InputMethodService() {
     private fun clearRomajiComposition() {
         candidatePipeline.invalidate()
         composition.clear()
-        romajiRaw.setLength(0)
-        romajiBaseKana.setLength(0)
         bunsetsuState = null
         romajiConversionState.clear()
         romajiCandidates = emptyList()
+        romajiCandidateRequest = null
+        romajiCursor.clear()
         currentInputConnection?.setComposingText("", 1)
         currentInputConnection?.finishComposingText()
         candidateBar.clear()
@@ -936,12 +1097,10 @@ class FuriganaImeService : InputMethodService() {
         bunsetsuState?.let { state ->
             val remaining = state.deleteLastCodePoint()
             composition.replace(remaining)
-            romajiBaseKana.setLength(0)
-            romajiBaseKana.append(remaining)
-            romajiRaw.setLength(0)
             if (remaining.isEmpty()) {
                 clearRomajiComposition()
             } else {
+                romajiCursor.replace(remaining, remaining)
                 romajiConversionState.onCompositionEdited(hasComposition = true)
                 renderBunsetsuComposition(state)
                 reanalyzeRemainingBunsetsu(
@@ -951,23 +1110,14 @@ class FuriganaImeService : InputMethodService() {
             }
             return true
         }
-        if (romajiRaw.isEmpty()) {
-            if (romajiBaseKana.isNotEmpty()) {
-                val remaining = deleteLastCodePoint(romajiBaseKana.toString())
-                romajiBaseKana.setLength(0)
-                romajiBaseKana.append(remaining)
-                if (remaining.isEmpty()) clearRomajiComposition() else updateRomajiComposition()
-                return true
-            }
-            return deleteBeforeCursor()
-        }
-        val remainingRaw = RomajiKanaConverter.deleteLastUnit(romajiRaw.toString())
-        romajiRaw.setLength(0)
-        romajiRaw.append(remainingRaw)
-        if (romajiRaw.isEmpty()) {
-            if (romajiBaseKana.isEmpty()) clearRomajiComposition() else updateRomajiComposition()
-        } else {
-            updateRomajiComposition()
+        if (!romajiCursor.isActive) return deleteBeforeCursor()
+
+        val mutation = romajiEditor.deleteBeforeCursor()
+        if (mutation !is CompositionCursorMutation.Applied) return true
+        if (romajiCursor.displayText.isEmpty()) {
+            clearRomajiComposition()
+        } else if (mutation.compositionChanged || mutation.cursorChanged) {
+            applyRomajiEdit(mutation)
         }
         return true
     }
@@ -980,11 +1130,11 @@ class FuriganaImeService : InputMethodService() {
     private fun finishComposition(clearCandidates: Boolean = true) {
         if (!composition.isEmpty) currentInputConnection?.finishComposingText()
         composition.clear()
-        romajiRaw.setLength(0)
-        romajiBaseKana.setLength(0)
         bunsetsuState = null
         romajiConversionState.clear()
         romajiCandidates = emptyList()
+        romajiCandidateRequest = null
+        romajiCursor.clear()
         clearAlternativeContext()
         candidatePipeline.invalidate()
         recognizer?.cancelPending()
@@ -1042,8 +1192,10 @@ class FuriganaImeService : InputMethodService() {
 
     private fun clearAlternativeContext() {
         latestCharacterAlternatives = emptyList()
+        latestCharacterCandidates = emptyList()
         wordRootBeforeLastCharacter = ""
         lastCharacterAlternatives = emptyList()
+        lastCharacterCandidates = emptyList()
     }
 
     /** Keep the gesture/navigation area visually continuous with the keyboard surface. */

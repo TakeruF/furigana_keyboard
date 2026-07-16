@@ -30,6 +30,31 @@ internal object KeyFactory {
         textSizeSp: Float = 17f,
         onClick: (() -> Unit)? = null
     ): Button = ImmediateKeyButton(context).apply {
+        style(context, label, kind, textSizeSp)
+        onClick?.let(::setOnKeyPress)
+    }
+
+    /**
+     * Key whose gesture adapter decides when a touch is a tap and calls [View.performClick].
+     * TalkBack and other accessibility clicks still invoke the normal [onClick] Space action.
+     */
+    fun deferredKey(
+        context: Context,
+        label: String,
+        kind: Kind = Kind.PLAIN,
+        textSizeSp: Float = 17f,
+        onClick: () -> Unit,
+    ): Button = DeferredKeyButton(context).apply {
+        style(context, label, kind, textSizeSp)
+        setOnKeyPress(onClick)
+    }
+
+    private fun Button.style(
+        context: Context,
+        label: String,
+        kind: Kind,
+        textSizeSp: Float,
+    ) {
         text = label
         isAllCaps = false
         // Force Japanese glyph variants for Han characters (Han unification).
@@ -67,7 +92,6 @@ internal object KeyFactory {
                 if (kind == Kind.ACCENT) R.color.kbd_on_accent else R.color.kbd_on_surface
             )
         )
-        onClick?.let(::setOnKeyPress)
     }
 
     /**
@@ -133,6 +157,22 @@ internal object KeyFactory {
                 Haptics.key(this)
                 keyPress?.invoke()
             }
+            return true
+        }
+    }
+
+    private class DeferredKeyButton(context: Context) : AppCompatButton(context) {
+        private var keyPress: (() -> Unit)? = null
+
+        fun setOnKeyPress(action: () -> Unit) {
+            keyPress = action
+            isClickable = true
+        }
+
+        override fun performClick(): Boolean {
+            super.performClick()
+            Haptics.key(this)
+            keyPress?.invoke()
             return true
         }
     }

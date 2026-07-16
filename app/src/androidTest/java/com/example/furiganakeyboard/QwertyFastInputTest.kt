@@ -7,6 +7,7 @@ import android.view.LayoutInflater
 import android.view.MotionEvent
 import android.view.View
 import android.view.ViewGroup
+import android.view.ViewConfiguration
 import android.view.ContextThemeWrapper
 import android.widget.Button
 import android.widget.ImageButton
@@ -262,6 +263,83 @@ class QwertyFastInputTest {
         assertEquals("releasing keys must not type twice", "as", text)
     }
 
+    @Test
+    fun spacePerformClickUsesTheSingleTalkBackCompatibleCallback() {
+        var spaces = 0
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val pad = QwertyPadView(ApplicationProvider.getApplicationContext()).apply {
+                onSpace = { spaces += 1 }
+            }
+            val space = pad.findButtonByDescription(pad.context.getString(R.string.key_space))
+
+            assertTrue(space.performClick())
+        }
+
+        assertEquals(1, spaces)
+    }
+
+    @Test
+    fun spaceTouchTapAndGraphemeStepDragAreMutuallyExclusive() {
+        var spaces = 0
+        val graphemeStepDeltas = mutableListOf<Int>()
+        var modeHaptics = 0
+        val stepHaptics = mutableListOf<Int>()
+
+        InstrumentationRegistry.getInstrumentation().runOnMainSync {
+            val pad = QwertyPadView(ApplicationProvider.getApplicationContext()).apply {
+                onSpace = { spaces += 1 }
+                onCursorStep = { graphemeStepDeltas += it }
+                onCursorModeHaptic = { modeHaptics += 1 }
+                onCursorStepHaptic = { stepHaptics += it }
+            }
+            pad.measure(exactly(1_080), exactly(600))
+            pad.layout(0, 0, 1_080, 600)
+            val space = pad.findButtonByDescription(pad.context.getString(R.string.key_space))
+            val start = SystemClock.uptimeMillis()
+            val center = space.width / 2f
+
+            assertTrue(space.dispatch(start, start, MotionEvent.ACTION_DOWN, center))
+            assertTrue(space.dispatch(start, start + 100, MotionEvent.ACTION_UP, center))
+            assertEquals(1, spaces)
+
+            val dragStart = start + 200
+            val activation = ViewConfiguration.get(pad.context).scaledTouchSlop
+            val cursorStep = 12f * pad.resources.displayMetrics.density
+            val anchor = center + activation + 1f
+            assertTrue(space.dispatch(dragStart, dragStart, MotionEvent.ACTION_DOWN, center))
+            assertTrue(
+                space.dispatch(
+                    dragStart,
+                    dragStart + ViewConfiguration.getLongPressTimeout(),
+                    MotionEvent.ACTION_MOVE,
+                    anchor,
+                )
+            )
+            assertTrue(
+                space.dispatch(
+                    dragStart,
+                    dragStart + ViewConfiguration.getLongPressTimeout() + 10,
+                    MotionEvent.ACTION_MOVE,
+                    anchor + cursorStep + 1f,
+                )
+            )
+            assertTrue(
+                space.dispatch(
+                    dragStart,
+                    dragStart + ViewConfiguration.getLongPressTimeout() + 20,
+                    MotionEvent.ACTION_UP,
+                    anchor + cursorStep + 1f,
+                )
+            )
+        }
+
+        assertEquals("cursor drag must not fire Space", 1, spaces)
+        assertEquals(listOf(1), graphemeStepDeltas)
+        assertEquals(1, modeHaptics)
+        assertEquals(graphemeStepDeltas, stepHaptics)
+    }
+
     private fun View.findButton(label: String): Button {
         if (this is Button && text.toString() == label) return this
         if (this is ViewGroup) {
@@ -270,6 +348,16 @@ class QwertyFastInputTest {
             }
         }
         error("Key not found: $label")
+    }
+
+    private fun View.findButtonByDescription(description: String): Button {
+        if (this is Button && contentDescription?.toString() == description) return this
+        if (this is ViewGroup) {
+            for (index in 0 until childCount) {
+                runCatching { return getChildAt(index).findButtonByDescription(description) }
+            }
+        }
+        error("Key not found: $description")
     }
 
     private fun View.buttons(): List<Button> = buildList {
@@ -288,5 +376,24 @@ class QwertyFastInputTest {
             event.recycle()
         }
     }
+
+    private fun View.dispatch(
+        downTime: Long,
+        eventTime: Long,
+        action: Int,
+        x: Float,
+    ): Boolean {
+        val event = MotionEvent.obtain(downTime, eventTime, action, x, height / 2f, 0)
+        return try {
+            dispatchTouchEvent(event)
+        } finally {
+            event.recycle()
+        }
+    }
+
+    private fun exactly(size: Int): Int = View.MeasureSpec.makeMeasureSpec(
+        size,
+        View.MeasureSpec.EXACTLY,
+    )
 
 }

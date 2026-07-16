@@ -1,0 +1,37 @@
+{
+  "schemaVersion": 1,
+  "baselineDate": "2026-07-14",
+  "description": "Normative IME improvement contracts. PASS means the current tested path satisfies the full stated contract. KNOWN_FAILURE remains an active target and must not be treated as acceptable product behavior; automation states where the missing integration test belongs.",
+  "cases": [
+    {"id":"conversion-ibaraki","area":"conversion","automation":"unit-database","baseline":"PASS","input":"いばらき｜","expected":"茨城 is top-1; standalone 荊 is absent"},
+    {"id":"conversion-ieni","area":"conversion","automation":"unit-database","baseline":"PASS","input":"いえに｜","expected":"家に is top-1; 家煮 is not top-1; standalone 家 is absent"},
+    {"id":"conversion-sumomo-boundary","area":"conversion","automation":"unit","baseline":"PASS","input":"すもも｜もも","expected":"Commit only the left reading and preserve the right reading verbatim"},
+
+    {"id":"cursor-start","area":"cursor","automation":"unit-state+instrumentation-required","baseline":"KNOWN_FAILURE","input":"｜かな","expected":"Editing and deletion operate at the editor cursor without moving or replacing the suffix"},
+    {"id":"cursor-middle","area":"cursor","automation":"unit-state+instrumentation-required","baseline":"KNOWN_FAILURE","input":"か｜な","expected":"Editing and deletion operate at the editor cursor without moving or replacing either side unexpectedly"},
+    {"id":"cursor-end","area":"cursor","automation":"unit-state+instrumentation-required","baseline":"KNOWN_FAILURE","input":"かな｜","expected":"Editing and deletion operate immediately before the editor cursor"},
+
+    {"id":"romaji-unresolved-n","area":"romaji","automation":"unit","baseline":"PASS","input":"n","expected":"Display ん, keep it unresolved, and do not query conversion candidates"},
+    {"id":"romaji-consonant-only","area":"romaji","automation":"unit","baseline":"PASS","input":"k","expected":"Display pending k and keep it unresolved"},
+    {"id":"romaji-delete","area":"romaji","automation":"unit","baseline":"PASS","input":"kyu then delete","expected":"Delete one visible kana unit without leaking an invalid raw suffix"},
+    {"id":"candidate-cancel","area":"candidate-state","automation":"unit","baseline":"PASS","input":"select candidate then cancel","expected":"Return to EMPTY and expose no selected candidate"},
+
+    {"id":"space-tap","area":"space-gesture","automation":"unit-state","baseline":"PASS","input":"tap","expected":"Dispatch exactly one context-appropriate space action"},
+    {"id":"space-hold","area":"space-gesture","automation":"instrumentation-required","baseline":"KNOWN_FAILURE","input":"hold","expected":"Enter cursor mode without cycling candidates or inserting repeated spaces"},
+    {"id":"space-drag","area":"space-gesture","automation":"instrumentation-required","baseline":"KNOWN_FAILURE","input":"hold then horizontal drag","expected":"Move the editor cursor by Unicode grapheme steps and do not commit text"},
+    {"id":"space-direction-reversal","area":"space-gesture","automation":"instrumentation-required","baseline":"KNOWN_FAILURE","input":"drag right then left","expected":"Reverse cursor movement without a stale-direction step"},
+    {"id":"space-cancel","area":"space-gesture","automation":"instrumentation-required","baseline":"KNOWN_FAILURE","input":"DOWN then CANCEL","expected":"Dispatch no tap, cursor, or commit action"},
+    {"id":"space-multi-touch","area":"space-gesture","automation":"instrumentation-required","baseline":"KNOWN_FAILURE","input":"primary DOWN then POINTER_DOWN","expected":"Ignore non-primary pointers and dispatch at most one action"},
+
+    {"id":"handwriting-hon-ki","area":"handwriting","automation":"unit","baseline":"PASS","input":"本/木","expected":"Retain both visually similar candidates"},
+    {"id":"handwriting-mi-sue","area":"handwriting","automation":"unit","baseline":"PASS","input":"未/末","expected":"Retain both visually similar candidates"},
+    {"id":"handwriting-tsuchi-shi","area":"handwriting","automation":"unit","baseline":"PASS","input":"土/士","expected":"Retain both visually similar candidates"},
+    {"id":"handwriting-kuchi-hi","area":"handwriting","automation":"unit","baseline":"PASS","input":"口/日","expected":"Retain both visually similar candidates"},
+    {"id":"candidate-proper-place-rare-retention","area":"candidate-retention","automation":"unit","baseline":"PASS","input":"人名/地名/珍字","expected":"Ranking may reorder but must not filter any supplied candidate"},
+
+    {"id":"unicode-supplementary","area":"unicode","automation":"unit","baseline":"PASS","input":"日𠮟 then delete","expected":"Never split a surrogate pair"},
+    {"id":"unicode-combining-grapheme","area":"unicode","automation":"unit","baseline":"KNOWN_FAILURE","input":"か + U+3099 then delete","expected":"Delete the complete user-perceived grapheme, not only U+3099"},
+    {"id":"unicode-precomposed-dakuten","area":"unicode","automation":"unit","baseline":"PASS","input":"が then delete","expected":"Delete the complete precomposed dakuten kana"},
+    {"id":"unicode-canonical-equivalence","area":"unicode","automation":"integration-required","baseline":"KNOWN_FAILURE","input":"が versus か + U+3099","expected":"Candidate lookup and deduplication treat NFC-equivalent input identically"}
+  ]
+}

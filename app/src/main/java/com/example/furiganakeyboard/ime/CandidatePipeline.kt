@@ -9,6 +9,7 @@ import com.example.furiganakeyboard.conversion.ConversionResult
 import com.example.furiganakeyboard.conversion.PosClass
 import com.example.furiganakeyboard.reading.KanjiUsagePriority
 import com.example.furiganakeyboard.reading.ReadingDataSource
+import com.example.furiganakeyboard.reading.SurfaceLexicalEvidence
 import com.example.furiganakeyboard.reading.WordReadingCandidate
 import com.example.furiganakeyboard.recognizer.KanjiCandidateRanker
 import com.example.furiganakeyboard.recognizer.RecognitionCandidate
@@ -20,13 +21,33 @@ import java.util.concurrent.ThreadPoolExecutor
 import java.util.concurrent.atomic.AtomicBoolean
 import java.util.concurrent.atomic.AtomicLong
 
-/** Immutable character candidate after dictionary enrichment. */
-data class ResolvedCharacterCandidate(val text: String, val readings: List<String>)
+/** Immutable character candidate with shape and lexical evidence retained. */
+data class ResolvedCharacterCandidate(
+    val text: String,
+    val readings: List<String>,
+    val originalShapeCost: Float,
+    val rankingShapeCost: Float,
+    val shapeCost: Float,
+    val isRecognizerRawTop: Boolean,
+    val lexicalEvidence: SurfaceLexicalEvidence?,
+)
+
+/** Final handwriting word candidate; lower [shapeCost] is better. */
+data class ResolvedWordCandidate(
+    val surface: String,
+    val readings: List<String>,
+    val originalShapeCost: Float,
+    val rankingShapeCost: Float,
+    val shapeCost: Float,
+    val isRecognizerRawTop: Boolean,
+    val lexicalEvidence: SurfaceLexicalEvidence?,
+)
 
 data class HandwritingStageContext(
     val baseBeforeCurrent: String,
     val wordRootBeforeLast: String,
-    val previousAlternatives: List<String>
+    val previousAlternatives: List<String>,
+    val previousCandidates: List<ResolvedCharacterCandidate> = emptyList(),
 )
 
 data class RomajiConversionResult(
@@ -44,14 +65,25 @@ private data class ConversionRequest(
     val requiredBoundary: Int?,
 )
 
+private data class RankedRecognitionCandidate(
+    val candidate: RecognitionCandidate,
+    val rankingShapeCost: Float,
+)
+
 sealed interface HandwritingPipelineResult {
     data class Characters(val candidates: List<ResolvedCharacterCandidate>) :
         HandwritingPipelineResult
 
+    /**
+     * [currentCandidates] is the lossless handoff for the next
+     * [HandwritingStageContext.previousCandidates]. [currentAlternatives] remains the compatible
+     * text-only view and has the same ordering.
+     */
     data class Staged(
         val topSurface: String,
         val currentAlternatives: List<String>,
-        val candidates: List<WordReadingCandidate>
+        val currentCandidates: List<ResolvedCharacterCandidate>,
+        val candidates: List<ResolvedWordCandidate>,
     ) : HandwritingPipelineResult
 }
 
@@ -108,6 +140,8 @@ class CandidatePipeline(
         requiredBoundary: Int? = null,
         callback: (RomajiConversionResult) -> Unit,
     ) {
+        // conversionResult() caches the complete 24-candidate pool. The caller chooses eight for
+        // an interior cursor or 24 for terminal WholeCompositionCandidatePolicy classification.
         submit(callback, failureValue = { RomajiConversionResult(emptyList(), emptyList()) }) {
             isCancelled ->
             val result = conversionResult(
@@ -117,7 +151,11 @@ class CandidatePipeline(
                 initialContextSurface,
                 requiredBoundary,
             )
-            result.copy(candidates = result.candidates.take(limit.coerceAtLeast(0)))
+            result.copy(
+                candidates = result.candidates.take(
+                    limit.coerceIn(0, MAX_ROMAJI_ANALYSIS_CANDIDATES)
+                )
+            )
         }
     }
 
@@ -127,51 +165,141 @@ class CandidatePipeline(
         limit: Int,
         callback: (HandwritingPipelineResult) -> Unit
     ) {
-        submit(callback) {
-            val priorities = priorities(candidates.map { it.text })
-            val ranked = KanjiCandidateRanker.rank(candidates, priorities)
-            val readings = readings(ranked.map { it.text })
-            if (stageContext == null) {
-                HandwritingPipelineResult.Characters(
-                    ranked.map { ResolvedCharacterCandidate(it.text, readings[it.text].orEmpty()) }
-                )
-            } else {
-                val currentAlternatives = ranked.map { it.text }.distinct()
-                val root = if (stageContext.previousAlternatives.isEmpty()) {
-                    stageContext.baseBeforeCurrent
-                } else {
-                    stageContext.wordRootBeforeLast
-                }
-                val surfaces = WordCandidateResolver.combine(
-                    root = root,
-                    previousCharacters = stageContext.previousAlternatives,
-                    currentCharacters = currentAlternatives
-                )
-                val previous = stageContext.previousAlternatives.ifEmpty { listOf("") }
-                val componentSurfaces = previous.map { root + it } + currentAlternatives
-                val loadedReadings = readings(surfaces + componentSurfaces)
-                val composed = WordCandidateResolver.composedReadings(
-                    root,
-                    stageContext.previousAlternatives,
-                    currentAlternatives,
-                    loadedReadings
-                )
-                val exact = surfaces.associateWith { surface ->
-                    loadedReadings[surface].orEmpty().ifEmpty { composed[surface].orEmpty() }
-                }
-                val completions = surfaceSuggestions(surfaces, limit)
-                HandwritingPipelineResult.Staged(
-                    topSurface = stageContext.baseBeforeCurrent + currentAlternatives.first(),
-                    currentAlternatives = currentAlternatives,
-                    candidates = WordCandidateResolver.resolve(
-                        surfaces,
-                        exact,
-                        completions,
-                        limit
-                    )
-                )
-            }
+        submit(callback) { isCancelled ->
+            handwritingResult(candidates, stageContext, limit, isCancelled)
         }
+    }
+
+    private fun handwritingResult(
+        candidates: List<RecognitionCandidate>,
+        stageContext: HandwritingStageContext?,
+        limit: Int,
+        isCancelled: () -> Boolean,
+    ): HandwritingPipelineResult {
+        val priorities = priorities(candidates.map { it.text })
+        val ranked = KanjiCandidateRanker.rank(candidates, priorities)
+        var rankingFloor = 0f
+        val rankedWithCosts = ranked.map { candidate ->
+            rankingFloor = maxOf(rankingFloor, candidate.shapeCost)
+            RankedRecognitionCandidate(candidate, rankingFloor)
+        }
+        if (stageContext == null) {
+            val unique = rankedWithCosts.asSequence()
+                .distinctBy { it.candidate.text }
+                .toList()
+            val shaped = takeRetainingRawTopRecognition(
+                unique,
+                MAX_HANDWRITING_SURFACES,
+            )
+            val evidence = loadLexicalEvidence(shaped.map { it.candidate.text })
+            if (isCancelled()) return HandwritingPipelineResult.Characters(emptyList())
+            val resolved = rankCharacters(shaped, evidence, limit)
+            val loadedReadings = readings(resolved.map { it.text })
+            return HandwritingPipelineResult.Characters(
+                resolved.map { candidate ->
+                    candidate.copy(readings = loadedReadings[candidate.text].orEmpty())
+                }
+            )
+        }
+
+        val current = rankedWithCosts.map { rankedCandidate ->
+            val candidate = rankedCandidate.candidate
+            ShapedCharacterCandidate(
+                text = candidate.text,
+                originalShapeCost = candidate.shapeCost,
+                shapeCost = rankedCandidate.rankingShapeCost,
+                isRecognizerRawTop = candidate.representsRecognizerRawTop(),
+            )
+        }
+        val currentForNextStage = takeRetainingRawTopShapedCharacters(
+            current.distinctBy { it.text },
+            MAX_HANDWRITING_SURFACES,
+        )
+        val currentAlternatives = currentForNextStage.map { it.text }
+        val root = if (stageContext.previousAlternatives.isEmpty()) {
+            stageContext.baseBeforeCurrent
+        } else {
+            stageContext.wordRootBeforeLast
+        }
+        val rawTopPrefix = stageContext.previousCandidates
+            .firstOrNull { it.isRecognizerRawTop }
+            ?.takeIf { stageContext.previousAlternatives.isNotEmpty() }
+            ?.let { root + it.text }
+            ?: stageContext.baseBeforeCurrent
+        val rawTopSurface = currentForNextStage.firstOrNull { it.isRecognizerRawTop }?.let {
+            rawTopPrefix + it.text
+        }
+        val shapedSurfaces = WordCandidateResolver.combineShaped(
+            root = root,
+            previousCharacters = stageContext.previousAlternatives,
+            previousCandidateEvidence = stageContext.previousCandidates.associate { candidate ->
+                candidate.text to ShapedCharacterCandidate(
+                    text = candidate.text,
+                    originalShapeCost = candidate.originalShapeCost,
+                    shapeCost = candidate.rankingShapeCost,
+                    isRecognizerRawTop = candidate.isRecognizerRawTop,
+                )
+            },
+            currentCharacters = current,
+            rawTopSurface = rawTopSurface,
+        )
+        val surfaces = shapedSurfaces.map { it.surface }
+        val previous = stageContext.previousAlternatives.ifEmpty { listOf("") }
+        val componentSurfaces = previous.map { root + it } + currentAlternatives
+        val loadedReadings = readings(surfaces + componentSurfaces)
+        if (isCancelled()) return HandwritingPipelineResult.Staged(
+            topSurface = rawTopSurface.orEmpty(),
+            currentAlternatives = emptyList(),
+            currentCandidates = emptyList(),
+            candidates = emptyList(),
+        )
+        // Component evidence is already available from the recognizer batch. Keep it separate
+        // from whole-surface lexical evidence so carrying it to the next stage never adds a DB
+        // query. The next stage consumes rankingShapeCost, not the presentation-only readings.
+        val currentCandidates = currentForNextStage.map { candidate ->
+            ResolvedCharacterCandidate(
+                text = candidate.text,
+                readings = loadedReadings[candidate.text].orEmpty(),
+                originalShapeCost = candidate.originalShapeCost,
+                rankingShapeCost = candidate.shapeCost,
+                shapeCost = candidate.shapeCost,
+                isRecognizerRawTop = candidate.isRecognizerRawTop,
+                lexicalEvidence = null,
+            )
+        }
+        val composed = WordCandidateResolver.composedReadings(
+            root,
+            stageContext.previousAlternatives,
+            currentAlternatives,
+            loadedReadings,
+        )
+        val exact = surfaces.associateWith { surface ->
+            loadedReadings[surface].orEmpty().ifEmpty { composed[surface].orEmpty() }
+        }
+        val completions = surfaceSuggestions(surfaces, limit)
+        val shapedWords = WordCandidateResolver.shapedCandidates(
+            shapedSurfaces,
+            exact,
+            completions,
+        )
+        val evidence = loadLexicalEvidence(shapedWords.map { it.surface })
+        if (isCancelled()) return HandwritingPipelineResult.Staged(
+            topSurface = rawTopSurface.orEmpty(),
+            currentAlternatives = emptyList(),
+            currentCandidates = emptyList(),
+            candidates = emptyList(),
+        )
+        val resolved = WordCandidateResolver.resolveShaped(shapedWords, evidence, limit)
+        val baseSurfaces = surfaces.toHashSet()
+        val topSurface = resolved.firstOrNull { it.surface in baseSurfaces }?.surface
+            ?: shapedSurfaces.firstOrNull()?.surface
+            ?: stageContext.baseBeforeCurrent
+        return HandwritingPipelineResult.Staged(
+            topSurface = topSurface,
+            currentAlternatives = currentAlternatives,
+            currentCandidates = currentCandidates,
+            candidates = resolved,
+        )
     }
 
     /** Invalidate callbacks and discard queued work when input state changes. */
@@ -224,6 +352,98 @@ class CandidatePipeline(
         }
     }
 
+    private fun loadLexicalEvidence(
+        surfaces: List<String>
+    ): Map<String, SurfaceLexicalEvidence> {
+        val normalized = surfaces.asSequence()
+            .filter(String::isNotEmpty)
+            .distinct()
+            .take(MAX_HANDWRITING_SURFACES)
+            .toList()
+        if (normalized.isEmpty()) return emptyMap()
+        return runCatching { dataSource().lexicalEvidenceForSurfaces(normalized) }
+            .onFailure(::logFailure)
+            .getOrDefault(emptyMap())
+    }
+
+    private fun rankCharacters(
+        candidates: List<RankedRecognitionCandidate>,
+        evidence: Map<String, SurfaceLexicalEvidence>,
+        limit: Int,
+    ): List<ResolvedCharacterCandidate> {
+        val ranked = candidates.mapIndexed { index, rankedCandidate ->
+            val candidate = rankedCandidate.candidate
+            val lexical = evidence[candidate.text]
+            IndexedValue(
+                index,
+                ResolvedCharacterCandidate(
+                    text = candidate.text,
+                    readings = emptyList(),
+                    originalShapeCost = candidate.shapeCost,
+                    rankingShapeCost = rankedCandidate.rankingShapeCost,
+                    shapeCost = lexical?.applyToShapeCost(rankedCandidate.rankingShapeCost)
+                        ?: rankedCandidate.rankingShapeCost,
+                    isRecognizerRawTop = candidate.representsRecognizerRawTop(),
+                    lexicalEvidence = lexical,
+                ),
+            )
+        }.sortedWith(
+            compareBy<IndexedValue<ResolvedCharacterCandidate>> { it.value.shapeCost }
+                .thenBy { it.index }
+        ).map { it.value }
+        return takeRetainingRawTop(ranked, limit.coerceIn(0, MAX_HANDWRITING_SURFACES))
+    }
+
+    private fun takeRetainingRawTop(
+        candidates: List<ResolvedCharacterCandidate>,
+        limit: Int,
+    ): List<ResolvedCharacterCandidate> {
+        if (limit <= 0) return emptyList()
+        val selected = candidates.take(limit).toMutableList()
+        val rawTop = candidates.firstOrNull { it.isRecognizerRawTop } ?: return selected
+        if (selected.none { it.isRecognizerRawTop }) {
+            if (selected.size == limit) selected.removeAt(selected.lastIndex)
+            selected += rawTop
+        }
+        return selected
+    }
+
+    private fun takeRetainingRawTopRecognition(
+        candidates: List<RankedRecognitionCandidate>,
+        limit: Int,
+    ): List<RankedRecognitionCandidate> {
+        if (limit <= 0) return emptyList()
+        val selected = candidates.take(limit).toMutableList()
+        val rawTop = candidates.firstOrNull {
+            it.candidate.representsRecognizerRawTop()
+        } ?: return selected
+        if (selected.none { it.candidate.representsRecognizerRawTop() }) {
+            if (selected.size == limit) selected.removeAt(selected.lastIndex)
+            selected += rawTop
+        }
+        return selected
+    }
+
+    private fun takeRetainingRawTopShapedCharacters(
+        candidates: List<ShapedCharacterCandidate>,
+        limit: Int,
+    ): List<ShapedCharacterCandidate> {
+        if (limit <= 0) return emptyList()
+        val selected = candidates.take(limit).toMutableList()
+        val rawTop = candidates.firstOrNull { it.isRecognizerRawTop } ?: return selected
+        if (selected.none { it.isRecognizerRawTop }) {
+            if (selected.size == limit) selected.removeAt(selected.lastIndex)
+            selected += rawTop
+        }
+        return selected
+    }
+
+    private fun RecognitionCandidate.representsRecognizerRawTop(): Boolean =
+        isRecognizerRawTop || (
+            evidence.components.isNotEmpty() &&
+                evidence.components.all { it.isRecognizerRawTop }
+            )
+
     private fun suggestions(
         kind: SuggestionKind,
         prefix: String,
@@ -270,7 +490,7 @@ class CandidatePipeline(
             reading = kana,
             lexemes = lexemes,
             connections = dataSource.conversionConnections(),
-            limit = MAX_CONVERSION_RESULTS,
+            limit = MAX_ROMAJI_ANALYSIS_CANDIDATES,
             preserveSegmentations = true,
             initialRightId = initialRightId,
             initialContextSurface = initialContextSurface,
@@ -285,13 +505,13 @@ class CandidatePipeline(
         val prefixMatches = suggestions(
             SuggestionKind.READING,
             kana,
-            MAX_CONVERSION_RESULTS
+            MAX_ROMAJI_ANALYSIS_CANDIDATES
         )
         if (isCancelled()) return RomajiConversionResult(emptyList(), emptyList())
         return RomajiConversionResult(
             candidates = (converted + prefixMatches)
                 .distinctBy { it.surface }
-                .take(MAX_CONVERSION_RESULTS),
+                .take(MAX_ROMAJI_ANALYSIS_CANDIDATES),
             conversions = conversionResults,
         ).also { conversionCache[request] = it }
     }
@@ -366,7 +586,9 @@ class CandidatePipeline(
         private const val MAX_CONVERSION_INPUT_CODE_POINTS = 48
         private const val MAX_CONVERSION_TOKEN_CODE_POINTS = 16
         private const val MAX_CONVERSION_VOCABULARY_PER_READING = 12
-        private const val MAX_CONVERSION_RESULTS = 8
+        /** Over-fetched pool; terminal policy owns the final display limit of eight. */
+        const val MAX_ROMAJI_ANALYSIS_CANDIDATES = 24
+        private const val MAX_HANDWRITING_SURFACES = 24
         private const val JAPANESE_LONG_VOWEL_MARK = "ー"
 
         private fun defaultWorker(): ExecutorService = ThreadPoolExecutor(

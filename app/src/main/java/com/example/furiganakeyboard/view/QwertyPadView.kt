@@ -2,8 +2,11 @@ package com.example.furiganakeyboard.view
 
 import android.content.Context
 import android.annotation.SuppressLint
+import android.os.SystemClock
 import android.view.Gravity
+import android.view.MotionEvent
 import android.view.View
+import android.view.ViewConfiguration
 import android.widget.Button
 import android.widget.LinearLayout
 import androidx.core.content.ContextCompat
@@ -27,6 +30,14 @@ class QwertyPadView(
     /** Input callbacks wired by the IME service. */
     var onText: ((String) -> Unit)? = null
     var onSpace: (() -> Unit)? = null
+    /**
+     * Incremental user-facing cursor steps. Each step means one grapheme; the consumer owns actual
+     * text-boundary movement, while this View only converts drag pixels to integer steps.
+     */
+    var onCursorStep: ((deltaInGraphemes: Int) -> Unit)? = null
+    /** Optional observability hooks invoked with the built-in cursor haptics. */
+    var onCursorModeHaptic: (() -> Unit)? = null
+    var onCursorStepHaptic: ((deltaInGraphemes: Int) -> Unit)? = null
     var onDelete: (() -> Boolean)? = null
     var onEnter: (() -> Unit)? = null
     var onBack: (() -> Unit)? = null
@@ -124,6 +135,7 @@ class QwertyPadView(
     }
 
     /** English uses [,] / [.]; Japanese uses [、] / [。]. Space stays icon-free. */
+    @SuppressLint("ClickableViewAccessibility")
     private fun buildBottomRow(): LinearLayout {
         val row = LinearLayout(context).apply { orientation = HORIZONTAL }
         val comma = if (includeJapaneseLongVowelKey) "、" else ","
@@ -138,19 +150,18 @@ class QwertyPadView(
             KeyFactory.key(context, comma, Kind.PLAIN) { onText?.invoke(comma) },
             KeyFactory.rowParams(context, 1f)
         )
-        row.addView(
-            KeyFactory.key(
-                context,
-                "",
-                Kind.FUNCTION,
-                13f
-            ) {
+        val space = KeyFactory.deferredKey(
+            context,
+            "",
+            Kind.FUNCTION,
+            13f,
+        ) {
                 onSpace?.invoke() ?: onText?.invoke(" ")
-            }.apply {
-                contentDescription = context.getString(R.string.key_space)
-            },
-            KeyFactory.rowParams(context, 3.5f)
-        )
+        }.apply {
+            contentDescription = context.getString(R.string.key_space)
+        }
+        space.setOnTouchListener(SpaceCursorTouchListener(space))
+        row.addView(space, KeyFactory.rowParams(context, 3.5f))
         row.addView(
             KeyFactory.key(context, period, Kind.PLAIN) { onText?.invoke(period) },
             KeyFactory.rowParams(context, 1f)
@@ -179,11 +190,125 @@ class QwertyPadView(
         }
     }
 
+    /** MotionEvent adapter; all gesture decisions live in [SpaceCursorGesture]. */
+    private inner class SpaceCursorTouchListener(
+        private val key: Button,
+    ) : OnTouchListener {
+        private val gesture = SpaceCursorGesture(
+            SpaceCursorGesture.Config(
+                longPressTimeoutMillis = ViewConfiguration.getLongPressTimeout().toLong(),
+                activationDistance = ViewConfiguration.get(context).scaledTouchSlop.toFloat(),
+                cursorStepDistancePixels = KeyFactory.dp(context, CURSOR_STEP_DP).toFloat(),
+            )
+        )
+        private var activePointerId = INVALID_POINTER_ID
+        private val longPressRunnable = Runnable {
+            dispatchEffects(gesture.onLongPressTimeout(SystemClock.uptimeMillis()))
+        }
+
+        override fun onTouch(view: View, event: MotionEvent): Boolean {
+            if (!view.isEnabled) {
+                cancel(view)
+                return false
+            }
+            when (event.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    cancel(view)
+                    activePointerId = event.getPointerId(event.actionIndex)
+                    view.isPressed = true
+                    view.parent?.requestDisallowInterceptTouchEvent(true)
+                    dispatchEffects(
+                        gesture.onDown(
+                            x = event.getX(event.actionIndex),
+                            timeMillis = event.eventTime,
+                            insideKey = true,
+                        )
+                    )
+                    view.postDelayed(longPressRunnable, gesture.config.longPressTimeoutMillis)
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val index = event.findPointerIndex(activePointerId)
+                    if (index < 0) {
+                        cancel(view)
+                    } else {
+                        val inside = isInside(view, event.getX(index), event.getY(index))
+                        view.isPressed = inside
+                        dispatchEffects(
+                            gesture.onMove(event.getX(index), event.eventTime, inside)
+                        )
+                    }
+                }
+                MotionEvent.ACTION_POINTER_DOWN -> {
+                    gesture.onPointerAdded()
+                    cancel(view, resetState = false)
+                }
+                MotionEvent.ACTION_POINTER_UP -> {
+                    if (event.getPointerId(event.actionIndex) == activePointerId) {
+                        cancel(view)
+                    }
+                }
+                MotionEvent.ACTION_UP -> {
+                    val index = event.findPointerIndex(activePointerId)
+                    view.removeCallbacks(longPressRunnable)
+                    view.isPressed = false
+                    if (index >= 0) {
+                        val inside = isInside(view, event.getX(index), event.getY(index))
+                        dispatchEffects(
+                            gesture.onUp(event.getX(index), event.eventTime, inside)
+                        )
+                    } else {
+                        gesture.onCancel()
+                    }
+                    finish(view)
+                }
+                MotionEvent.ACTION_CANCEL -> cancel(view)
+            }
+            return true
+        }
+
+        private fun dispatchEffects(effects: List<SpaceCursorGesture.Effect>) {
+            effects.forEach { effect ->
+                when (effect) {
+                    SpaceCursorGesture.Effect.Tap -> key.performClick()
+                    SpaceCursorGesture.Effect.CursorModeStarted -> {
+                        key.removeCallbacks(longPressRunnable)
+                        Haptics.selection(key)
+                        onCursorModeHaptic?.invoke()
+                    }
+                    is SpaceCursorGesture.Effect.CursorStep -> {
+                        // The gesture emits abstract steps. A3 maps these to real grapheme bounds.
+                        val deltaInGraphemes = effect.deltaInSteps
+                        Haptics.tick(key)
+                        onCursorStepHaptic?.invoke(deltaInGraphemes)
+                        onCursorStep?.invoke(deltaInGraphemes)
+                    }
+                }
+            }
+        }
+
+        private fun cancel(view: View, resetState: Boolean = true) {
+            view.removeCallbacks(longPressRunnable)
+            view.isPressed = false
+            if (resetState) gesture.onCancel()
+            finish(view)
+        }
+
+        private fun finish(view: View) {
+            activePointerId = INVALID_POINTER_ID
+            view.parent?.requestDisallowInterceptTouchEvent(false)
+        }
+
+        private fun isInside(view: View, x: Float, y: Float): Boolean =
+            x >= 0f && x < view.width && y >= 0f && y < view.height
+    }
+
     /** Invisible flexible gap used to inset the middle letter row. */
     private inner class Spacer : android.view.View(context)
 
     private companion object {
         const val LETTER_TEXT_SIZE_SP = 24f
         const val NUMBER_TEXT_SIZE_SP = 20f
+        const val CURSOR_STEP_DP = 12
+        const val INVALID_POINTER_ID = -1
     }
 }

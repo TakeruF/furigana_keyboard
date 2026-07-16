@@ -27,6 +27,13 @@ interface ReadingDataSource : AutoCloseable {
         limitPerPrefix: Int = 8
     ): Map<String, List<WordReadingCandidate>>
     fun kanjiPriorities(literals: List<String>): Map<String, KanjiUsagePriority>
+    /**
+     * Exact lexical evidence for at most the first 24 unique, non-empty surfaces.
+     * Results preserve normalized input order and include neutral unknown entries.
+     */
+    fun lexicalEvidenceForSurfaces(
+        surfaces: List<String>
+    ): Map<String, SurfaceLexicalEvidence> = SurfaceLexicalEvidenceBatch.unknown(surfaces)
     fun conversionLexemes(
         reading: String,
         maxTokenCodePoints: Int,
@@ -40,6 +47,7 @@ interface ReadingDataSource : AutoCloseable {
 class ReadingRepository(context: Context) : ReadingDataSource {
     private val database: SQLiteDatabase
     private val contextModel: ConversionContextModel
+    private val lexicalEvidenceReader: SQLiteSurfaceLexicalEvidenceReader
     private var cachedConversionConnections: List<ConversionConnection>? = null
 
     init {
@@ -58,6 +66,7 @@ class ReadingRepository(context: Context) : ReadingDataSource {
             null,
             SQLiteDatabase.OPEN_READONLY or SQLiteDatabase.NO_LOCALIZED_COLLATORS
         )
+        lexicalEvidenceReader = SQLiteSurfaceLexicalEvidenceReader(database)
     }
 
     override fun readingsFor(surface: String, limit: Int): List<String> =
@@ -290,6 +299,10 @@ class ReadingRepository(context: Context) : ReadingDataSource {
             }
         }
     }
+
+    override fun lexicalEvidenceForSurfaces(
+        surfaces: List<String>
+    ): Map<String, SurfaceLexicalEvidence> = lexicalEvidenceReader.load(surfaces)
 
     /**
      * Expand exact and full-width katakana conversion matches at every occurrence.
