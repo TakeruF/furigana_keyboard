@@ -18,6 +18,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.ContextCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import com.example.furiganakeyboard.R
+import com.example.furiganakeyboard.update.ReadingDataUpdates
 
 /** Shown whenever this IME is not the currently selected Android input method. */
 class OnboardingActivity : AppCompatActivity() {
@@ -33,6 +34,8 @@ class OnboardingActivity : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         prefs = KeyboardPrefs(this)
         super.onCreate(savedInstanceState)
+        // This is the parent app's first-run path. The IME never schedules or performs downloads.
+        ReadingDataUpdates.initialize(this)
 
         if (KeyboardSetupState.isSelected(this)) {
             openSettings()

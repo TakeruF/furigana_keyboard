@@ -46,11 +46,11 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         contextModel = context.applicationContext.assets.open(CONTEXT_MODEL_ASSET).use { input ->
             ConversionContextModel.decode(input.readBytes())
         }
-        val dbFile = ReadingDataStore.activeOrBundled(
+        val dbFile = ReadingDataStore.fullOrBundledCore(
             context.applicationContext,
-            DB_ASSET,
-            DB_FILE,
-            DB_SHA256
+            CORE_DB_ASSET,
+            CORE_DB_FILE,
+            CORE_DB_SHA256
         )
         LEGACY_DB_FILES.forEach { name -> File(context.noBackupFilesDir, name).delete() }
         database = SQLiteDatabase.openDatabase(
@@ -443,10 +443,13 @@ class ReadingRepository(context: Context) : ReadingDataSource {
         prefix + String(Character.toChars(Character.MAX_CODE_POINT))
 
     companion object {
-        private const val DB_ASSET = "reading.db"
+        // `reading.db` remains the transitional asset until the deterministic core generator
+        // publishes `reading-core.db`. Its installed filename is intentionally distinct from
+        // the old full asset so ReadingDataStore can preserve `reading-v8.db` first.
+        private const val CORE_DB_ASSET = "reading.db"
         private const val CONTEXT_MODEL_ASSET = "context-model.bin"
-        private const val DB_FILE = "reading-v8.db"
-        private const val DB_SHA256 =
+        private const val CORE_DB_FILE = "reading-core-v8.db"
+        private const val CORE_DB_SHA256 =
             "991a13b8552748ea2c35fb229446809869a0ceee14ba0107a65351c8527efbc2"
         private val LEGACY_DB_FILES = listOf(
             "reading-v1.db", "reading-v1.db.sha256",

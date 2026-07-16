@@ -33,21 +33,21 @@ object ReadingDataUpdater {
         if (manifest.minAppVersion > appVersion(context) ||
             manifest.schemaVersion != SUPPORTED_SCHEMA_VERSION
         ) return Result.INCOMPATIBLE
-        if (manifest.dataVersion <= ReadingDataStore.installedVersion(context)) {
+        if (manifest.dataVersion <= ReadingDataStore.installedFullVersion(context)) {
             return Result.CURRENT
         }
 
         val directory = ReadingDataStore.updateDirectory(context)
-        val temporary = File(directory, "reading-${manifest.dataVersion}.tmp")
-        val target = File(directory, "reading-${manifest.dataVersion}.db")
+        val temporary = File(directory, "full-${manifest.dataVersion}.tmp")
+        val target = File(directory, "full-${manifest.dataVersion}.db")
         temporary.delete()
-        downloadDatabase(manifest, temporary)
         try {
+            downloadDatabase(manifest, temporary)
             validateDatabase(temporary, manifest.schemaVersion)
             if (target.exists()) check(target.delete()) { "Could not replace ${target.name}" }
             check(temporary.renameTo(target)) { "Could not install ${target.name}" }
             check(
-                ReadingDataStore.activate(
+                ReadingDataStore.activateFull(
                     context,
                     target,
                     manifest.dataVersion,
@@ -55,7 +55,7 @@ object ReadingDataUpdater {
                     manifest.dictionaryDate
                 )
             ) { "Could not activate ${target.name}" }
-            ReadingDataStore.removeInactive(context, target)
+            ReadingDataStore.removeTemporaryFiles(context)
         } finally {
             temporary.delete()
         }
@@ -151,9 +151,13 @@ object ReadingDataUpdater {
         }
     }
 
-    private fun verifySignature(message: ByteArray, signature: ByteArray): Boolean {
+    internal fun verifySignature(
+        message: ByteArray,
+        signature: ByteArray,
+        publicKeyDerBase64: String = PUBLIC_KEY_DER_BASE64
+    ): Boolean {
         val publicKey = KeyFactory.getInstance("EC").generatePublic(
-            X509EncodedKeySpec(Base64.decode(PUBLIC_KEY_DER_BASE64, Base64.DEFAULT))
+            X509EncodedKeySpec(Base64.decode(publicKeyDerBase64, Base64.DEFAULT))
         )
         return Signature.getInstance("SHA256withECDSA").run {
             initVerify(publicKey)

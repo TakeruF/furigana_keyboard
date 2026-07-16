@@ -13,6 +13,11 @@ import org.junit.runner.RunWith
 import java.io.File
 import java.security.MessageDigest
 
+/**
+ * Device-level cover for full/core selection against real Android SQLite. The JVM suite owns the
+ * legacy-full migration itself, which [ReadingDataStore.preserveLegacyFull] exercises without a
+ * multi-megabyte fixture.
+ */
 @RunWith(AndroidJUnit4::class)
 class ReadingDataStoreMigrationTest {
     private lateinit var context: Context
@@ -22,66 +27,77 @@ class ReadingDataStoreMigrationTest {
     fun setUp() {
         context = ApplicationProvider.getApplicationContext()
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().clear().commit()
-        updates = File(context.noBackupFilesDir, "reading-updates")
+        updates = ReadingDataStore.updateDirectory(context)
         updates.deleteRecursively()
         updates.mkdirs()
+        clearLegacyBundledFull()
     }
 
     @After
     fun tearDown() {
         context.getSharedPreferences(PREFERENCES, Context.MODE_PRIVATE).edit().clear().commit()
         updates.deleteRecursively()
+        clearLegacyBundledFull()
         context.noBackupFilesDir.listFiles().orEmpty()
-            .filter { it.name.startsWith("migration-test-bundled-") }
+            .filter { it.name.startsWith(CORE_PREFIX) }
             .forEach(File::delete)
     }
 
     @Test
-    fun activeV7FallsBackToBundledV8() = assertFallback(activeSchema = 7)
+    fun activeFullOnAnOlderSchemaFallsBackToBundledCore() = assertCoreFallback(activeSchema = 7)
 
     @Test
-    fun activeWithoutSchemaFallsBackToBundledV8() = assertFallback(activeSchema = null)
+    fun corruptActiveFullFallsBackToBundledCore() = assertCoreFallback(corrupt = true)
 
     @Test
-    fun corruptActiveFallsBackToBundledV8() = assertFallback(
-        activeSchema = 8,
-        corrupt = true
-    )
-
-    @Test
-    fun validActiveV8IsSelectedAndItsVersionIsInstalled() {
-        val bundled = bundledDatabase()
-        val active = createDatabase(File(updates, "active-v8.db"), 8)
+    fun validActiveFullIsSelectedAndItsVersionIsInstalled() {
+        val core = bundledCore()
+        val active = createDatabase(File(updates, "full-42.db"), 8)
         recordActive(active, schema = 8, version = 42)
 
-        val selected = select(bundled)
-
-        assertEquals(active.canonicalFile, selected.canonicalFile)
-        assertEquals(42, ReadingDataStore.installedVersion(context))
+        assertEquals(active.canonicalFile, select(core).canonicalFile)
+        assertEquals(42, ReadingDataStore.installedFullVersion(context))
     }
 
-    private fun assertFallback(activeSchema: Int?, corrupt: Boolean = false) {
-        val bundled = bundledDatabase()
-        val active = File(updates, "legacy-or-corrupt.db")
-        if (corrupt) active.writeText("not a sqlite database") else createDatabase(active, 7)
-        recordActive(active, activeSchema, version = 99)
+    /** The database itself, not the recorded preference, now decides schema compatibility. */
+    @Test
+    fun activeFullWithoutARecordedSchemaIsSelectedWhenTheDatabaseIsCompatible() {
+        val core = bundledCore()
+        val active = createDatabase(File(updates, "full-42.db"), 8)
+        recordActive(active, schema = null, version = 42)
 
-        val selected = select(bundled)
-
-        assertEquals(bundled.canonicalFile, selected.canonicalFile)
-        assertEquals(0, ReadingDataStore.installedVersion(context))
+        assertEquals(active.canonicalFile, select(core).canonicalFile)
+        assertEquals(42, ReadingDataStore.installedFullVersion(context))
     }
 
-    private fun bundledDatabase(): File = createDatabase(
-        File(context.noBackupFilesDir, "migration-test-bundled-${System.nanoTime()}.db"),
+    private fun assertCoreFallback(activeSchema: Int = 8, corrupt: Boolean = false) {
+        val core = bundledCore()
+        val active = File(updates, "full-99.db")
+        if (corrupt) {
+            active.writeText("not a sqlite database")
+        } else {
+            createDatabase(active, activeSchema)
+        }
+        recordActive(active, schema = 8, version = 99)
+
+        assertEquals(core.canonicalFile, select(core).canonicalFile)
+        assertEquals(0, ReadingDataStore.installedFullVersion(context))
+    }
+
+    /**
+     * Pre-installed under its own hash so the asset installer adopts it in place, without
+     * unpacking the real bundled asset.
+     */
+    private fun bundledCore(): File = createDatabase(
+        File(context.noBackupFilesDir, "$CORE_PREFIX${System.nanoTime()}.db"),
         8
     )
 
-    private fun select(bundled: File): File = ReadingDataStore.activeOrBundled(
+    private fun select(core: File): File = ReadingDataStore.fullOrBundledCore(
         context = context,
-        assetName = "unused-test-asset.db",
-        bundledName = bundled.name,
-        bundledSha256 = sha256(bundled)
+        coreAssetName = "unused-test-asset.db",
+        coreFileName = core.name,
+        coreSha256 = sha256(core)
     )
 
     private fun recordActive(file: File, schema: Int?, version: Int) {
@@ -90,6 +106,12 @@ class ReadingDataStoreMigrationTest {
             .putInt("active-version", version)
         if (schema != null) edit.putInt("active-schema-version", schema)
         edit.commit()
+    }
+
+    /** A leftover pre-core full database would otherwise migrate in and win selection. */
+    private fun clearLegacyBundledFull() {
+        File(context.noBackupFilesDir, ReadingDataStore.LEGACY_BUNDLED_FILE).delete()
+        File(context.noBackupFilesDir, "${ReadingDataStore.LEGACY_BUNDLED_FILE}.sha256").delete()
     }
 
     private fun createDatabase(file: File, schema: Int): File {
@@ -110,5 +132,6 @@ class ReadingDataStoreMigrationTest {
 
     private companion object {
         const val PREFERENCES = "reading-data-updates"
+        const val CORE_PREFIX = "migration-test-core-"
     }
 }
