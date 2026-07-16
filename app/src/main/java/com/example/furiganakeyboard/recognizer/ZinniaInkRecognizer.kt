@@ -78,7 +78,14 @@ class ZinniaInkRecognizer(context: Context) : InkRecognizer {
                         }
                     }.toTypedArray(),
                     RESULT_LIMIT
-                ).distinctBy { it.text }
+                ).map { RawRecognitionCandidate(it.text, it.evidence.rawScore) }
+                    .let {
+                        RecognitionScoreNormalizer.normalize(
+                            it,
+                            RecognitionSource.ZINNIA,
+                            RawScoreSemantics.NATIVE_HIGHER_IS_BETTER
+                        )
+                    }
             } catch (error: Throwable) {
                 Log.e(TAG, "Offline recognition failed", error)
                 postState(InkRecognizer.State.ERROR)

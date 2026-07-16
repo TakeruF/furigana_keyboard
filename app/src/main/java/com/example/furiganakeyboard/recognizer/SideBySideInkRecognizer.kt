@@ -78,14 +78,43 @@ class SideBySideInkRecognizer(
     private fun combine(
         left: List<RecognitionCandidate>,
         right: List<RecognitionCandidate>
-    ): List<RecognitionCandidate> = left.take(PER_CHARACTER_LIMIT).flatMapIndexed { leftIndex, l ->
-        right.take(PER_CHARACTER_LIMIT).mapIndexed { rightIndex, r ->
-            val rankBias = (PER_CHARACTER_LIMIT * 2 - leftIndex - rightIndex) * RANK_BIAS
-            RecognitionCandidate(l.text + r.text, (l.score + r.score) / 2f + rankBias)
-        }
-    }.sortedByDescending { it.score }
-        .distinctBy { it.text }
-        .take(RESULT_LIMIT)
+    ): List<RecognitionCandidate> {
+        val normalizedLeft = RecognitionScoreNormalizer.normalizeIfNeeded(left)
+        val normalizedRight = RecognitionScoreNormalizer.normalizeIfNeeded(right)
+        return normalizedLeft.take(PER_CHARACTER_LIMIT).flatMapIndexed { leftIndex, l ->
+            normalizedRight.take(PER_CHARACTER_LIMIT).mapIndexed { rightIndex, r ->
+                val componentRank = leftIndex + rightIndex
+                RecognitionCandidate(
+                    text = l.text + r.text,
+                    shapeCost = (l.shapeCost + r.shapeCost) / 2f,
+                    evidence = RecognitionEvidence(
+                        source = RecognitionSource.SIDE_BY_SIDE,
+                        rawScore = null,
+                        rawRank = null,
+                        components = listOf(componentEvidence(0, l), componentEvidence(1, r))
+                    )
+                ) to componentRank
+            }
+        }.sortedWith(
+            compareBy<Pair<RecognitionCandidate, Int>> { it.first.shapeCost }
+                .thenBy { it.second }
+        ).distinctBy { it.first.text }
+            .take(RESULT_LIMIT)
+            .map { it.first }
+    }
+
+    private fun componentEvidence(
+        position: Int,
+        candidate: RecognitionCandidate
+    ) = RecognitionComponentEvidence(
+        position = position,
+        text = candidate.text,
+        shapeCost = candidate.shapeCost,
+        source = candidate.evidence.source,
+        rawScore = candidate.evidence.rawScore,
+        rawRank = candidate.evidence.rawRank,
+        isRecognizerRawTop = candidate.isRecognizerRawTop
+    )
 
     private fun isCurrent(request: Long): Boolean = !closed && request == generation
 
@@ -104,7 +133,6 @@ class SideBySideInkRecognizer(
     companion object {
         private const val PER_CHARACTER_LIMIT = 4
         private const val RESULT_LIMIT = 10
-        private const val RANK_BIAS = 0.001f
     }
 }
 

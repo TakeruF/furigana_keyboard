@@ -109,12 +109,15 @@ class MlKitInkRecognizer : InkRecognizer {
                 val values = result.candidates.asSequence()
                     .map { it.text.trim() }
                     .filter { it.codePointCount(0, it.length) == 1 }
-                    .distinct()
-                    .take(RESULT_LIMIT)
-                    .mapIndexed { index, text ->
-                        RecognitionCandidate(text, (RESULT_LIMIT - index).toFloat())
-                    }
+                    .map { RawRecognitionCandidate(it) }
                     .toList()
+                    .let {
+                        RecognitionScoreNormalizer.normalize(
+                            it,
+                            RecognitionSource.ML_KIT,
+                            RawScoreSemantics.RANK_ONLY
+                        )
+                    }.take(RESULT_LIMIT)
                 postResult(request, values, callback)
             }
             .addOnFailureListener { error ->

@@ -87,6 +87,11 @@ class SideBySideInkRecognizerTest {
         assertEquals("日本", result.first().text)
         assertTrue(result.any { it.text == "目木" })
         assertEquals(listOf("前", "前日"), delegate.contexts)
+        assertEquals(0f, result.first().shapeCost)
+        assertEquals(2, result.first().evidence.components.size)
+        assertEquals(listOf("日", "本"), result.first().evidence.components.map { it.text })
+        assertTrue(result.first().evidence.components.all { it.isRecognizerRawTop })
+        assertFalse(result.first().isRecognizerRawTop)
     }
 
     private fun sideBySideInk() = HandwritingInk().apply {
