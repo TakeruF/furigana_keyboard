@@ -1,50 +1,12 @@
-import CryptoKit
-import Combine
 import Foundation
 import SQLite3
 
-enum ReadingUpdateConfiguration {
+/// Configuration shared by the app and the keyboard extension. It intentionally contains no
+/// endpoint, public key, URLSession, or update implementation: the extension only opens files.
+enum ReadingDataConfiguration {
     static let appGroup = "group.app.hanlu.furiganakeyboard"
-    static let manifestURL = URL(
-        string: "https://downloads.hanlu.app/furigana/manifest.json"
-    )!
     static let supportedSchemaVersion = 8
-    static let publicKeyDERBase64 =
-        "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9fXKWi9gKlKzeFvoERpCuEm0cpuo7LZ8bhqU0ZDU8BV1naCjNzdHDg6uW04s4P0x1Q4yFKv+w7kLN6j0HKGhGQ=="
-}
-
-struct ReadingUpdateManifest: Decodable {
-    let formatVersion: Int
-    let dataVersion: Int
-    let schemaVersion: Int
-    let minAppVersion: Int
-    let databaseUrl: URL
-    let databaseSize: Int64
-    let databaseSha256: String
-    let dictionaryDate: String
-
-    enum CodingKeys: String, CodingKey {
-        case formatVersion, dataVersion, schemaVersion, minAppVersion
-        case databaseUrl = "databaseUrl"
-        case databaseSize, databaseSha256, dictionaryDate
-    }
-}
-
-extension ReadingUpdateManifest {
-    func validate(appVersion: Int) throws {
-        guard formatVersion == 1,
-              schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
-              minAppVersion <= appVersion,
-              databaseSize > 0,
-              databaseSize <= 128 * 1024 * 1024,
-              databaseUrl.scheme == "https",
-              databaseSha256.lowercased().range(
-                of: "^[0-9a-f]{64}$",
-                options: .regularExpression
-              ) != nil else {
-            throw ReadingUpdateValidationError.incompatible
-        }
-    }
+    static let fullProfile = "full"
 }
 
 struct ActiveReadingData: Codable {
@@ -52,34 +14,66 @@ struct ActiveReadingData: Codable {
     let dataVersion: Int
     let schemaVersion: Int
     let dictionaryDate: String
+    /// Missing means a pre-core active record, which was necessarily a full dictionary.
+    let profile: String?
+
+    init(
+        fileName: String,
+        dataVersion: Int,
+        schemaVersion: Int,
+        dictionaryDate: String,
+        profile: String? = nil
+    ) {
+        self.fileName = fileName
+        self.dataVersion = dataVersion
+        self.schemaVersion = schemaVersion
+        self.dictionaryDate = dictionaryDate
+        self.profile = profile
+    }
 }
 
 enum ReadingDataLocation {
     private static let activeFileName = "active.json"
+    static let legacyFullFileName = "legacy-full-v8.db"
 
+    /// Used by the extension: an App Group full dictionary wins, then the bundled core.
     static func databaseURL(
         bundle: Bundle = .main,
         activeDirectory: URL? = sharedDirectory()
     ) -> URL? {
-        activeDirectory.flatMap { activeDatabaseURL(in: $0) }
-            ?? bundle.url(forResource: "reading", withExtension: "db")
+        activeDirectory.flatMap { activeFullDatabaseURL(in: $0) }
+            ?? bundledCoreURL(bundle: bundle)
     }
 
+    /// Compatibility spelling for callers and tests from the single-dictionary implementation.
     static func activeDatabaseURL(in directory: URL) -> URL? {
-        guard let active = try? activeData(in: directory),
-              active.schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
-              safeFileName(active.fileName) else { return nil }
-        let candidate = directory.appendingPathComponent(active.fileName)
+        activeFullDatabaseURL(in: directory)
+    }
+
+    static func activeFullDatabaseURL(in directory: URL) -> URL? {
+        if let active = try? activeData(in: directory),
+           active.profile == nil || active.profile == ReadingDataConfiguration.fullProfile,
+           active.schemaVersion == ReadingDataConfiguration.supportedSchemaVersion,
+           safeFileName(active.fileName) {
+            let candidate = directory.appendingPathComponent(active.fileName)
+            if (try? ReadingDatabaseValidator.validate(
+                url: candidate,
+                expectedSchema: active.schemaVersion
+            )) != nil {
+                return candidate
+            }
+        }
+        let legacy = directory.appendingPathComponent(legacyFullFileName)
         guard (try? ReadingDatabaseValidator.validate(
-            url: candidate,
-            expectedSchema: active.schemaVersion
+            url: legacy,
+            expectedSchema: ReadingDataConfiguration.supportedSchemaVersion
         )) != nil else { return nil }
-        return candidate
+        return legacy
     }
 
     static func sharedDirectory() -> URL? {
         guard let container = FileManager.default.containerURL(
-            forSecurityApplicationGroupIdentifier: ReadingUpdateConfiguration.appGroup
+            forSecurityApplicationGroupIdentifier: ReadingDataConfiguration.appGroup
         ) else { return nil }
         let directory = container.appendingPathComponent("ReadingUpdates", isDirectory: true)
         try? FileManager.default.createDirectory(
@@ -94,6 +88,7 @@ enum ReadingDataLocation {
         return try JSONDecoder().decode(ActiveReadingData.self, from: data)
     }
 
+    /// The pointer is written only after the complete database has been verified and renamed.
     static func activate(_ active: ActiveReadingData, in directory: URL) throws {
         let data = try JSONEncoder().encode(active)
         try data.write(
@@ -102,15 +97,23 @@ enum ReadingDataLocation {
         )
     }
 
-    static func removeInactive(in directory: URL, keeping fileName: String) {
+    /// Valid prior full dictionaries remain available; only interrupted staging files are removed.
+    static func removeTemporaryFiles(in directory: URL) {
         guard let files = try? FileManager.default.contentsOfDirectory(
             at: directory,
             includingPropertiesForKeys: nil
         ) else { return }
-        for file in files where file.lastPathComponent != fileName &&
-            file.lastPathComponent != activeFileName {
+        for file in files where file.lastPathComponent.hasSuffix(".tmp") ||
+            file.lastPathComponent.contains(".staging-") {
             try? FileManager.default.removeItem(at: file)
         }
+    }
+
+    private static func bundledCoreURL(bundle: Bundle) -> URL? {
+        // `reading.db` is the transitional core asset until the deterministic generator emits
+        // `reading-core.db`. Keeping this fallback prevents an app update from losing offline use.
+        bundle.url(forResource: "reading-core", withExtension: "db")
+            ?? bundle.url(forResource: "reading", withExtension: "db")
     }
 
     private static func safeFileName(_ value: String) -> Bool {
@@ -152,138 +155,4 @@ enum ReadingDatabaseValidator {
     enum ValidationError: Error {
         case openFailed, integrityFailed, schemaMismatch
     }
-}
-
-enum ReadingUpdateValidationError: Error {
-    case incompatible, sizeMismatch, hashMismatch, invalidSignature
-}
-
-enum ReadingManifestSignatureVerifier {
-    static func verify(
-        manifestData: Data,
-        signatureData: Data,
-        publicKeyDERBase64: String = ReadingUpdateConfiguration.publicKeyDERBase64
-    ) throws {
-        guard let keyData = Data(base64Encoded: publicKeyDERBase64),
-              let encodedSignature = String(data: signatureData, encoding: .utf8),
-              let signature = Data(
-                base64Encoded: encodedSignature.trimmingCharacters(in: .whitespacesAndNewlines)
-              ) else {
-            throw ReadingUpdateValidationError.invalidSignature
-        }
-        let publicKey = try P256.Signing.PublicKey(derRepresentation: keyData)
-        let ecdsaSignature = try P256.Signing.ECDSASignature(derRepresentation: signature)
-        guard publicKey.isValidSignature(ecdsaSignature, for: manifestData) else {
-            throw ReadingUpdateValidationError.invalidSignature
-        }
-    }
-}
-
-enum ReadingUpdatePackageValidator {
-    static func validate(data: Data, at url: URL, manifest: ReadingUpdateManifest) throws {
-        guard Int64(data.count) == manifest.databaseSize else {
-            throw ReadingUpdateValidationError.sizeMismatch
-        }
-        guard SHA256.hash(data: data).hex == manifest.databaseSha256.lowercased() else {
-            throw ReadingUpdateValidationError.hashMismatch
-        }
-        try ReadingDatabaseValidator.validate(url: url, expectedSchema: manifest.schemaVersion)
-    }
-}
-
-@MainActor
-final class ReadingDataUpdater: ObservableObject {
-    @Published private(set) var status = AppStrings.text("update_checking")
-    @Published private(set) var isUpdating = false
-
-    func update() async {
-        guard !isUpdating else { return }
-        isUpdating = true
-        defer { isUpdating = false }
-        do {
-            status = try await performUpdate()
-        } catch {
-            status = AppStrings.text("update_failed")
-        }
-    }
-
-    private func performUpdate() async throws -> String {
-        let manifestData = try await fetch(
-            ReadingUpdateConfiguration.manifestURL,
-            maximumSize: 32 * 1024
-        )
-        let signatureData = try await fetch(
-            ReadingUpdateConfiguration.manifestURL.appendingPathExtension("sig"),
-            maximumSize: 4 * 1024
-        )
-        try ReadingManifestSignatureVerifier.verify(
-            manifestData: manifestData,
-            signatureData: signatureData
-        )
-        let manifest = try JSONDecoder().decode(ReadingUpdateManifest.self, from: manifestData)
-        try manifest.validate(appVersion: appVersion)
-        guard let directory = ReadingDataLocation.sharedDirectory() else {
-            throw UpdateError.sharedContainerUnavailable
-        }
-        if let active = try? ReadingDataLocation.activeData(in: directory),
-           active.schemaVersion == ReadingUpdateConfiguration.supportedSchemaVersion,
-           ReadingDataLocation.activeDatabaseURL(in: directory) != nil,
-           active.dataVersion >= manifest.dataVersion {
-            return "\(AppStrings.text("update_current"))（\(active.dictionaryDate)）"
-        }
-
-        let (temporaryDownload, response) = try await URLSession.shared.download(
-            from: manifest.databaseUrl
-        )
-        try requireOK(response)
-        let databaseData = try Data(contentsOf: temporaryDownload, options: .mappedIfSafe)
-        let fileName = "reading-\(manifest.dataVersion).db"
-        let staging = directory.appendingPathComponent("\(fileName).tmp")
-        let target = directory.appendingPathComponent(fileName)
-        try? FileManager.default.removeItem(at: staging)
-        try FileManager.default.copyItem(at: temporaryDownload, to: staging)
-        try ReadingUpdatePackageValidator.validate(
-            data: databaseData,
-            at: staging,
-            manifest: manifest
-        )
-        try? FileManager.default.removeItem(at: target)
-        try FileManager.default.moveItem(at: staging, to: target)
-        try ReadingDataLocation.activate(
-            ActiveReadingData(
-                fileName: fileName,
-                dataVersion: manifest.dataVersion,
-                schemaVersion: manifest.schemaVersion,
-                dictionaryDate: manifest.dictionaryDate
-            ),
-            in: directory
-        )
-        ReadingDataLocation.removeInactive(in: directory, keeping: fileName)
-        return "\(AppStrings.text("update_complete"))（\(manifest.dictionaryDate)）"
-    }
-
-    private func fetch(_ url: URL, maximumSize: Int) async throws -> Data {
-        let (data, response) = try await URLSession.shared.data(from: url)
-        try requireOK(response)
-        guard data.count <= maximumSize else { throw UpdateError.responseTooLarge }
-        return data
-    }
-
-    private func requireOK(_ response: URLResponse) throws {
-        guard let response = response as? HTTPURLResponse,
-              response.statusCode == 200 else { throw UpdateError.httpFailure }
-    }
-
-    private var appVersion: Int {
-        Int(Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "1") ?? 1
-    }
-
-    enum UpdateError: Error {
-        case incompatible, sharedContainerUnavailable
-        case responseTooLarge, httpFailure
-    }
-}
-
-private extension SHA256.Digest {
-    var hex: String { map { String(format: "%02x", $0) }.joined() }
 }

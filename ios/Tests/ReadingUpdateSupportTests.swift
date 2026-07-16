@@ -65,6 +65,39 @@ final class ReadingUpdateSupportTests: XCTestCase {
         XCTAssertEqual(selectedDatabase(), active)
     }
 
+    func testVerifiedBundledFullIsPreservedInAppGroupBeforeCoreFallback() throws {
+        let oldBundledFull = root.appendingPathComponent("reading-v8.db")
+        try createDatabase(at: oldBundledFull, schema: 8)
+
+        let preserved = try XCTUnwrap(
+            LegacyFullDictionaryMigration.preserve(
+                source: oldBundledFull,
+                in: activeDirectory,
+                expectedSha256: try ReadingFileHasher.sha256(url: oldBundledFull)
+            )
+        )
+
+        XCTAssertTrue(FileManager.default.fileExists(atPath: preserved.path))
+        XCTAssertEqual(selectedDatabase(), preserved)
+    }
+
+    func testUnexpectedLegacyFileCannotReplaceAnExistingFullDictionary() throws {
+        let active = activeDirectory.appendingPathComponent("full-101.db")
+        try createDatabase(at: active, schema: 8)
+        try activate(fileName: active.lastPathComponent, schema: 8)
+        let unexpected = root.appendingPathComponent("unexpected.db")
+        try createDatabase(at: unexpected, schema: 8)
+
+        let preserved = try LegacyFullDictionaryMigration.preserve(
+            source: unexpected,
+            in: activeDirectory,
+            expectedSha256: String(repeating: "0", count: 64)
+        )
+
+        XCTAssertNil(preserved)
+        XCTAssertEqual(selectedDatabase(), active)
+    }
+
     func testV7ManifestIsIncompatibleAndV8ManifestIsAccepted() throws {
         let data = Data([0])
         XCTAssertThrowsError(try manifest(schema: 7, data: data).validate(appVersion: 1))
@@ -77,28 +110,24 @@ final class ReadingUpdateSupportTests: XCTestCase {
         let data = try Data(contentsOf: valid)
         let validManifest = manifest(schema: 8, data: data)
         XCTAssertNoThrow(
-            try ReadingUpdatePackageValidator.validate(data: data, at: valid, manifest: validManifest)
+            try ReadingUpdatePackageValidator.validate(url: valid, manifest: validManifest)
         )
 
         let wrongSize = manifest(schema: 8, data: data, size: Int64(data.count + 1))
         XCTAssertThrowsError(
-            try ReadingUpdatePackageValidator.validate(data: data, at: valid, manifest: wrongSize)
+            try ReadingUpdatePackageValidator.validate(url: valid, manifest: wrongSize)
         )
 
         let wrongHash = manifest(schema: 8, data: data, hash: String(repeating: "0", count: 64))
         XCTAssertThrowsError(
-            try ReadingUpdatePackageValidator.validate(data: data, at: valid, manifest: wrongHash)
+            try ReadingUpdatePackageValidator.validate(url: valid, manifest: wrongHash)
         )
 
         let corrupt = activeDirectory.appendingPathComponent("corrupt-package.db")
         let corruptData = Data("not sqlite".utf8)
         try corruptData.write(to: corrupt)
         XCTAssertThrowsError(
-            try ReadingUpdatePackageValidator.validate(
-                data: corruptData,
-                at: corrupt,
-                manifest: manifest(schema: 8, data: corruptData)
-            )
+            try ReadingUpdatePackageValidator.validate(url: corrupt, manifest: manifest(schema: 8, data: corruptData))
         )
     }
 
@@ -135,8 +164,7 @@ final class ReadingUpdateSupportTests: XCTestCase {
 
         XCTAssertThrowsError(
             try ReadingUpdatePackageValidator.validate(
-                data: failedData,
-                at: failedDownload,
+                url: failedDownload,
                 manifest: manifest(schema: 8, data: failedData)
             )
         )
