@@ -1,0 +1,38 @@
+Furigana Keyboard
+Copyright 2026 Takeru Fujii
+
+This product includes software developed by Takeru Fujii, licensed under the
+Apache License, Version 2.0. See LICENSE.
+
+The Apache License applies to this project's own source code. Portions of this
+repository are third-party works kept under their original licenses, and the
+Apache License does not apply to them:
+
+  app/src/main/cpp/zinnia/
+      Zinnia online handwriting recognition runtime.
+      Copyright (c) 2005-2007 Taku Kudo. New BSD License.
+      See app/src/main/cpp/zinnia/COPYING.
+
+  app/src/main/assets/handwriting-ja.model
+      Tegaki Japanese 0.3 handwriting model. GNU LGPL 2.1.
+      See app/src/main/assets/licenses/TEGAKI-MODEL-LGPL-2.1.txt.
+
+  app/src/main/assets/reading.db
+      Derived from KANJIDIC2, JMdict, and JMnedict.
+      Copyright (c) The Electronic Dictionary Research and Development Group.
+      Creative Commons Attribution-ShareAlike 4.0 (CC BY-SA 4.0).
+      See app/src/main/assets/licenses/EDRDG-CC-BY-SA-4.0.txt. Redistributing
+      this file or a work derived from it requires attribution to EDRDG and
+      keeps it under CC BY-SA 4.0.
+
+  Offline context model
+      Derived from the Tatoeba Japanese sentences export.
+      Copyright Tatoeba contributors. CC BY 2.0 FR.
+
+Notices for dependencies linked at build time, along with the full license
+texts shown in the application, are collected in
+app/src/main/assets/licenses/THIRD-PARTY-NOTICES.txt.
+
+Google ML Kit Digital Ink Recognition is optional, is not redistributed in this
+repository, and is governed by the Google APIs and ML Kit terms:
+https://developers.google.com/ml-kit/terms

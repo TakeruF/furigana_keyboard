@@ -45,11 +45,19 @@ Furigana Plus model delivery; handwriting and typed text are not sent. The
 bundled recognizer and dictionary remain usable offline. The first Plus
 activation downloads an approximately 20 MB Japanese model.
 
-- Zinnia runtime: New BSD License.
+This project's own source code is licensed under the Apache License 2.0; see
+`LICENSE`. The bundled third-party runtime and data stay under their original
+licenses, which the Apache License does not override:
+
+- Zinnia runtime (`app/src/main/cpp/zinnia`): New BSD License.
 - Tegaki Japanese 0.3 model: LGPL 2.1.
 - KANJIDIC2/JMdict/JMnedict and the generated `reading.db`: CC BY-SA 4.0,
-  EDRDG.
+  EDRDG. Redistributing `reading.db` or a derivative keeps it under CC BY-SA
+  4.0 with EDRDG attribution.
 - Google ML Kit Digital Ink Recognition: Google APIs/ML Kit terms.
+
+`NOTICE` records the per-path breakdown and must be carried along when
+redistributing, per section 4(d) of the Apache License.
 
 Notices are bundled under `app/src/main/assets/licenses`; localized privacy
 policies and terms are under `app/src/main/assets/legal`. They are accessible
