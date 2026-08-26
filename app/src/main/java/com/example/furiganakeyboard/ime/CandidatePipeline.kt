@@ -105,6 +105,7 @@ class CandidatePipeline(
 
     private val generation = AtomicLong()
     private val closed = AtomicBoolean()
+    private val forgetRequested = AtomicBoolean()
     private var source: ReadingDataSource? = null
 
     // These maps are worker-confined. Empty results are cached as well.
@@ -308,6 +309,28 @@ class CandidatePipeline(
         (worker as? ThreadPoolExecutor)?.queue?.clear()
     }
 
+    /**
+     * Drop every cached candidate derived from what the user typed. The dictionary
+     * stays open; only this session's memory of the input is discarded. Used when an
+     * editor forbids personalized learning or was password-like.
+     */
+    fun forgetCachedInput() {
+        if (closed.get()) return
+        forgetRequested.set(true)
+        invalidate()
+        // A later submission may clear this task out of the queue, so the caches are
+        // also dropped before the next lookup can read them.
+        worker.execute(::clearCachesIfRequested)
+    }
+
+    private fun clearCachesIfRequested() {
+        if (!forgetRequested.compareAndSet(true, false)) return
+        readingCache.clear()
+        suggestionCache.clear()
+        conversionCache.clear()
+        priorityCache.clear()
+    }
+
     private fun <T> submit(
         callback: (T) -> Unit,
         failureValue: (() -> T)? = null,
@@ -317,6 +340,7 @@ class CandidatePipeline(
         val request = generation.incrementAndGet()
         (worker as? ThreadPoolExecutor)?.queue?.clear()
         worker.execute {
+            clearCachesIfRequested()
             if (closed.get() || request != generation.get()) return@execute
             val isCancelled = { closed.get() || request != generation.get() }
             val result = runCatching { operation(isCancelled) }

@@ -1,10 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <!-- Input-method metadata. Declares a single Japanese handwriting subtype and
-     points the "settings" affordance at SettingsActivity. -->
+     points the "settings" affordance at SettingsActivity.
+     supportsSwitchingToNextInputMethod lets the globe key hand the session to the
+     next keyboard; isAsciiCapable advertises the ABC panel, which is what the
+     system looks for when it needs an ASCII keyboard (password fields included). -->
 <input-method xmlns:android="http://schemas.android.com/apk/res/android"
-    android:settingsActivity="com.example.furiganakeyboard.settings.SettingsActivity">
+    android:settingsActivity="com.example.furiganakeyboard.settings.SettingsActivity"
+    android:supportsSwitchingToNextInputMethod="true">
     <subtype
         android:label="@string/subtype_ja"
+        android:languageTag="ja"
         android:imeSubtypeLocale="ja"
-        android:imeSubtypeMode="keyboard" />
+        android:imeSubtypeMode="keyboard"
+        android:isAsciiCapable="true" />
 </input-method>

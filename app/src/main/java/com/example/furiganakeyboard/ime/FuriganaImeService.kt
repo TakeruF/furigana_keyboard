@@ -83,6 +83,7 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
     private var romajiCandidates: List<CandidateUiModel> = emptyList()
     private var romajiCandidateRequest: RomajiCursorRequest? = null
     private var currentEnterLabel = ""
+    private var privacyPolicy = InputPrivacyPolicy.UNRESTRICTED
 
     override fun attachBaseContext(newBase: Context) {
         super.attachBaseContext(AppLocale.wrap(newBase))
@@ -156,8 +157,14 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
         root.doOnAttach { ViewCompat.requestApplyInsets(it) }
     }
 
+    override fun onStartInput(attribute: EditorInfo?, restarting: Boolean) {
+        super.onStartInput(attribute, restarting)
+        privacyPolicy = InputPrivacyPolicy.of(attribute)
+    }
+
     override fun onStartInputView(info: EditorInfo?, restarting: Boolean) {
         super.onStartInputView(info, restarting)
+        privacyPolicy = InputPrivacyPolicy.of(info ?: currentInputEditorInfo)
         applyNavigationBarStyle()
         if (applyChangedLocale()) {
             setInputView(onCreateInputView())
@@ -204,6 +211,20 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
         finishComposition(clearCandidates = false)
         super.onFinishInputView(finishingInput)
     }
+
+    override fun onFinishInput() {
+        super.onFinishInput()
+        // Nothing typed is ever persisted; this drops the in-memory copies too.
+        if (!privacyPolicy.allowsRetainingCandidates) candidatePipeline.forgetCachedInput()
+        privacyPolicy = InputPrivacyPolicy.UNRESTRICTED
+    }
+
+    /**
+     * The handwriting canvas is the point of this keyboard, and the extracted
+     * editor hides the app it is writing into. Landscape keeps the real app
+     * visible instead.
+     */
+    override fun onEvaluateFullscreenMode(): Boolean = false
 
     override fun onUpdateSelection(
         oldSelStart: Int,
@@ -360,9 +381,11 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
 
     private fun wireHandwriting() {
         handwritingView.onRecognize = { ink ->
-            ensureRecognizer().recognize(ink, composition.text.takeLast(MAX_RECOGNITION_CONTEXT)) { values ->
+            ensureRecognizer().recognize(ink, recognitionContext()) { values ->
                 if (values.isEmpty()) return@recognize
-                val stageContext = if (prefs.autoCommit && !composition.isEmpty) {
+                val stageContext = if (
+                    privacyPolicy.allowsDictionaryLookup && prefs.autoCommit && !composition.isEmpty
+                ) {
                     HandwritingStageContext(
                         baseBeforeCurrent = composition.text,
                         wordRootBeforeLast = wordRootBeforeLastCharacter,
@@ -420,6 +443,10 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
         alternatives: List<String> = listOf(text),
         candidates: List<ResolvedCharacterCandidate> = emptyList(),
     ) {
+        if (!privacyPolicy.allowsComposingText) {
+            commitWithoutComposing(text)
+            return
+        }
         wordRootBeforeLastCharacter = composition.text
         lastCharacterAlternatives = alternatives.distinct()
         lastCharacterCandidates = candidates
@@ -476,6 +503,11 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
     }
 
     private fun showWordSuggestions() {
+        if (!privacyPolicy.allowsDictionaryLookup) {
+            candidatePipeline.invalidate()
+            candidateBar.clear()
+            return
+        }
         if (composition.isEmpty) {
             candidatePipeline.invalidate()
             candidateBar.clear()
@@ -541,11 +573,34 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
 
     /** A deliberate candidate tap selects and confirms the character immediately. */
     private fun commitCharacterCandidate(text: String) {
+        if (!privacyPolicy.allowsComposingText) {
+            commitWithoutComposing(text)
+            handwritingView.clear()
+            return
+        }
         val surface = composition.append(text)
         currentInputConnection?.setComposingText(surface, 1)
         finishComposition()
         handwritingView.clear()
     }
+
+    /**
+     * Password-like editors get one committed character at a time: no composing
+     * span is held in the editor and no word context survives the keystroke.
+     */
+    private fun commitWithoutComposing(text: String) {
+        currentInputConnection?.commitText(text, 1)
+        clearAlternativeContext()
+        candidateBar.clear()
+        updateEnterLabel(currentInputEditorInfo)
+    }
+
+    private fun recognitionContext(): String =
+        if (privacyPolicy.allowsRecognitionContext) {
+            composition.text.takeLast(MAX_RECOGNITION_CONTEXT)
+        } else {
+            ""
+        }
 
     private fun showStatus(message: String) {
         candidateBar.setCandidates(listOf(CandidateUiModel(message, kind = CandidateKind.STATUS)))
@@ -558,9 +613,13 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
 
     @SuppressLint("ClickableViewAccessibility")
     private fun wireControlKeys(root: View) {
-        root.findViewById<View>(R.id.keyKeyboardSwitch).onKey {
+        val keyboardSwitchKey = root.findViewById<View>(R.id.keyKeyboardSwitch)
+        keyboardSwitchKey.onKey { switchToNextKeyboard() }
+        keyboardSwitchKey.setOnLongClickListener { view ->
+            Haptics.key(view)
             finishComposition()
-            getSystemService(InputMethodManager::class.java).showInputMethodPicker()
+            showKeyboardPicker()
+            true
         }
         root.findViewById<Button>(R.id.keySymbol).onKey { switchPanel(Panel.SYMBOLS) }
         root.findViewById<Button>(R.id.keyEnglish).onKey { switchPanel(Panel.ENGLISH) }
@@ -572,6 +631,25 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
         root.findViewById<Button>(R.id.keyPeriod).onKey { commitDirect("。") }
         questionKey.onKey { commitDirect("？") }
         enterKey.onKey { sendEnter() }
+    }
+
+    /**
+     * A tap moves to the next enabled keyboard the way the system globe key does,
+     * so returning from a temporary Japanese switch is one tap. The picker stays
+     * reachable by long-press, and is the fallback wherever the platform has no
+     * next keyboard to offer.
+     */
+    private fun switchToNextKeyboard() {
+        finishComposition()
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P &&
+            shouldOfferSwitchingToNextInputMethod() &&
+            switchToNextInputMethod(false)
+        ) return
+        showKeyboardPicker()
+    }
+
+    private fun showKeyboardPicker() {
+        getSystemService(InputMethodManager::class.java).showInputMethodPicker()
     }
 
     private fun deleteHandwritingOrText(): Boolean {
@@ -621,6 +699,12 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
     }
 
     private fun appendRomajiInput(text: String) {
+        // Kana composition and its conversion lookups have no place in a password
+        // field, so the romaji panel behaves like the plain ABC panel there.
+        if (!privacyPolicy.allowsComposingText) {
+            commitDirect(text)
+            return
+        }
         leaveBunsetsuModeForEditing()
         if (text.length == 1 && text[0].isLetter() && text[0].code < 128) {
             applyRomajiEdit(romajiEditor.append(text.lowercase()))
@@ -689,6 +773,11 @@ class FuriganaImeService : InputMethodService(), RomajiCursorDeltaReceiver {
      */
     private fun refreshRomajiCandidatesForCursor() {
         candidatePipeline.invalidate()
+        if (!privacyPolicy.allowsDictionaryLookup) {
+            romajiCandidateRequest = null
+            candidateBar.clear()
+            return
+        }
         val slice = romajiCursor.conversionSlice()
         if (slice == null) {
             romajiCandidateRequest = null

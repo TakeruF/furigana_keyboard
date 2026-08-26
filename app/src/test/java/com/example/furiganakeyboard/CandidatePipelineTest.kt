@@ -64,6 +64,36 @@ class CandidatePipelineTest {
     }
 
     @Test
+    fun forgettingCachedInputMakesTheNextLookupReadTheDictionaryAgain() {
+        val source = FakeSource().apply {
+            conversionLexemeLoader = { requiredPhraseLexemes() }
+            connections = requiredPhraseConnections()
+        }
+        val pipeline = pipeline(source)
+
+        assertTrue(convert(pipeline))
+        assertEquals(1, source.conversionLexemeCalls.get())
+        assertTrue(convert(pipeline))
+        assertEquals("a cached reading must not be looked up twice", 1, source.conversionLexemeCalls.get())
+
+        pipeline.forgetCachedInput()
+
+        assertTrue(convert(pipeline))
+        assertEquals(
+            "input from a private editor must not survive in the caches",
+            2,
+            source.conversionLexemeCalls.get(),
+        )
+        pipeline.close()
+    }
+
+    private fun convert(pipeline: CandidatePipeline): Boolean {
+        val delivered = CountDownLatch(1)
+        pipeline.submitRomaji("これもほんだ", 6) { delivered.countDown() }
+        return delivered.await(2, TimeUnit.SECONDS)
+    }
+
+    @Test
     fun romajiAnalysisPreservesTopConversionSegmentsForBunsetsuSelection() {
         val source = FakeSource().apply {
             conversionLexemeLoader = { requiredPhraseLexemes() }
