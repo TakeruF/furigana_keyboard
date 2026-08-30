@@ -7,6 +7,10 @@ QWERTY panels, symbols, and romaji kana-kanji conversion. Android additionally
 offers optional Furigana Plus recognition through Google ML Kit. Bundled
 recognition remains available on both platforms without a network.
 
+## Download
+
+[<img src="https://raw.githubusercontent.com/machiav3lli/oandbackupx/main/badge_github.png" alt="Get it on GitHub" height="60">](https://github.com/TakeruF/furigana_keyboard/releases)
+
 ## Features
 
 - Offline Zinnia recognition for the Tegaki Japanese label set: 6,356 JIS X
