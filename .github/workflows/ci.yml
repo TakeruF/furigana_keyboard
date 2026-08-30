@@ -29,7 +29,7 @@ jobs:
           python-version: "3.14"
       - uses: gradle/actions/setup-gradle@v4
       - name: Test reading-data tools
-        run: python3 -m unittest discover -s tools/tests -v
+        run: python -m unittest discover -s tools/tests -v
       - name: Test and lint Android flavors
         run: >-
           ./gradlew
