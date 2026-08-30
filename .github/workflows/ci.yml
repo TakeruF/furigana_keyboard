@@ -24,12 +24,19 @@ jobs:
         with:
           distribution: temurin
           java-version: "17"
-      - uses: actions/setup-python@v6
-        with:
-          python-version: "3.14"
+      - name: Install SQLite 3.50.4
+        run: |
+          curl --fail --location --retry 3 --silent --show-error \
+            https://www.sqlite.org/2025/sqlite-tools-linux-x64-3500400.zip \
+            --output "$RUNNER_TEMP/sqlite-tools.zip"
+          echo "2c61fe3f6bfcf4ab0cad6c4edf1fa1cae93bbb816b744bef52a4bdde5bf7bf38  $RUNNER_TEMP/sqlite-tools.zip" \
+            | sha256sum --check -
+          mkdir -p "$RUNNER_TEMP/sqlite-3.50.4"
+          unzip -q "$RUNNER_TEMP/sqlite-tools.zip" -d "$RUNNER_TEMP/sqlite-3.50.4"
+          echo "$RUNNER_TEMP/sqlite-3.50.4" >> "$GITHUB_PATH"
       - uses: gradle/actions/setup-gradle@v4
       - name: Test reading-data tools
-        run: python -m unittest discover -s tools/tests -v
+        run: python3 -m unittest discover -s tools/tests -v
       - name: Test and lint Android flavors
         run: >-
           ./gradlew
