@@ -82,7 +82,7 @@ See the README for build prerequisites and for regenerating reading data.
 ## Reporting bugs and vulnerabilities
 
 Use GitHub issues for bugs. Do **not** file security vulnerabilities publicly;
-follow `SECURITY.md` and email `support@hanlu.app`.
+follow `SECURITY.md` and email `support@takeruf.com`.
 
 When reporting an input or recognition bug, do not include passwords or text you
 entered into other apps.

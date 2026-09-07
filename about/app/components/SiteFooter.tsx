@@ -9,7 +9,7 @@ export default function SiteFooter({ locale }: { locale: Locale }) {
           <a href={`/${locale}`}>About</a>
           <a href={`/${locale}/privacy`}>{content.legal.privacy}</a>
           <a href={`/${locale}/terms`}>{content.legal.terms}</a>
-          <a href="mailto:support@hanlu.app">{content.support}</a>
+          <a href="mailto:support@takeruf.com">{content.support}</a>
         </nav>
         <nav className="footer-languages" aria-label={content.nav.language}>
           {locales.map((item) => (

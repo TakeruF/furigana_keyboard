@@ -101,7 +101,7 @@ npm run build
 - `/ja`、`/zh-Hans`、`/zh-Hant`、`/en`、`/ko`が表示できる
 - 各ページのcanonical URLが`keyboard.hanlu.app`を指す
 - 簡体中文にNoto Sans SC、繁体中文にNoto Sans TC、韓国語にNoto Sans KRが適用される
-- `support@hanlu.app`以外の不要な問い合わせ先が表示されない
+- `support@takeruf.com`以外の不要な問い合わせ先が表示されない
 - GitHubリポジトリ名やローカルパスがHTMLへ含まれない
 - APK・App StoreのURLが未設定なら「準備中」になる
 

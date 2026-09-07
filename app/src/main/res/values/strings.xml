@@ -185,9 +185,9 @@
     <string name="help_coverage_title">Recognition coverage</string>
     <string name="help_coverage_desc">Handwriting covers 6,356 JIS X 0208 kanji labels plus kana; arbitrary Unicode Han characters are outside the guaranteed range</string>
     <string name="help_support_title">Support and inquiries</string>
-    <string name="help_support_desc">Email support@hanlu.app for help or to report a problem</string>
-    <string name="help_support_unavailable">No email app is available. Contact support@hanlu.app.</string>
-    <string name="support_email" translatable="false">support@hanlu.app</string>
+    <string name="help_support_desc">Email support@takeruf.com for help or to report a problem</string>
+    <string name="help_support_unavailable">No email app is available. Contact support@takeruf.com.</string>
+    <string name="support_email" translatable="false">support@takeruf.com</string>
 
     <string name="onboarding_title">Set up Furigana Keyboard</string>
     <string name="onboarding_description">Complete these two Android settings to start using the keyboard.</string>

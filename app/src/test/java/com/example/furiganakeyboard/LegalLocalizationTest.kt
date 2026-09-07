@@ -58,7 +58,7 @@ class LegalLocalizationTest {
     ).first { it.exists() }
 
     companion object {
-        private const val contactUrl = "support@hanlu.app"
+        private const val contactUrl = "support@takeruf.com"
         private val supportedLocales = listOf("en", "ja", "zh-CN", "ko")
         private val translatedResourceFolders = listOf("values-ja", "values-zh-rCN", "values-ko")
         private val namePattern = Regex("name=\"([^\"]+)\"")

@@ -9,7 +9,7 @@ have been fixed.
 ## Reporting a vulnerability
 
 Please do not disclose suspected vulnerabilities in a public issue. Send a report
-to `support@hanlu.app` with:
+to `support@takeruf.com` with:
 
 - the affected app version and platform;
 - steps to reproduce the issue;

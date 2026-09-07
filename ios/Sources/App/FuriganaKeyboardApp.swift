@@ -172,7 +172,7 @@ private struct SettingsView: View {
             }
             Section(AppStrings.text("about")) {
                 LabeledContent(AppStrings.text("version"), value: Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "—")
-                Link(AppStrings.text("support"), destination: URL(string: "mailto:support@hanlu.app")!)
+                Link(AppStrings.text("support"), destination: URL(string: "mailto:support@takeruf.com")!)
                 Link(AppStrings.text("website"), destination: URL(string: "https://hanlu.app")!)
             }
         }.navigationTitle(AppStrings.text("settings"))

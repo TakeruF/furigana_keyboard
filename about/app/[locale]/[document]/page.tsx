@@ -58,8 +58,8 @@ export default async function LegalPage({ params }: PageProps) {
           <p className="legal-effective">{lines[1]}</p>
           {lines.slice(2).map((line, index) => {
             if (/^\d+\./.test(line)) return <h2 key={index}>{line}</h2>;
-            if (line === "support@hanlu.app") {
-              return <p key={index}><a className="legal-contact" href="mailto:support@hanlu.app">support@hanlu.app</a></p>;
+            if (line === "support@takeruf.com") {
+              return <p key={index}><a className="legal-contact" href="mailto:support@takeruf.com">support@takeruf.com</a></p>;
             }
             return <p key={index}>{line}</p>;
           })}

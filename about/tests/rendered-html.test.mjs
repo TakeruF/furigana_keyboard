@@ -87,8 +87,8 @@ for (const expectation of [
     assert.match(html, /href="\/zh-Hant"/);
     assert.match(html, /href="\/en"/);
     assert.match(html, /href="\/ko"/);
-    assert.match(html, /mailto:support@hanlu\.app/);
-    assert.doesNotMatch(html, />support@hanlu\.app</);
+    assert.match(html, /mailto:support@takeruf\.com/);
+    assert.doesNotMatch(html, />support@takeruf\.com</);
     assert.match(html, new RegExp(`href="${expectation.path}/terms"`));
     assert.match(html, new RegExp(`href="${expectation.path}/privacy"`));
     assert.match(html, /keyboard-preview\.jpg/);
@@ -121,7 +121,7 @@ for (const locale of ["ja", "zh-Hans", "zh-Hant", "en", "ko"]) {
       const response = await fetch(`${baseUrl}/${locale}/${document}`);
       assert.equal(response.status, 200);
       const html = await response.text();
-      assert.match(html, /support@hanlu\.app/);
+      assert.match(html, /support@takeruf\.com/);
       assert.match(html, new RegExp(`href="/${locale}"`));
     });
   }
