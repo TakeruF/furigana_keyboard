@@ -50,9 +50,9 @@ final class ReadingRepository {
         return output
     }
 
-    func priorities(for literals: [String]) -> [String: (grade: Int, frequency: Int)] {
+    func priorities(for literals: [String]) -> [String: KanjiUsagePriority] {
         guard let database else { return [:] }
-        var output: [String: (Int, Int)] = [:]
+        var output: [String: KanjiUsagePriority] = [:]
         var seen = Set<[UInt32]>()
         let unique = literals.filter { seen.insert(ConversionText.scalarValues($0)).inserted }
         let sql = "SELECT grade, frequency FROM kanji_priority WHERE literal = ?"
@@ -63,7 +63,10 @@ final class ReadingRepository {
             sqlite3_reset(statement); sqlite3_clear_bindings(statement)
             bind(literal, at: 1, to: statement)
             if sqlite3_step(statement) == SQLITE_ROW {
-                output[literal] = (Int(sqlite3_column_int(statement, 0)), Int(sqlite3_column_int(statement, 1)))
+                output[literal] = KanjiUsagePriority(
+                    grade: Int(sqlite3_column_int(statement, 0)),
+                    frequency: Int(sqlite3_column_int(statement, 1))
+                )
             }
         }
         return output
@@ -203,6 +206,96 @@ final class ReadingRepository {
             if !(grouped[surface] ?? []).contains(reading) { grouped[surface, default: []].append(reading) }
         }
         return order.prefix(limit).map { WordCandidate(surface: $0, readings: grouped[$0] ?? []) }
+    }
+
+    /// Exact dictionary evidence for a bounded batch of handwriting surfaces, in one query.
+    ///
+    /// Unknown surfaces come back neutral rather than missing, so ranking never has to
+    /// distinguish "not in the dictionary" from "not asked about".
+    func lexicalEvidence(for surfaces: [String]) -> [String: SurfaceLexicalEvidence] {
+        let normalized = SurfaceLexicalEvidenceBatch.normalize(surfaces)
+        guard let database, !normalized.isEmpty else { return [:] }
+        var output = SurfaceLexicalEvidenceBatch.unknown(normalized)
+        let requested = normalized.indices.map { "(?, \($0))" }.joined(separator: ",")
+        let namedBranch = conversionLexemeSurfaceIsIndexed ? """
+
+            UNION ALL
+            SELECT lexeme.surface,
+                   1,
+                   CASE WHEN lexeme.left_id = 4 OR lexeme.right_id = 4 THEN 1 ELSE 0 END,
+                   CASE WHEN lexeme.source = 'jmnedict_place' THEN 1 ELSE 0 END
+            FROM conversion_lexeme AS lexeme
+            WHERE lexeme.surface IN (SELECT surface FROM requested)
+        """ : ""
+        let sql = """
+        WITH requested(surface, ordinal) AS (VALUES \(requested)),
+        matched(surface, exact_match, proper_name, place_name) AS (
+            SELECT word.surface, 1, 0, 0
+            FROM word_reading AS word
+            WHERE word.surface IN (SELECT surface FROM requested)
+            UNION ALL
+            SELECT kanji.literal, 1, 0, 0
+            FROM kanji_reading AS kanji
+            WHERE kanji.literal IN (SELECT surface FROM requested)\(namedBranch)
+        )
+        SELECT requested.surface,
+               coalesce(max(matched.exact_match), 0),
+               coalesce(max(matched.proper_name), 0),
+               coalesce(max(matched.place_name), 0)
+        FROM requested
+        LEFT JOIN matched ON matched.surface = requested.surface
+        GROUP BY requested.ordinal, requested.surface
+        ORDER BY requested.ordinal
+        """
+        var statement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, sql, -1, &statement, nil) == SQLITE_OK else { return output }
+        defer { sqlite3_finalize(statement) }
+        for (index, surface) in normalized.enumerated() { bind(surface, at: Int32(index + 1), to: statement) }
+        while sqlite3_step(statement) == SQLITE_ROW, let value = sqlite3_column_text(statement, 0) {
+            let surface = String(cString: value)
+            output[surface] = SurfaceLexicalEvidence.match(
+                surface: surface,
+                exact: sqlite3_column_int(statement, 1) != 0,
+                properName: sqlite3_column_int(statement, 2) != 0,
+                placeName: sqlite3_column_int(statement, 3) != 0
+            )
+        }
+        return output
+    }
+
+    /// Whether `conversion_lexeme` can answer a `surface` lookup without a full scan.
+    ///
+    /// `word_reading` and `kanji_reading` already establish that a surface exists, which is
+    /// the whole of the exact-match discount. `conversion_lexeme` only adds the smaller
+    /// proper-name/place-name discount, and its primary key leads with `reading`, so on the
+    /// shipped schema-8 database that branch costs a 679k-row scan -- about 130 ms warm and
+    /// 650 ms cold, against 5 ms for the two indexed branches -- on every recognized stroke.
+    /// It is therefore skipped until a database ships an index led by `surface`, at which
+    /// point named entries start earning their own discount with no code change.
+    private lazy var conversionLexemeSurfaceIsIndexed: Bool = detectsSurfaceLedIndex(on: "conversion_lexeme")
+
+    private func detectsSurfaceLedIndex(on table: String) -> Bool {
+        guard let database else { return false }
+        var indexNames: [String] = []
+        var listStatement: OpaquePointer?
+        guard sqlite3_prepare_v2(database, "PRAGMA index_list(\(table))", -1, &listStatement, nil) == SQLITE_OK else {
+            return false
+        }
+        while sqlite3_step(listStatement) == SQLITE_ROW, let value = sqlite3_column_text(listStatement, 1) {
+            indexNames.append(String(cString: value))
+        }
+        sqlite3_finalize(listStatement)
+        for name in indexNames where !name.contains("\"") {
+            var infoStatement: OpaquePointer?
+            guard sqlite3_prepare_v2(database, "PRAGMA index_info(\"\(name)\")", -1, &infoStatement, nil) == SQLITE_OK else {
+                continue
+            }
+            let leadsWithSurface = sqlite3_step(infoStatement) == SQLITE_ROW &&
+                sqlite3_column_text(infoStatement, 2).map { String(cString: $0) } == "surface"
+            sqlite3_finalize(infoStatement)
+            if leadsWithSurface { return true }
+        }
+        return false
     }
 
     private func bind(_ value: String, at index: Int32, to statement: OpaquePointer?) {
