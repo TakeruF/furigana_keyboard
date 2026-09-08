@@ -3,7 +3,9 @@ import Foundation
 enum CandidateKind { case character, word, segmentShrink, segmentExpand, status }
 
 struct KanaAnalysis {
-    let candidates: [KeyboardCandidate]
+    /// Converter and dictionary output in source order, over-fetched beyond the display
+    /// capacity so the terminal policy, not the fetch limit, owns the visible list.
+    let wordCandidates: [WordCandidate]
     let conversions: [KanaKanjiConversion]
 }
 
@@ -42,17 +44,43 @@ final class CandidateEngine {
 
     func invalidate() { _ = nextGeneration() }
 
+    /// Ranks recognized surfaces and their dictionary completions together, so a well-known
+    /// word can outrank a shape the recognizer was unsure about, while the shape it was most
+    /// sure about always keeps a slot.
     func resolveHandwriting(base: String, recognized: [RecognitionCandidate], completion: @escaping ([KeyboardCandidate]) -> Void) {
         submit(completion) { repository in
-            let direct = recognized.map {
-                KeyboardCandidate(base + $0.text, readings: repository.readings(for: base + $0.text), kind: .character)
+            let surfaces = recognized.map {
+                ShapedSurfaceCandidate(
+                    surface: base + $0.text,
+                    shapeCost: $0.shapeCost,
+                    isRecognizerRawTop: $0.isRecognizerRawTop
+                )
             }
-            let completions = direct.prefix(5).flatMap { candidate in
-                repository.suggestions(surfacePrefix: candidate.text, limit: 4)
-                    .filter { $0.surface != candidate.text }
-                    .map { KeyboardCandidate($0.surface, readings: $0.readings) }
+            var exactReadings: [String: [String]] = [:]
+            var suggestions: [String: [WordCandidate]] = [:]
+            for (index, shaped) in surfaces.enumerated() where exactReadings[shaped.surface] == nil {
+                exactReadings[shaped.surface] = repository.readings(for: shaped.surface)
+                guard index < Self.completionSourceLimit else { continue }
+                suggestions[shaped.surface] = repository.suggestions(surfacePrefix: shaped.surface, limit: 4)
             }
-            return Self.unique(direct + completions, limit: 10)
+            let shaped = WordCandidateResolver.shapedCandidates(
+                surfaces,
+                exactReadings: exactReadings,
+                suggestions: suggestions
+            )
+            let evidence = repository.lexicalEvidence(for: shaped.map(\.surface))
+            let recognizedSurfaces = Set(surfaces.map(\.surface))
+            return WordCandidateResolver.resolveShaped(
+                shaped,
+                lexicalEvidence: evidence,
+                limit: Self.candidateLimit
+            ).map {
+                KeyboardCandidate(
+                    $0.surface,
+                    readings: $0.readings,
+                    kind: recognizedSurfaces.contains($0.surface) ? .character : .word
+                )
+            }
         }
     }
 
@@ -64,10 +92,6 @@ final class CandidateEngine {
         }
     }
 
-    func convertKana(_ kana: String, completion: @escaping ([KeyboardCandidate]) -> Void) {
-        analyzeKana(kana) { completion($0.candidates) }
-    }
-
     func analyzeKana(
         _ kana: String,
         initialRightID: Int = 0,
@@ -76,7 +100,7 @@ final class CandidateEngine {
         completion: @escaping (KanaAnalysis) -> Void
     ) {
         let request = nextGeneration()
-        guard let repository else { completion(KanaAnalysis(candidates: [], conversions: [])); return }
+        guard let repository else { completion(KanaAnalysis(wordCandidates: [], conversions: [])); return }
         queue.async { [weak self] in
             guard let self, self.isCurrent(request) else { return }
             let data = repository.conversionData(for: kana)
@@ -92,17 +116,15 @@ final class CandidateEngine {
                 isCancelled: { [weak self] in !(self?.isCurrent(request) ?? false) }
             )
             guard self.isCurrent(request) else { return }
-            let converted = conversions
-                .map { KeyboardCandidate($0.surface, readings: [kana]) }
-            let prefix = repository.suggestions(readingPrefix: kana, limit: 8).map {
-                KeyboardCandidate($0.surface, readings: $0.readings)
-            }
-            let scripts = [KeyboardCandidate(kana, readings: [kana]),
-                           KeyboardCandidate(RomajiKanaConverter.toKatakana(kana), readings: [kana])]
-            let candidates = Self.unique(converted + prefix + scripts, limit: 10)
+            let converted = conversions.map { WordCandidate(surface: $0.surface, readings: [kana]) }
+            let prefix = repository.suggestions(readingPrefix: kana, limit: Self.analysisCandidateLimit)
+            let wordCandidates = Self.uniqueBySurface(
+                converted + prefix,
+                limit: Self.analysisCandidateLimit
+            )
             DispatchQueue.main.async {
                 guard self.isCurrent(request) else { return }
-                completion(KanaAnalysis(candidates: candidates, conversions: conversions))
+                completion(KanaAnalysis(wordCandidates: wordCandidates, conversions: conversions))
             }
         }
     }
@@ -134,8 +156,13 @@ final class CandidateEngine {
         return request == generation
     }
 
-    private static func unique(_ values: [KeyboardCandidate], limit: Int) -> [KeyboardCandidate] {
+    private static let completionSourceLimit = 5
+    private static let candidateLimit = 10
+    /// Over-fetch beyond the eight visible slots so rejected entries cannot consume them.
+    static let analysisCandidateLimit = 24
+
+    private static func uniqueBySurface(_ values: [WordCandidate], limit: Int) -> [WordCandidate] {
         var seen = Set<String>()
-        return values.filter { seen.insert($0.text).inserted }.prefix(limit).map { $0 }
+        return values.filter { seen.insert($0.surface).inserted }.prefix(limit).map { $0 }
     }
 }

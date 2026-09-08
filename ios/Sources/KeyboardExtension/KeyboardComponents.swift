@@ -18,6 +18,114 @@ enum KeyboardFeedback {
         if preferences.hapticsEnabled { UIImpactFeedbackGenerator(style: .light).impactOccurred(intensity: 0.45) }
         if preferences.keyClicksEnabled { AudioServicesPlaySystemSound(1104) }
     }
+
+    /// Entering space-drag cursor mode. Deliberately stronger than a key press, and silent:
+    /// the gesture is continuous, so a click per step would be unbearable.
+    static func cursorModeStarted(preferences: KeyboardPreferences) {
+        if preferences.hapticsEnabled { UIImpactFeedbackGenerator(style: .medium).impactOccurred(intensity: 0.6) }
+    }
+
+    static func cursorStep(preferences: KeyboardPreferences) {
+        if preferences.hapticsEnabled { UISelectionFeedbackGenerator().selectionChanged() }
+    }
+}
+
+/// Space key that hands its touches to `SpaceCursorGesture`.
+///
+/// A plain tap still inserts a space; holding and dragging enters cursor mode and emits
+/// grapheme steps. All gesture decisions live in the state machine, so this view only
+/// translates touches into coordinates and times.
+final class SpaceKeyButton: UIButton {
+    var preferences = KeyboardPreferences()
+    var onTap: (() -> Void)?
+    var onCursorStep: ((Int) -> Void)?
+
+    private let gesture = SpaceCursorGesture(
+        config: SpaceCursorGesture.Config(
+            longPressDuration: 0.5,
+            activationDistance: 10,
+            cursorStepDistance: 12
+        )
+    )
+    private var trackedTouch: UITouch?
+    private var longPressWork: DispatchWorkItem?
+
+    override var isHighlighted: Bool {
+        didSet { alpha = isHighlighted ? 0.6 : 1 }
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard trackedTouch == nil, let touch = touches.first else {
+            // A second finger invalidates the gesture; its later lift cannot become a tap.
+            gesture.onAdditionalTouch()
+            endTracking()
+            return
+        }
+        trackedTouch = touch
+        isHighlighted = true
+        dispatch(gesture.onDown(x: touch.location(in: self).x, time: touch.timestamp))
+        scheduleLongPressTimeout()
+    }
+
+    override func touchesMoved(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = trackedTouch, touches.contains(touch) else { return }
+        let point = touch.location(in: self)
+        let inside = bounds.contains(point)
+        isHighlighted = inside
+        dispatch(gesture.onMove(x: point.x, time: touch.timestamp, insideKey: inside))
+    }
+
+    override func touchesEnded(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard let touch = trackedTouch, touches.contains(touch) else { return }
+        let point = touch.location(in: self)
+        cancelLongPressTimeout()
+        dispatch(gesture.onUp(x: point.x, time: touch.timestamp, insideKey: bounds.contains(point)))
+        endTracking()
+    }
+
+    override func touchesCancelled(_ touches: Set<UITouch>, with event: UIEvent?) {
+        gesture.onCancel()
+        endTracking()
+    }
+
+    private func scheduleLongPressTimeout() {
+        cancelLongPressTimeout()
+        let work = DispatchWorkItem { [weak self] in
+            guard let self else { return }
+            // UITouch.timestamp and systemUptime share the same time base.
+            dispatch(gesture.onLongPressTimeout(time: ProcessInfo.processInfo.systemUptime))
+        }
+        longPressWork = work
+        DispatchQueue.main.asyncAfter(deadline: .now() + gesture.config.longPressDuration, execute: work)
+    }
+
+    private func cancelLongPressTimeout() {
+        longPressWork?.cancel()
+        longPressWork = nil
+    }
+
+    private func endTracking() {
+        cancelLongPressTimeout()
+        trackedTouch = nil
+        isHighlighted = false
+    }
+
+    private func dispatch(_ effects: [SpaceCursorGesture.Effect]) {
+        for effect in effects {
+            switch effect {
+            case .tap:
+                onTap?()
+            case .cursorModeStarted:
+                cancelLongPressTimeout()
+                KeyboardFeedback.cursorModeStarted(preferences: preferences)
+            case let .cursorStep(delta):
+                KeyboardFeedback.cursorStep(preferences: preferences)
+                onCursorStep?(delta)
+            }
+        }
+    }
+
+    deinit { longPressWork?.cancel() }
 }
 
 final class RepeatButton: UIButton {
@@ -203,6 +311,8 @@ final class QwertyPanelView: UIStackView {
     var onEnter: (() -> Void)?
     var onSymbols: (() -> Void)?
     var onSwitchLanguage: (() -> Void)?
+    /// Space-drag emits user-visible grapheme steps, never pixels or UTF-16 offsets.
+    var onCursorStep: ((Int) -> Void)?
 
     private let japanese: Bool
     private var shifted = false
@@ -272,7 +382,7 @@ final class QwertyPanelView: UIStackView {
         let switcher = functionKey(japanese ? "ABC" : "かな") { [weak self] in self?.onSwitchLanguage?() }
         let symbols = functionKey("123") { [weak self] in self?.onSymbols?() }
         let comma = key(japanese ? "、" : ","); comma.addAction(action(japanese ? "、" : ","), for: .touchUpInside)
-        let space = key(AppStrings.text("space")); space.addAction(action(" "), for: .touchUpInside)
+        let space = spaceKey()
         let period = key(japanese ? "。" : "."); period.addAction(action(japanese ? "。" : "."), for: .touchUpInside)
         let enter = functionKey(AppStrings.text("return")) { [weak self] in self?.onEnter?() }
         enter.backgroundColor = preferences.accent.color; enter.setTitleColor(.white, for: .normal)
@@ -283,6 +393,20 @@ final class QwertyPanelView: UIStackView {
         period.widthAnchor.constraint(equalTo: space.widthAnchor, multiplier: 0.5).isActive = true
         enter.widthAnchor.constraint(equalTo: space.widthAnchor, multiplier: 0.9).isActive = true
         return stack
+    }
+
+    private func spaceKey() -> SpaceKeyButton {
+        let button = SpaceKeyButton(frame: .zero)
+        style(button, function: false)
+        button.setTitle(AppStrings.text("space"), for: .normal)
+        button.preferences = preferences
+        button.onTap = { [weak self] in
+            guard let self else { return }
+            KeyboardFeedback.key(preferences: self.preferences)
+            self.onText?(" ")
+        }
+        button.onCursorStep = { [weak self] in self?.onCursorStep?($0) }
+        return button
     }
 
     private func action(_ value: String) -> UIAction { UIAction { [weak self] _ in

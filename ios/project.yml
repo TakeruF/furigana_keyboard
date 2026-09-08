@@ -142,12 +142,19 @@ targets:
       - path: ../app/src/main/assets/context-model.bin
         buildPhase: resources
       - Sources/KeyboardExtension/BunsetsuState.swift
+      - Sources/KeyboardExtension/CompositionCursorState.swift
       - Sources/KeyboardExtension/ConversionContextModel.swift
       - Sources/KeyboardExtension/ConversionCost.swift
       - Sources/KeyboardExtension/KanaKanjiConverter.swift
       - Sources/KeyboardExtension/HandwritingStrokeSegmenter.swift
       - Sources/KeyboardExtension/ReadingRepository.swift
+      - Sources/KeyboardExtension/RomajiCompositionCursor.swift
+      - Sources/KeyboardExtension/RomajiCompositionEditor.swift
       - Sources/KeyboardExtension/RomajiConversionState.swift
+      - Sources/KeyboardExtension/SpaceCursorGesture.swift
+      - Sources/KeyboardExtension/SurfaceLexicalEvidence.swift
+      - Sources/KeyboardExtension/WholeCompositionCandidatePolicy.swift
+      - Sources/KeyboardExtension/WordCandidateResolver.swift
     dependencies:
       - target: FuriganaKeyboard
       - sdk: libsqlite3.tbd
