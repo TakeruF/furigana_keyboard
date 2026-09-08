@@ -6,7 +6,7 @@
 
 1. 公開済みの最新番号を確認する。
    - Android Play版: Google Play Consoleの最新`versionCode`
-   - Android直接配布版: 公開中の`latest.json`の`versionCode`
+   - Android直接配布版: 公開中の`furigana-keyboard/latest.json`の`versionCode`
    - iOS: App Store Connectの最新build番号
    - 読み辞書: 公開中の`furigana/manifest.json`の`dataVersion`
 2. 公開先を確認できない場合は、前回のリリース記録から確認する。推測で番号を決めない。
@@ -92,13 +92,13 @@ python3 tools/publish_android_update.py \
 ```
 
 1. `android-update-dist/furigana-keyboard/<versionName>.apk`を同じオブジェクトパスへ先にアップロードする。
-2. 公開URLからAPKを取得でき、SHA-256が`latest.json`と一致することを確認する。
-3. `latest.json`を最後にアップロードする。
+2. 公開URLからAPKを取得でき、SHA-256が`furigana-keyboard/latest.json`と一致することを確認する。
+3. `furigana-keyboard/latest.json`を最後にアップロードする。
 4. 旧版の直接配布APKから更新通知、ダウンロード、署名検証、Androidインストーラ起動まで確認する。
 
-`latest.json`だけを先に公開してはいけません。ロールバックが必要な場合も、署名済みの修正版を新しい`versionCode`で公開します。
+`furigana-keyboard/latest.json`だけを先に公開してはいけません。ロールバックが必要な場合も、署名済みの修正版を新しい`versionCode`で公開します。
 
-OSSでは、バケット一覧を公開する必要はありませんが、上記2オブジェクトへの匿名`GetObject`を許可します。`latest.json`の`Content-Type`は`application/json`にし、差し替えが端末へ早く反映されるよう短いキャッシュ時間（例: `Cache-Control: public, max-age=300`）を設定します。APKは長期キャッシュして構いません。
+OSSでは、バケット一覧を公開する必要はありませんが、上記2オブジェクトへの匿名`GetObject`を許可します。`furigana-keyboard/latest.json`の`Content-Type`は`application/json`にし、差し替えが端末へ早く反映されるよう短いキャッシュ時間（例: `Cache-Control: public, max-age=300`）を設定します。APKは長期キャッシュして構いません。
 
 アップロード後は、外部ネットワークから次を実行します。1つ目は公開マニフェストの形式と現在のビルドに対する更新有無、2つ目はAPK本体の取得とSHA-256まで確認します。どちらも終了コード0になってから公開完了とします。
 
@@ -109,7 +109,7 @@ python3 tools/check_android_update.py \
 python3 tools/check_android_update.py --download-apk
 ```
 
-`HTTP 403`の場合はアプリの問題ではなく、OSSのオブジェクトACL／バケットポリシーが匿名`GetObject`を許可していません。`latest.json`と参照先APKを公開読取可能にしてから再実行します。`latest.json`が古いままキャッシュされないこと、APKより先に公開されていないことも確認します。
+`HTTP 403`の場合はアプリの問題ではなく、OSSのオブジェクトACL／バケットポリシーが匿名`GetObject`を許可していません。`furigana-keyboard/latest.json`と参照先APKを公開読取可能にしてから再実行します。マニフェストが古いままキャッシュされないこと、APKより先に公開されていないことも確認します。
 
 ## 4. iOSアプリ
 
@@ -148,7 +148,7 @@ TestFlightで確認してからApp Store審査へ提出します。同じマー�
 python3 tools/publish_reading_update.py \
   --database app/src/main/assets/reading.db \
   --version <公開済みdataVersionより大きい値> \
-  --database-url https://downloads.hanlu.app/furigana/reading-<version>.db \
+  --database-url https://downloads.takeruf.com/furigana/reading-<version>.db \
   --private-key .secrets/reading-update-private.pem
 ```
 

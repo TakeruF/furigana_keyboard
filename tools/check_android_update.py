@@ -14,8 +14,8 @@ from dataclasses import dataclass
 from urllib.parse import urlsplit
 
 
-MANIFEST_URL = "https://downloads.hanlu.app/latest.json"
-DOWNLOAD_HOST = "downloads.hanlu.app"
+MANIFEST_URL = "https://downloads.takeruf.com/furigana-keyboard/latest.json"
+DOWNLOAD_HOST = "downloads.takeruf.com"
 DOWNLOAD_PATH_PREFIX = "/furigana-keyboard/"
 MAX_MANIFEST_BYTES = 64 * 1024
 SHA256 = re.compile(r"^[0-9a-f]{64}$")
@@ -146,7 +146,7 @@ def verify_apk(manifest: UpdateManifest, *, timeout: float = 60) -> int:
 
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(
-        description="Check downloads.hanlu.app/latest.json and optionally verify its APK"
+        description="Check the Furigana Keyboard update manifest and optionally verify its APK"
     )
     parser.add_argument(
         "--current-version-code",

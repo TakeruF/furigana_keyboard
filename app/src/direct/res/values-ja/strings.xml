@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_check_update_desc">downloads.hanlu.appで最新版を確認します</string>
+    <string name="settings_check_update_desc">downloads.takeruf.comで最新版を確認します</string>
     <string name="update_check_failed">アップデートを確認できませんでした。通信状態を確認して、もう一度お試しください。</string>
     <string name="direct_update_available_version">バージョン%1$sを利用できます。</string>
     <string name="direct_update_download">ダウンロード</string>

@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_check_update_desc">downloads.hanlu.app에서 최신 버전을 확인합니다</string>
+    <string name="settings_check_update_desc">downloads.takeruf.com에서 최신 버전을 확인합니다</string>
     <string name="update_check_failed">업데이트를 확인할 수 없습니다. 인터넷 연결을 확인한 후 다시 시도하세요.</string>
     <string name="direct_update_available_version">버전 %1$s을(를) 사용할 수 있습니다.</string>
     <string name="direct_update_download">다운로드</string>

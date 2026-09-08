@@ -18,7 +18,7 @@ class CheckAndroidUpdateTest(unittest.TestCase):
         value = {
             "versionCode": 12,
             "versionName": "1.2.0",
-            "downloadUrl": "https://downloads.hanlu.app/furigana-keyboard/1.2.0.apk",
+            "downloadUrl": "https://downloads.takeruf.com/furigana-keyboard/1.2.0.apk",
             "sha256": "a" * 64,
         }
         value.update(overrides)
@@ -41,11 +41,11 @@ class CheckAndroidUpdateTest(unittest.TestCase):
 
     def test_rejects_download_with_invalid_port(self) -> None:
         with self.assertRaises(MODULE.UpdateCheckError):
-            self.manifest(downloadUrl="https://downloads.hanlu.app:invalid/1.2.0.apk")
+            self.manifest(downloadUrl="https://downloads.takeruf.com:invalid/1.2.0.apk")
 
     def test_rejects_apk_outside_distribution_directory(self) -> None:
         with self.assertRaises(MODULE.UpdateCheckError):
-            self.manifest(downloadUrl="https://downloads.hanlu.app/1.2.0.apk")
+            self.manifest(downloadUrl="https://downloads.takeruf.com/1.2.0.apk")
 
     def test_rejects_oversized_manifest(self) -> None:
         with self.assertRaises(MODULE.UpdateCheckError):

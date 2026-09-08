@@ -89,7 +89,7 @@ internal fun readDirectUpdateManifest(stream: InputStream): String {
     return output.toString(Charsets.UTF_8.name())
 }
 
-private const val DOWNLOAD_HOST = "downloads.hanlu.app"
+private const val DOWNLOAD_HOST = "downloads.takeruf.com"
 private const val DOWNLOAD_PATH_PREFIX = "/furigana-keyboard/"
-private const val MANIFEST_URL = "https://downloads.hanlu.app/latest.json"
+private const val MANIFEST_URL = "https://downloads.takeruf.com/furigana-keyboard/latest.json"
 private const val MAX_MANIFEST_BYTES = 64 * 1024

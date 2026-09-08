@@ -204,7 +204,7 @@ object ReadingDataUpdater {
     }
 
     private const val MANIFEST_URL =
-        "https://downloads.hanlu.app/furigana/manifest.json"
+        "https://downloads.takeruf.com/furigana/manifest.json"
     private const val PUBLIC_KEY_DER_BASE64 =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9fXKWi9gKlKzeFvoERpCuEm0cpuo7LZ8bhqU0ZDU8BV1naCjNzdHDg6uW04s4P0x1Q4yFKv+w7kLN6j0HKGhGQ=="
     internal const val SUPPORTED_SCHEMA_VERSION = 8

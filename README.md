@@ -87,7 +87,7 @@ Requirements:
 
 Android has two distribution flavors. `play` uses Google Play In-App Updates
 and contains no external APK updater. `direct` checks
-`https://downloads.hanlu.app/latest.json`, downloads the listed APK inside the
+`https://downloads.takeruf.com/furigana-keyboard/latest.json`, downloads the listed APK inside the
 app, verifies its SHA-256 digest and signing certificate, and then opens the
 Android installer after the user confirms. Build release artifacts with
 `:app:bundlePlayRelease` for Google Play and `:app:assembleDirectRelease` for
@@ -175,7 +175,7 @@ text is not logged, analyzed, or persisted.
 
 Reading data is distributed as static files; Supabase or another online
 database is not required. Upload the generated files to HTTPS object storage
-served at `downloads.hanlu.app/furigana/`. Android checks once per day while
+served at `downloads.takeruf.com/furigana/`. Android checks once per day while
 connected. On iOS, the container app checks at launch and when the user taps
 the update button; the keyboard extension remains offline and reads the
 verified database through its App Group.
@@ -199,7 +199,7 @@ and verifies that the emitted manifest schema matches the database metadata:
 python3 tools/publish_reading_update.py \
   --database app/src/main/assets/reading.db \
   --version 20260711 \
-  --database-url https://downloads.hanlu.app/furigana/reading-20260711.db \
+  --database-url https://downloads.takeruf.com/furigana/reading-20260711.db \
   --private-key .secrets/reading-update-private.pem
 ```
 
@@ -257,8 +257,8 @@ python3 tools/publish_android_update.py \
 
 Upload both files from `android-update-dist/` without changing their names:
 
-- `furigana-keyboard/<versionName>.apk` → `https://downloads.hanlu.app/furigana-keyboard/<versionName>.apk`
-- `latest.json` → `https://downloads.hanlu.app/latest.json`
+- `furigana-keyboard/<versionName>.apk` → `https://downloads.takeruf.com/furigana-keyboard/<versionName>.apk`
+- `furigana-keyboard/latest.json` → `https://downloads.takeruf.com/furigana-keyboard/latest.json`
 
 Upload the APK first and `latest.json` last so clients are never directed to
 an APK that is not available yet. `versionCode` must increase for every

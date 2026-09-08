@@ -5,7 +5,7 @@ import Foundation
 /// This type is compiled into the parent app target only. The keyboard extension has no network
 /// update code and only consumes the atomically switched App Group files.
 enum ReadingUpdateConfiguration {
-    static let manifestURL = URL(string: "https://downloads.hanlu.app/furigana/manifest.json")!
+    static let manifestURL = URL(string: "https://downloads.takeruf.com/furigana/manifest.json")!
     static let publicKeyDERBase64 =
         "MFkwEwYHKoZIzj0CAQYIKoZIzj0DAQcDQgAE9fXKWi9gKlKzeFvoERpCuEm0cpuo7LZ8bhqU0ZDU8BV1naCjNzdHDg6uW04s4P0x1Q4yFKv+w7kLN6j0HKGhGQ=="
     static let legacyBundledFullSha256 =

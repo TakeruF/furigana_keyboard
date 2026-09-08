@@ -14,7 +14,7 @@ Semantic Versioningを基準にし、バージョン本体は`MAJOR.MINOR.PATCH`
 | iOS `MARKETING_VERSION` | `1.0.0` | `v`を付けない。App Storeで許容される形式に従う |
 | Gitタグ／GitHub Release | `v1.0.0-rc.1` | バージョン本体との識別のため先頭に`v`を付ける |
 | APKファイル | `1.0.0-rc.1.apk` | `v`なしのバージョン本体を使用する |
-| OSSオブジェクトURL | `https://downloads.hanlu.app/furigana-keyboard/1.0.0-rc.1.apk` | `furigana-keyboard/`配下にAPK名と一致する不変URLを置く |
+| OSSオブジェクトURL | `https://downloads.takeruf.com/furigana-keyboard/1.0.0-rc.1.apk` | `furigana-keyboard/`配下にAPK名と一致する不変URLを置く |
 
 このプロジェクトではAPK名を`<versionName>.apk`に統一し、OSSでは`furigana-keyboard/`ディレクトリに配置します。既存の公開契約やユーザー指定と異なる命名へ変更するときは、互換性と移行方法を先に確認してください。
 
@@ -31,10 +31,10 @@ Semantic Versioningを基準にし、バージョン本体は`MAJOR.MINOR.PATCH`
 
 - `latest.apk`のような上書き型URLは更新配布に使用しません。
 - APKはバージョンごとの不変オブジェクトとして公開します。
-- `latest.json`だけを可変ポインタとして使用し、`downloadUrl`、`versionCode`、`versionName`、`sha256`を記録します。
-- 公開順序は、APKのアップロード、公開URLからの取得とSHA-256検証、`latest.json`のアップロード、Aboutサイトの公開、の順とします。
-- APKと`latest.json`には匿名`GetObject`を許可し、外部ネットワークからHTTP 200になることを確認します。
-- `latest.json`は短時間キャッシュ、バージョン固定APKは長期キャッシュを基本とします。
+- `furigana-keyboard/latest.json`だけを可変ポインタとして使用し、`downloadUrl`、`versionCode`、`versionName`、`sha256`を記録します。バケット直下の旧`latest.json`は既存クライアントの互換用として保持します。
+- 公開順序は、APKのアップロード、公開URLからの取得とSHA-256検証、`furigana-keyboard/latest.json`のアップロード、Aboutサイトの公開、の順とします。
+- APKと`furigana-keyboard/latest.json`には匿名`GetObject`を許可し、外部ネットワークからHTTP 200になることを確認します。
+- `furigana-keyboard/latest.json`は短時間キャッシュ、バージョン固定APKは長期キャッシュを基本とします。
 - 生成物の`android-update-dist/`や署名鍵をGitへコミットしません。
 
 ## リリース時の同期
@@ -43,7 +43,7 @@ Semantic Versioningを基準にし、バージョン本体は`MAJOR.MINOR.PATCH`
 
 - `app/build.gradle.kts`の`versionName`
 - APKファイル名とOSS URL
-- `latest.json`の`versionName`と`downloadUrl`
+- `furigana-keyboard/latest.json`の`versionName`と`downloadUrl`
 - Aboutサイトの既定ダウンロードURL
 - `RELEASE_NOTES/`のファイル名と見出し
 - Gitタグ名（バージョン本体に`v`を付加）
@@ -56,9 +56,9 @@ Semantic Versioningを基準にし、バージョン本体は`MAJOR.MINOR.PATCH`
 2. バージョンとリリースノートを更新する。
 3. テスト、Lint、リリースビルドを実行する。
 4. APK内のパッケージ名、`versionCode`、`versionName`、署名を検証する。
-5. 公開ツールでAPKと`latest.json`を生成し、SHA-256を照合する。
+5. 公開ツールでAPKと`furigana-keyboard/latest.json`を生成し、SHA-256を照合する。
 6. APKを先に公開し、外部から取得できることを確認する。
-7. `latest.json`を公開し、旧版の番号を指定して更新ありと判定されることを確認する。
+7. `furigana-keyboard/latest.json`を公開し、旧版の番号を指定して更新ありと判定されることを確認する。
 8. Aboutサイトを公開し、リンク先がHTTP 200になることを確認する。
 9. 公開成功後に`v<version>`タグを作成する。タグは移動・再利用しない。
 

@@ -13,7 +13,7 @@ class DirectUpdateManifestTest {
             {
               "versionCode": 12,
               "versionName": "1.2.0",
-              "downloadUrl": "https://downloads.hanlu.app/furigana-keyboard/1.2.0.apk",
+              "downloadUrl": "https://downloads.takeruf.com/furigana-keyboard/1.2.0.apk",
               "sha256": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
               "releaseNotes": "Recognition improvements"
             }
@@ -23,7 +23,7 @@ class DirectUpdateManifestTest {
         assertEquals(12L, manifest.versionCode)
         assertEquals("1.2.0", manifest.versionName)
         assertEquals(
-            "https://downloads.hanlu.app/furigana-keyboard/1.2.0.apk",
+            "https://downloads.takeruf.com/furigana-keyboard/1.2.0.apk",
             manifest.downloadUrl
         )
         assertEquals("a".repeat(64), manifest.sha256)
@@ -37,7 +37,7 @@ class DirectUpdateManifestTest {
             {
               "versionCode": 2,
               "versionName": "1.1",
-              "downloadUrl": "https://downloads.hanlu.app/furigana-keyboard/1.1.apk",
+              "downloadUrl": "https://downloads.takeruf.com/furigana-keyboard/1.1.apk",
               "sha256": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
             }
             """.trimIndent()
@@ -53,7 +53,7 @@ class DirectUpdateManifestTest {
             {
               "versionCode": 2,
               "versionName": "1.1",
-              "downloadUrl": "http://downloads.hanlu.app/furigana-keyboard/1.1.apk",
+              "downloadUrl": "http://downloads.takeruf.com/furigana-keyboard/1.1.apk",
               "sha256": "cccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
             }
             """.trimIndent()
@@ -81,7 +81,7 @@ class DirectUpdateManifestTest {
             {
               "versionCode": 2,
               "versionName": "1.1",
-              "downloadUrl": "https://downloads.hanlu.app/furigana-keyboard/1.1.apk",
+              "downloadUrl": "https://downloads.takeruf.com/furigana-keyboard/1.1.apk",
               "sha256": "not-a-hash"
             }
             """.trimIndent()
@@ -95,7 +95,7 @@ class DirectUpdateManifestTest {
             {
               "versionCode": 2,
               "versionName": "1.1",
-              "downloadUrl": "https://downloads.hanlu.app/1.1.apk",
+              "downloadUrl": "https://downloads.takeruf.com/1.1.apk",
               "sha256": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
             }
             """.trimIndent()

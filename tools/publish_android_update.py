@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 SAFE_FILE_COMPONENT = re.compile(r"^[A-Za-z0-9._-]+$")
-DOWNLOAD_BASE_URL = "https://downloads.hanlu.app/furigana-keyboard"
+DOWNLOAD_BASE_URL = "https://downloads.takeruf.com/furigana-keyboard"
 
 
 def read_built_apk_version(apk: Path) -> tuple[int, str]:
@@ -92,11 +92,12 @@ def main() -> None:
     }
     if args.release_notes:
         manifest["releaseNotes"] = args.release_notes
-    (args.output / "latest.json").write_text(
+    manifest_path = args.output / "furigana-keyboard" / "latest.json"
+    manifest_path.write_text(
         json.dumps(manifest, ensure_ascii=False, indent=2) + "\n",
         encoding="utf-8",
     )
-    print(f"Prepared {output_apk} and {args.output / 'latest.json'}")
+    print(f"Prepared {output_apk} and {manifest_path}")
 
 
 if __name__ == "__main__":

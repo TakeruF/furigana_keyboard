@@ -93,14 +93,16 @@ class PublishAndroidUpdateTest(unittest.TestCase):
                     for path in output.rglob("*")
                     if path.is_file()
                 },
-                {"furigana-keyboard/1.2.0.apk", "latest.json"},
+                {"furigana-keyboard/1.2.0.apk", "furigana-keyboard/latest.json"},
             )
-            manifest = json.loads((output / "latest.json").read_text(encoding="utf-8"))
+            manifest = json.loads(
+                (output / "furigana-keyboard" / "latest.json").read_text(encoding="utf-8")
+            )
             self.assertEqual(manifest["versionCode"], 12)
             self.assertEqual(manifest["versionName"], "1.2.0")
             self.assertEqual(
                 manifest["downloadUrl"],
-                "https://downloads.hanlu.app/furigana-keyboard/1.2.0.apk",
+                "https://downloads.takeruf.com/furigana-keyboard/1.2.0.apk",
             )
             self.assertNotIn("latest.apk", manifest["downloadUrl"])
 

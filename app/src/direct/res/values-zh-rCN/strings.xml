@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="settings_check_update_desc">通过 downloads.hanlu.app 检查最新版本</string>
+    <string name="settings_check_update_desc">通过 downloads.takeruf.com 检查最新版本</string>
     <string name="update_check_failed">无法检查更新。请检查网络连接后重试。</string>
     <string name="direct_update_available_version">版本 %1$s 已可用。</string>
     <string name="direct_update_download">下载</string>
