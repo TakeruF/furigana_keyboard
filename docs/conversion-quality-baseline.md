@@ -81,8 +81,19 @@ ordering bias.
 
 The p95 uses 20 samples per mode for dictionary-included conversion and 40 per
 mode for engine-only conversion. Simulator values are engineering comparisons,
-not physical-device guarantees. The tests fail when context p95 exceeds the
-paired baseline by more than 25% plus a small timer allowance.
+not physical-device guarantees.
+
+The p95 columns above are reported measurements, not the gate. Baseline and
+context are timed adjacently on the same reading with alternating order, so each
+pair cancels ordering, cache, and thermal drift. The tests fail when the median
+of those paired differences exceeds 25% of the median baseline plus a small
+timer allowance.
+
+Comparing the two p95 values directly was the earlier gate. It could not
+separate the model's cost from scheduler noise: at 20 samples the 95th
+percentile is the second-largest sample, so one stalled measurement decided the
+result. A CI run on unchanged code measured a 1.71x p95 ratio against a 1.18x
+median ratio, and passed at 1.12x when re-run.
 
 | Size item | Measurement |
 | --- | ---: |

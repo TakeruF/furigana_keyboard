@@ -59,5 +59,6 @@ candidate count, or break any baseline-passing case.
 Current quality and latency measurements are recorded in
 `docs/conversion-quality-baseline.md`. Android instrumentation and iOS XCTest
 both rotate through the four acceptance readings and report dictionary-included
-conversion p95, baseline/context engine p95, delta, and model bytes. These are
+conversion p95, baseline/context engine p95, delta, the median paired cost that
+gates them, and model bytes. These are
 environment-specific engineering measurements, not device-wide guarantees.
