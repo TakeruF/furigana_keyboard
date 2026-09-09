@@ -17,7 +17,7 @@ android {
     compileSdk = 35
 
     defaultConfig {
-        applicationId = "app.hanlu.furiganakeyboard"
+        applicationId = "com.takeruf.furiganakeyboard"
         minSdk = 24
         targetSdk = 35
         versionCode = 6
