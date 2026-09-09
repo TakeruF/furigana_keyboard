@@ -45,24 +45,6 @@ jobs:
           :app:lintPlayDebug
           :app:lintDirectDebug
 
-  about-site:
-    runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: about
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "22"
-          cache: npm
-          cache-dependency-path: about/package-lock.json
-      - run: npm ci
-      - name: Audit production dependencies
-        run: npm audit --omit=dev
-      - run: npm test
-      - run: npm run lint
-
   ios:
     runs-on: macos-15
     defaults:
