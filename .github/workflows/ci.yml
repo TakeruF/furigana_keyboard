@@ -25,10 +25,10 @@ jobs:
   android-and-data:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           lfs: true
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@v6
         with:
           distribution: temurin
           java-version: "17"
@@ -42,7 +42,7 @@ jobs:
           mkdir -p "$RUNNER_TEMP/sqlite-3.50"
           unzip -q "$RUNNER_TEMP/sqlite-tools.zip" -d "$RUNNER_TEMP/sqlite-3.50"
           echo "$RUNNER_TEMP/sqlite-3.50" >> "$GITHUB_PATH"
-      - uses: gradle/actions/setup-gradle@v4
+      - uses: gradle/actions/setup-gradle@v6
       - name: Test reading-data tools
         run: python3 -m unittest discover -s tools/tests -v
       - name: Test and lint Android flavors
@@ -59,7 +59,7 @@ jobs:
       run:
         working-directory: ios
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           lfs: true
       - name: Install XcodeGen
